@@ -304,7 +304,7 @@ the score and the minute ("LIVE · Premier League · 67'"), kick-off time ("star
 - **Which matches:** live now, starting within a day, or finished in the last 12 hours, from your leagues.
 - **Your leagues:** Talkies settings → **Football leagues**. Each country starts with its own (India: Premier League,
   Champions League and Indian Super League; the UK: Premier League, Champions League and the Scottish Premiership;
-  the US: MLS, Premier League and Champions League…), plus the World Cup and the Euros when they're on. Press OK to
+  the US: MLS, Premier League and Champions League; Turkey: Süper Lig, Champions League and Premier League…), plus the World Cup and the Euros when they're on. Press OK to
   turn one on or off; **Back to the defaults** undoes your changes.
 - **Updates:** every 15 minutes, and every minute for a league with a match on, only while Talkies is in front.
 - **Data:** ESPN's public scoreboard. It's free and needs no key, but it isn't an official API: ESPN can change it

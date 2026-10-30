@@ -58,6 +58,7 @@ final class Football {
             {"fra.1", "Ligue 1", "Ligue 1"}, {"uefa.europa", "Europa League", "UEL"},
             {"ind.1", "Indian Super League", "ISL"}, {"usa.1", "MLS", "MLS"}, {"ned.1", "Eredivisie", "Eredivisie"},
             {"por.1", "Primeira Liga", "Primeira"}, {"sco.1", "Scottish Premiership", "SPFL"},
+            {"tur.1", "S\u00fcper Lig", "S\u00fcper Lig"},
             {"bra.1", "Brasileirão", "Brazil"}, {"arg.1", "Liga Profesional", "Argentina"},
             {"mex.1", "Liga MX", "Liga MX"}, {"ksa.1", "Saudi Pro League", "Saudi Pro"}, {"aus.1", "A-League", "A-League"},
             {"jpn.1", "J1 League", "J1"}, {"eng.fa", "FA Cup", "FA Cup"}, {"fifa.world", "World Cup", "World Cup"},
@@ -66,6 +67,7 @@ final class Football {
     private static final Map<String, String[]> DEFAULTS = new HashMap<>();
     static {
         DEFAULTS.put("IN", new String[]{"eng.1", "uefa.champions", "ind.1"});
+        DEFAULTS.put("TR", new String[]{"tur.1", "uefa.champions", "eng.1"});
         DEFAULTS.put("GB", new String[]{"eng.1", "uefa.champions", "sco.1"});
         DEFAULTS.put("IE", new String[]{"eng.1", "uefa.champions"});
         DEFAULTS.put("US", new String[]{"usa.1", "eng.1", "uefa.champions"});
@@ -171,6 +173,9 @@ final class Football {
         if (running) return;
         List<String> on = leagues();
         if (on.isEmpty()) return;
+        // A new set of leagues (a country's new default after an update, say): fetch now, not when the last list goes stale.
+        String sig = String.join(",", on);
+        if (!sig.equals(prefs.getString("sig", ""))) prefs.edit().putString("sig", sig).remove("ok_at").remove("try_at").apply();
         long now = System.currentTimeMillis();
         boolean full = now - prefs.getLong("ok_at", 0) >= FULL_MS;
         String live = prefs.getString("live", "");  // "league@date,…" with a match on or about to start
