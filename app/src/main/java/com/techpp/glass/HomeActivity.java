@@ -490,7 +490,8 @@ public class HomeActivity extends Activity {
         bigAmPm.setText(h24 ? "" : DateFormat.format("a", now));
         bigAmPm.setVisibility(h24 ? View.GONE : View.VISIBLE);
         bigDate.setText(DateFormat.format("EEEE  d MMMM", now));
-        bigWeather.setText(weatherLine == null ? "" : weatherLine);
+        String city = cityName();
+        bigWeather.setText(weatherLine == null ? "" : (city == null ? "" : city + "  \u00b7  ") + weatherLine);
         if (meters.getVisibility() == View.VISIBLE) meters.update();
         bigWeather.setVisibility(weatherLine == null ? View.GONE : View.VISIBLE);
         updateScore();
@@ -2373,6 +2374,61 @@ public class HomeActivity extends Activity {
         focusMenu(focus);
     }
 
+    /** Weather city: name, country (as in Region) and "lat,lon". The TV's own country is listed first. */
+    private static final String[][] CITIES = {
+            {"Mumbai", "IN", "19.0760,72.8777"}, {"Delhi", "IN", "28.6139,77.2090"}, {"Bengaluru", "IN", "12.9716,77.5946"},
+            {"Hyderabad", "IN", "17.3850,78.4867"}, {"Chennai", "IN", "13.0827,80.2707"}, {"Kolkata", "IN", "22.5726,88.3639"},
+            {"Pune", "IN", "18.5204,73.8567"}, {"Ahmedabad", "IN", "23.0225,72.5714"},
+            {"London", "GB", "51.5074,-0.1278"}, {"Manchester", "GB", "53.4808,-2.2426"},
+            {"New York", "US", "40.7128,-74.0060"}, {"Los Angeles", "US", "34.0522,-118.2437"}, {"Chicago", "US", "41.8781,-87.6298"},
+            {"Toronto", "CA", "43.6532,-79.3832"}, {"Sydney", "AU", "-33.8688,151.2093"}, {"Melbourne", "AU", "-37.8136,144.9631"},
+            {"Dubai", "AE", "25.2048,55.2708"}, {"Singapore", "SG", "1.3521,103.8198"},
+            {"Istanbul", "TR", "41.0082,28.9784"}, {"Ankara", "TR", "39.9334,32.8597"}, {"Izmir", "TR", "38.4237,27.1428"},
+            {"Paris", "FR", "48.8566,2.3522"}, {"Berlin", "DE", "52.5200,13.4050"}, {"Madrid", "ES", "40.4168,-3.7038"},
+            {"Barcelona", "ES", "41.3874,2.1686"}, {"Rome", "IT", "41.9028,12.4964"}, {"Amsterdam", "NL", "52.3676,4.9041"},
+            {"Lisbon", "PT", "38.7223,-9.1393"}, {"Tokyo", "JP", "35.6762,139.6503"}, {"S\u00e3o Paulo", "BR", "-23.5505,-46.6333"},
+            {"Mexico City", "MX", "19.4326,-99.1332"}, {"Johannesburg", "ZA", "-26.2041,28.0473"}, {"Cairo", "EG", "30.0444,31.2357"},
+    };
+
+    /** The list city the weather area is set to, or null when it was typed or sent from a phone. */
+    private String cityName() {
+        String n = prefs.getString("city_name", null), a = prefs.getString("city_area", null);
+        return n != null && a != null && a.equals(Keys.read(this, Keys.LOCATION)) ? n : null;
+    }
+
+    /**
+     * Talkies settings → Weather city: pick a big city from the list instead of typing a place; OK sets the weather
+     * area and the name shown beside the temperature. "Another place…" is the typed box of Keys and location.
+     */
+    private void openCityPicker(int focus) {
+        beginMenu(settingsAt, "Weather city");
+        String area = Keys.read(this, Keys.LOCATION), home = Region.country(this);
+        final List<String[]> cities = new ArrayList<>();
+        for (String[] c : CITIES) if (c[1].equals(home)) cities.add(c);
+        for (String[] c : CITIES) if (!c[1].equals(home)) cities.add(c);
+        final View[] rows = new View[cities.size()];
+        for (int i = 0; i < cities.size(); i++) {
+            final int row = i;
+            final String[] c = cities.get(i);
+            rows[i] = addRow(c[0], c[2].equals(area) ? "Selected" : null, () -> {
+                if (!Keys.write(this, Keys.LOCATION, c[2])) {
+                    Toast.makeText(this, "Couldn't save the city", Toast.LENGTH_SHORT).show();
+                    return;
+                }
+                prefs.edit().putString("city_name", c[0]).putString("city_area", c[2]).apply();
+                for (int j = 0; j < rows.length; j++) setStatus(rows[j], j == row ? "Selected" : null);
+                weatherLine = null;   // the old temperature was for the old city
+                updateInfo();
+                Toast.makeText(this, c[0] + ". The weather follows in a moment", Toast.LENGTH_SHORT).show();
+                refreshOnline();
+            }, true);
+        }
+        addRow("Another place\u2026", null, () -> askText("Weather location", "A town or area, like \"Camden, London\", or latitude,longitude, like "
+                + "\"51.54,-0.14\".", area, false, area != null, this::saveLocation), true);
+        showMenu(380);
+        focusMenu(focus);
+    }
+
     /** A one-line text box over the home screen. Save hands back the text; Remove (or saving it empty) hands back "". */
     private void askText(String title, String help, String current, boolean code, boolean canRemove,
                          java.util.function.Consumer<String> onSave) {
@@ -2431,6 +2487,7 @@ public class HomeActivity extends Activity {
     }
 
     private void saveLocation(String text) {
+        prefs.edit().remove("city_name").remove("city_area").apply();   // a typed place has no list name
         if (!Keys.write(this, Keys.LOCATION, text)) {
             Toast.makeText(this, "Couldn't save the location", Toast.LENGTH_SHORT).show();
             return;
@@ -3197,6 +3254,7 @@ public class HomeActivity extends Activity {
         int missing = setupMissing();
         if (missing > 0) addRow("Finish setup", missing + (missing == 1 ? " step left" : " steps left"), this::openFinishSetup, false);
         addRow("Keys and location", null, () -> openKeysAndLocation(0), false);
+        addRow("Weather city", cityName() == null ? "Your own" : cityName(), () -> openCityPicker(0), false);
         final View[] look = new View[1];
         look[0] = addRow("Appearance", APPEARANCE[prefs.getInt("appearance", 0)], () -> {
             int mode = (prefs.getInt("appearance", 0) + 1) % APPEARANCE.length;
