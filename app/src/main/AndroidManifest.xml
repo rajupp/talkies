@@ -16,8 +16,6 @@
     <uses-permission android:name="com.android.providers.tv.permission.READ_EPG_DATA" />
     <!-- Trending picks: TMDB lists and backdrops. -->
     <uses-permission android:name="android.permission.INTERNET" />
-    <!-- Control Center: "Free up memory". -->
-    <uses-permission android:name="android.permission.KILL_BACKGROUND_PROCESSES" />
     <!-- Hold OK on an app → Uninstall: opens Android's own "Uninstall this app?" dialog. -->
     <uses-permission android:name="android.permission.REQUEST_DELETE_PACKAGES" />
     <!-- Talkies settings → Updates: hands a newer release to Android's installer, which asks first. -->

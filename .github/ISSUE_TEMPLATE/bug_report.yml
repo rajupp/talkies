@@ -34,10 +34,16 @@ body:
     id: version
     attributes:
       label: Talkies version
-      description: Talkies settings → About.
+      description: Talkies settings → About (Report a problem there fills this and the two above in).
       placeholder: e.g. 1.1.0
     validations:
       required: true
+  - type: input
+    id: details
+    attributes:
+      label: Details from Talkies
+      description: Filled in for you by Talkies settings → About → Report a problem.
+      placeholder: e.g. TV, 1.9 GB RAM, Accessibility On, Remote keys Off
   - type: dropdown
     id: install
     attributes:

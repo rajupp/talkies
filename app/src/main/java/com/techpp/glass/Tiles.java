@@ -46,6 +46,38 @@ final class Tiles {
         return out;
     }
 
+    /**
+     * An input's tile: the input glyph above its name ("PlayStation 5", "HDMI 2"), white on the device's brand colour,
+     * or on graphite for a device Talkies doesn't know.
+     */
+    static Bitmap input(Drawable glyph, String label, int color, int w, int h) {
+        Bitmap out = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888);
+        Canvas c = new Canvas(out);
+        c.drawColor(color == Devices.PLAIN ? 0xFF2C2C2E : darker(color));
+        Paint p = new Paint(Paint.ANTI_ALIAS_FLAG | Paint.SUBPIXEL_TEXT_FLAG);
+        p.setTypeface(NAME);
+        p.setColor(Color.WHITE);
+        p.setTextSize(h * 0.17f);
+        while (p.measureText(label) > w * 0.86f && p.getTextSize() > 12f) p.setTextSize(p.getTextSize() * 0.94f);
+        float size = h * 0.3f, gap = h * 0.07f;
+        Paint.FontMetrics fm = p.getFontMetrics();
+        float textH = fm.descent - fm.ascent, top = (h - (size + gap + textH)) / 2f;
+        Drawable g = glyph.mutate();
+        g.setTint(Color.WHITE);
+        g.setBounds(Math.round((w - size) / 2f), Math.round(top), Math.round((w + size) / 2f), Math.round(top + size));
+        g.draw(c);
+        c.drawText(label, (w - p.measureText(label)) / 2f, top + size + gap - fm.ascent, p);
+        return out;
+    }
+
+    /** A brand colour deepened enough for white text on it (Fire TV's orange, Apple TV's silver). */
+    private static int darker(int color) {
+        float[] hsv = new float[3];
+        Color.colorToHSV(color, hsv);
+        hsv[2] = Math.min(hsv[2], 0.62f);
+        return Color.HSVToColor(hsv);
+    }
+
     private static void draw(Canvas c, Drawable d, int w, int h, int size) {
         int left = (w - size) / 2, top = (h - size) / 2;
         d.setBounds(left, top, left + size, top + size);

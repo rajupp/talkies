@@ -30,7 +30,7 @@
   Only titles that stream on a subscription you can use; hide it for a big clean clock instead.
 - **Live cricket and football** on the home screen, with your country's teams and leagues first.
 - **Weather** at a glance, with the next hours and days in Control Center.
-- **Control Center:** what's playing (pause, skip), sleep timer, turn off, free up memory, speed test, Bluetooth,
+- **Control Center:** what's playing (pause, skip), sleep timer, turn off, recent apps, speed test, Bluetooth,
   sound output and more, one button away.
 - **Inputs** that know your devices: "PlayStation 5 · On", "Fire TV · Standby".
 - **Remote buttons with a new job:** make any spare button open an app, and give it a second job when held.
@@ -53,7 +53,7 @@ stay on "English (United States)" wherever they are), and almost everything on t
 
 | | |
 |---|---|
-| ![The Inputs menu over the Bing wallpaper: HDMI 1 shows "Fire TV · On" with an orange dot, HDMI 2 and 3, Live TV and More inputs](docs/inputs.jpg) | ![Control Center: Talkies settings, weather, sleep timer, turn off now, free up memory, storage, animations, network and speed test](docs/control-center.jpg) |
+| ![The Inputs menu over the Bing wallpaper: HDMI 1 shows "Fire TV · On" with an orange dot, HDMI 2 and 3, Live TV and More inputs](docs/inputs.jpg) | ![Control Center: Talkies settings, weather, sleep timer, turn off now, storage, animations, network and speed test](docs/control-center.jpg) |
 | *Inputs: each HDMI device by name, with its brand's colour* | *Control Center* |
 | ![Control Center → Weather: the next six hours, 20° Clear at 10 pm down to 18° Mostly clear at 3 am](docs/weather-hours.jpg) | ![Control Center → Weather, OK again: the next six days with highs, lows and conditions](docs/weather-days.jpg) |
 | *Weather: the next six hours…* | *…and OK again for the next six days* |
@@ -70,8 +70,8 @@ too, use [CleanYourTV](https://github.com/Gathin23/cleanyourtv) first; Talkies w
 ## Install
 
 **You need** an Android TV or Google TV with **Android 8.0 or newer**. Talkies is built and tested on a OnePlus TV
-(Google TV, Android 11); other TVs should work but haven't been tried. Samsung, LG, Roku and other TVs that don't run
-Android can't use it.
+(Google TV, Android 11); see [TVs and boxes](#tvs-and-boxes) for others people use it on. Samsung, LG, Roku and other
+TVs that don't run Android can't use it.
 
 Pick the way that suits you:
 
@@ -109,6 +109,12 @@ onto it and open it with a file manager on the TV.
    Accept **Allow debugging?** on the TV the first time. The last line is optional: it lets Talkies switch its Home
    button service back on by itself, change the animation speed, and turn network debugging off.
 3. Go on to [First-time setup](#first-time-setup).
+
+**On a slow TV**, one more command makes Talkies smoother from its first launch, by compiling it ahead of time instead
+of while you use it (an idea from Aerial). It takes a few seconds; run it again after an update if you like:
+```bash
+adb -s 192.168.1.20:5555 shell cmd package compile -m speed -f com.techpp.glass
+```
 
 Only *Wireless debugging* on your TV, or `adb connect` refused? See [Connect to the TV](docs/building.md#connect-to-the-tv).
 
@@ -149,6 +155,20 @@ opens its switch.
 
 Football scores need no key. Without a TMDB key, Trending and *New in your country* stay away (Continue still
 works); without a CricketData key, so does cricket.
+
+### TVs and boxes
+
+What people have told us, besides the OnePlus TV it's made on. Yours isn't here, or something's off? Talkies settings
+→ About → **Report a problem** opens a bug report on your phone with your TV's details filled in.
+
+| TV or box | How it does |
+|---|---|
+| OnePlus TV (Google TV, Android 11) | Everything; it's built and tested on one. |
+| Google TV Streamer (Android 14) | Works. The Accessibility switch needs [one `adb` command](#first-time-setup); Inputs shows only Live TV and there's no Screensaver button, since the Streamer allows neither. |
+| NVIDIA SHIELD (Android 11) | Installs from the release APK ([#2](https://github.com/rajupp/talkies/issues/2)). |
+| Xiaomi Mi Box S | Holding Home opens Google TV's dashboard since 1.2.5. |
+| Sony (Google TV) | Sound output opens Display & sound, where Audio output picks the speakers. |
+| TCL with 1 GB of memory | Can feel slow; Effects switches to Lite on its own on TVs like these (Talkies settings → Effects). |
 
 ## Updates
 
@@ -260,10 +280,12 @@ Ideas (no code; Talkies' own implementation):
   accessibility service: [Matinee](https://github.com/Jarvis322/matinee).
 - Starting the screensaver the way Google Assistant does, Recent apps and Control Center shortcuts:
   [tvOS Launcher](https://github.com/techgenius1/tvOS-Launcher) (ideas; no code copied).
-- Bluetooth connect, Restart…, Talkies at power-on, Empty inputs and the settings fallback for TVs that hide the
+- Bluetooth connect, Restart…, Talkies at power-on (every time), Empty inputs and the settings fallback for TVs that hide the
   standard settings screen: [CleanYourTV](https://github.com/Gathin23/cleanyourtv)'s launcher and add-ons.
 - Now playing and the weather forecast: [Luma](https://github.com/0xProbabillity/luma-tv).
 - Animation speed and Storage in Control Center: [GlassLauncher](https://github.com/tlfares/GlassLauncher).
+- Inputs on Home, an app or input at power-on, Lite effects on low-memory TVs, Report a problem with the TV's details,
+  ahead-of-time compiling and a list of TVs: [Aerial](https://github.com/pengchujin/aerial-tv).
 
 The Outfit typeface is © The Outfit Project Authors, licensed under the SIL Open Font License 1.1 (`OUTFIT-OFL.txt`).
 

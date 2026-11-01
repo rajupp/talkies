@@ -102,6 +102,10 @@ public class HomeActivity extends Activity {
 
     private View root;
     private Backdrop backdrop;
+    /** Lite effects (Talkies settings → Effects): no glow, and focus and scrolling jump instead of gliding. */
+    private boolean lite;
+    /** Talkies settings' At power-on row, to come back to once you've chosen. */
+    private View powerOnRow;
     private FrameLayout page, dockBand;
     private LinearLayout dock, grid, menu, channelsBox;
     private android.widget.ScrollView menuScroll;
@@ -255,6 +259,8 @@ public class HomeActivity extends Activity {
 
         root = findViewById(R.id.root);
         backdrop = findViewById(R.id.backdrop);
+        lite = liteEffects();
+        backdrop.setLite(lite);
         forYouHead = findViewById(R.id.for_you_head);
         bigClock = findViewById(R.id.big_clock);
         bigTime = findViewById(R.id.big_time);
@@ -589,6 +595,24 @@ public class HomeActivity extends Activity {
 
     /** Appearance from Control Center: Auto (by sunrise and sunset), Light or Dark. */
     private static final String[] APPEARANCE = {"Auto", "Light", "Dark"};
+
+    /**
+     * Effects: "auto" (the default) is Lite on a TV with under 1.6 GB of memory, where the glow and gliding motion
+     * cost frames, and Full elsewhere. An idea from Aerial (aerial-tv, MIT), which does the same on low-memory TVs.
+     */
+    private boolean liteEffects() {
+        String e = prefs.getString("effects", "auto");
+        if (!e.equals("auto")) return e.equals("lite");
+        ActivityManager am = getSystemService(ActivityManager.class);
+        ActivityManager.MemoryInfo mi = new ActivityManager.MemoryInfo();
+        am.getMemoryInfo(mi);
+        return am.isLowRamDevice() || mi.totalMem < 1600L * 1024 * 1024;
+    }
+
+    private String effectsLabel() {
+        String e = prefs.getString("effects", "auto");
+        return e.equals("full") ? "Full" : e.equals("lite") ? "Lite" : liteEffects() ? "Auto · Lite" : "Auto · Full";
+    }
     /** How All apps is arranged (Talkies settings → All apps order). The dock always keeps your order. */
     private static final String[] APPS_ORDER = {"Your order", "Recently opened", "A to Z"};
     private static final int ORDER_YOURS = 0, ORDER_RECENT = 1, ORDER_AZ = 2;
@@ -633,6 +657,12 @@ public class HomeActivity extends Activity {
                 if (p.equals(getPackageName()) || hidden.contains(p) || !seen.add(p)) continue;
                 all.add(new AppEntry(ri.activityInfo, String.valueOf(ri.loadLabel(pm)).trim(), false));
             }
+        }
+        // Inputs you put on Home (Talkies settings → Inputs on Home): tiles that switch the TV to them.
+        Set<String> onHome = homeInputs();
+        if (!onHome.isEmpty()) {
+            Drawable glyph = getDrawable(R.drawable.ic_input);
+            for (Port port : ports()) if (onHome.contains(port.id)) all.add(new AppEntry(port.id, port.tile(), port.color, glyph));
         }
         // Your arrangement (hold OK on an app to move it), else dock.xml; the dock fills up to its size.
         int dockSize = dockSize();
@@ -1493,6 +1523,12 @@ public class HomeActivity extends Activity {
     private void doMotion(long now) {
         float dt = motionNanos == 0 ? 1 / 60f : Math.min(0.05f, (now - motionNanos) / 1e9f);
         motionNanos = now;
+        if (lite) {
+            // Straight to where each is going: one frame instead of a dozen.
+            pageSpring.snap(pageSpring.target);
+            for (Spring sp : chanSprings) sp.snap(sp.target);
+            for (Spring sp : scaleSprings.values()) sp.snap(sp.target);
+        }
         boolean moving = pageSpring.step(dt);
         page.setTranslationY(-pageSpring.value);
         for (int i = 0; i < chanSprings.size() && i < chanScrolls.size(); i++) {
@@ -2137,17 +2173,7 @@ public class HomeActivity extends Activity {
         List<TvInputInfo> hdmi = new ArrayList<>(), av = new ArrayList<>(), tuners = new ArrayList<>();
         TvInputInfo tuner = null;
         Map<String, TvInputInfo> cec = new java.util.HashMap<>();  // port id → the HDMI-CEC device behind it
-        if (tim != null) {
-            for (TvInputInfo i : tim.getTvInputList()) {
-                if (i.getParentId() != null) { cec.put(i.getParentId(), i); continue; } // devices behind a port: use the port
-                switch (i.getType()) {
-                    case TvInputInfo.TYPE_HDMI: hdmi.add(i); break;
-                    case TvInputInfo.TYPE_COMPOSITE: case TvInputInfo.TYPE_COMPONENT:
-                    case TvInputInfo.TYPE_SCART: case TvInputInfo.TYPE_SVIDEO: case TvInputInfo.TYPE_VGA: av.add(i); break;
-                    case TvInputInfo.TYPE_TUNER: tuners.add(i); break;
-                }
-            }
-        }
+        sortInputs(tim, hdmi, av, tuners, cec);
         // App channels (Zee5, Play Movies…) also register as tuners; prefer the TV's own one.
         String vendor = hdmi.isEmpty() ? null : hdmi.get(0).getServiceInfo().packageName;
         for (TvInputInfo i : tuners) {
@@ -2155,7 +2181,6 @@ public class HomeActivity extends Activity {
             if (i.getServiceInfo().packageName.equals(vendor)) { tuner = i; break; }
             if (tuner == null && system) tuner = i;
         }
-        Collections.sort(hdmi, (a, b) -> label(a).compareTo(label(b)));
         int n = 1, hidden = 0, firstEmpty = -1;
         boolean named = false;
         for (TvInputInfo i : hdmi) {
@@ -2199,6 +2224,99 @@ public class HomeActivity extends Activity {
         showMenu(named ? 340 : 220);
         // Opened from More inputs: start on the first port it brought back.
         if (all && firstEmpty > 0 && prefs.getBoolean("inputs_connected_only", false)) focusMenu(firstEmpty);
+    }
+
+    /** The TV's inputs by kind: HDMI ports in order, AV ports, tuners, and port ID → the HDMI-CEC device behind it. */
+    private void sortInputs(TvInputManager tim, List<TvInputInfo> hdmi, List<TvInputInfo> av, List<TvInputInfo> tuners,
+                            Map<String, TvInputInfo> cec) {
+        if (tim == null) return;
+        for (TvInputInfo i : tim.getTvInputList()) {
+            if (i.getParentId() != null) { cec.put(i.getParentId(), i); continue; } // devices behind a port: use the port
+            switch (i.getType()) {
+                case TvInputInfo.TYPE_HDMI: hdmi.add(i); break;
+                case TvInputInfo.TYPE_COMPOSITE: case TvInputInfo.TYPE_COMPONENT:
+                case TvInputInfo.TYPE_SCART: case TvInputInfo.TYPE_SVIDEO: case TvInputInfo.TYPE_VGA: av.add(i); break;
+                case TvInputInfo.TYPE_TUNER: tuners.add(i); break;
+            }
+        }
+        Collections.sort(hdmi, (a, b) -> label(a).compareTo(label(b)));
+    }
+
+    /** An HDMI or AV port, named as Inputs names it ("HDMI 2"), with the device it says is plugged in, if any. */
+    private static final class Port {
+        final String id, name, device;
+        final int color;
+
+        Port(String id, String name, String device, int color) {
+            this.id = id;
+            this.name = name;
+            this.device = device;
+            this.color = color;
+        }
+
+        /** Its tile's name: the device's ("PlayStation 5") when it has one. */
+        String tile() { return device != null ? device : name; }
+
+        /** "HDMI 2 · PlayStation 5", for lists of ports. */
+        String row() { return device != null ? name + "  ·  " + device : name; }
+    }
+
+    /** The HDMI ports, then the AV ones. Empty on a streaming box, which has none. */
+    private List<Port> ports() {
+        TvInputManager tim = getSystemService(TvInputManager.class);
+        List<TvInputInfo> hdmi = new ArrayList<>(), av = new ArrayList<>(), tuners = new ArrayList<>();
+        Map<String, TvInputInfo> cec = new java.util.HashMap<>();
+        sortInputs(tim, hdmi, av, tuners, cec);
+        List<Port> out = new ArrayList<>();
+        int n = 1;
+        for (TvInputInfo i : hdmi) {
+            String name = fixLabel(label(i), "HDMI " + n++);
+            TvInputInfo behind = cec.get(i.getId());
+            Devices d = cecStatus(tim, behind) != null ? identify(behind) : null;
+            out.add(new Port(i.getId(), name, d == null ? null : d.name, d == null ? Devices.PLAIN : d.color));
+        }
+        n = 1;
+        for (TvInputInfo i : av) out.add(new Port(i.getId(), av.size() == 1 ? "AV" : fixLabel(label(i), "AV " + n++), null, Devices.PLAIN));
+        return out;
+    }
+
+    /** Inputs you put on Home, by input ID. */
+    private Set<String> homeInputs() {
+        String s = prefs.getString("home_inputs", "");
+        return s.isEmpty() ? new HashSet<>() : new HashSet<>(Arrays.asList(s.split(",")));
+    }
+
+    /**
+     * Talkies settings → Inputs on Home: OK puts a port on Home as a tile, in the dock's first spot, so the console or
+     * set-top box on it is one press away; OK again takes it off. An idea from Aerial (aerial-tv, MIT).
+     */
+    private void openHomeInputs() {
+        beginMenu(settingsAt, "Inputs on Home  ·  OK puts one in the dock");
+        Set<String> on = homeInputs();
+        for (Port port : ports()) {
+            final View[] row = new View[1];
+            row[0] = addRow(port.row(), on.contains(port.id) ? "On Home" : null, () -> {
+                int at = menuIdx;
+                setHomeInput(port.id, !homeInputs().contains(port.id));
+                setStatus(row[0], homeInputs().contains(port.id) ? "On Home" : null);
+                focusMenu(at);
+            }, true);
+        }
+        showMenu(400);
+    }
+
+    private void setHomeInput(String id, boolean show) {
+        Set<String> on = homeInputs();
+        if (show) on.add(id); else on.remove(id);
+        SharedPreferences.Editor e = prefs.edit().putString("home_inputs", String.join(",", on));
+        if (show) {
+            // The dock's first spot: the dock as it is, with the input in front.
+            StringBuilder d = new StringBuilder(AppEntry.INPUT + id);
+            for (int i = 0; i < dockCount && i < apps.size(); i++) d.append(',').append(apps.get(i).pkg);
+            e.putString("order_dock", d.toString());
+        }
+        e.apply();
+        reloadApps();
     }
 
     private static boolean connected(TvInputManager tim, TvInputInfo info) {
@@ -2576,6 +2694,53 @@ public class HomeActivity extends Activity {
                 .show();
     }
 
+    private static final String REPORT_URL = "https://github.com/rajupp/talkies/issues/new?template=bug_report.yml";
+
+    /**
+     * About → Report a problem: a QR code for a new GitHub bug report with this TV's details already filled in (its
+     * model, Android and Talkies versions, memory and the settings that change how keys work), so the report doesn't
+     * start with "which TV?". Nothing is sent from the TV. An idea from Aerial (aerial-tv, MIT).
+     */
+    private void showReport() {
+        String version = "";
+        try { version = pm.getPackageInfo(getPackageName(), 0).versionName; } catch (PackageManager.NameNotFoundException ignored) { }
+        ActivityManager am = getSystemService(ActivityManager.class);
+        ActivityManager.MemoryInfo mi = new ActivityManager.MemoryInfo();
+        am.getMemoryInfo(mi);
+        String device = (Build.MODEL.toLowerCase(Locale.ROOT).startsWith(Build.MANUFACTURER.toLowerCase(Locale.ROOT)) ? ""
+                : Build.MANUFACTURER + " ") + Build.MODEL;
+        String details = (ports().isEmpty() ? "Box" : "TV") + String.format(Locale.ROOT, ", %.1f GB RAM", mi.totalMem / 1073741824.0)
+                + ", Accessibility " + (SleepService.isRunning() ? "On" : "Off")
+                + ", Remote keys " + (SleepService.watchButtons(this) ? "On" : "Off") + (lite ? ", Lite effects" : "");
+        // The same, in characters a link carries as they are, so it fits in the QR code: TV_1.9GB_access-on_keys-off.
+        String compact = (ports().isEmpty() ? "Box" : "TV") + String.format(Locale.ROOT, "_%.1fGB", mi.totalMem / 1073741824.0)
+                + "_access-" + (SleepService.isRunning() ? "on" : "off") + "_keys-" + (SleepService.watchButtons(this) ? "on" : "off")
+                + (lite ? "_lite" : "");
+        String url = REPORT_URL + "&version=" + Uri.encode(version) + "&android=" + Uri.encode("Android " + Build.VERSION.RELEASE)
+                + "&device=" + Uri.encode(device);
+        // A QR code holds 213 bytes here: the details go in only when they fit.
+        if ((url + "&details=" + compact).length() <= 213) url += "&details=" + compact;
+        if (url.length() > 213) url = REPORT_URL;
+        LinearLayout box = new LinearLayout(this);
+        box.setOrientation(LinearLayout.VERTICAL);
+        box.setGravity(Gravity.CENTER_HORIZONTAL);
+        box.setPadding(px(24), px(8), px(24), 0);
+        box.addView(qrCode(url), new LinearLayout.LayoutParams(px(200), px(200)));
+        TextView what = new TextView(this);
+        what.setText(device + "  ·  Android " + Build.VERSION.RELEASE + "  ·  Talkies " + version + "\n" + details);
+        what.setTextSize(12);
+        what.setGravity(Gravity.CENTER_HORIZONTAL);
+        what.setPadding(0, px(8), 0, 0);
+        box.addView(what);
+        new android.app.AlertDialog.Builder(this, android.R.style.Theme_DeviceDefault_Dialog_Alert)
+                .setTitle("Report a problem")
+                .setMessage("Scan this with your phone: it opens a bug report on GitHub with these details filled in. "
+                        + "Say what happened, and add a photo of the screen if you can.")
+                .setView(box)
+                .setNegativeButton("Close", null)
+                .show();
+    }
+
     /** Checks a key from the phone page with its service and saves it unless turned down; the line the phone shows. */
     private String acceptKey(String file, String service, String text) {
         String key = text.replaceAll("\\s", "");
@@ -2664,7 +2829,7 @@ public class HomeActivity extends Activity {
 
     private void openKeyApps(int code, boolean hold) {
         beginMenu(settingsAt, "Open which app?");
-        for (AppEntry a : apps) addRow(a.label, null, () -> {
+        for (AppEntry a : apps) if (a.input == null) addRow(a.label, null, () -> {
             if (hold) setHold(code, RemoteKeys.APP + a.pkg); else setKey(code, RemoteKeys.APP + a.pkg);
         }, false);
         showMenu(360);
@@ -2909,6 +3074,11 @@ public class HomeActivity extends Activity {
         if (inDock || appsOrder() == ORDER_YOURS) addRow("Move", null, this::startMove, false);
         File own = AppEntry.customImage(a.pkg);
         addRow("Change image", own != null && own.isFile() ? "your picture" : null, () -> openTileImage(a.pkg), false);
+        if (a.input != null) {
+            addRow("Remove from Home", null, () -> setHomeInput(a.input, false), false);
+            showMenu(240);
+            return;
+        }
         addRow("Hide", null, () -> hideApp(a.pkg), false);
         if (canUninstall(a.pkg)) {
             addRow("Uninstall", null, () -> start(new Intent(Intent.ACTION_DELETE, Uri.parse("package:" + a.pkg))), false);
@@ -3175,8 +3345,6 @@ public class HomeActivity extends Activity {
             }, true);
             addRow("Turn off now", null, () -> { if (!Sleep.now()) needsTurnOffSetup(); }, false);
         }
-        final View[] mem = new View[1];
-        mem[0] = addRow("Free up memory", availableMb() + " MB free", () -> freeMemory(mem[0]), true);
         addRow("Recent apps", null, this::openRecents, false);
         addRow("Storage", storageLine(), () -> { if (!openShortcut("storage")) start(new Intent(Settings.ACTION_INTERNAL_STORAGE_SETTINGS)); }, false);
         final View[] anim = new View[1];
@@ -3238,6 +3406,16 @@ public class HomeActivity extends Activity {
             if (heading instanceof TextView && !menuItems.contains(heading)) ((TextView) heading).setTextColor(theme.text2);
             focusMenu(menuIdx);
         }, true);
+        final View[] fx = new View[1];
+        fx[0] = addRow("Effects", effectsLabel(), () -> {
+            String[] order = {"auto", "full", "lite"};
+            String next = order[(Arrays.asList(order).indexOf(prefs.getString("effects", "auto")) + 1) % order.length];
+            prefs.edit().putString("effects", next).apply();
+            lite = liteEffects();
+            backdrop.setLite(lite);
+            updateAmbient();
+            setStatus(fx[0], effectsLabel());
+        }, true);
         final View[] fy = new View[1];
         fy[0] = addRow("For You", forYou ? "Shown" : "Hidden", () -> {
             forYou = !forYou;
@@ -3258,6 +3436,9 @@ public class HomeActivity extends Activity {
             refreshWatchNext();
         }, true);
         addRow("Dock apps", dockCount + " in the dock", this::openDockApps, false);
+        // Only on a TV: a streaming box has no inputs of its own.
+        if (!ports().isEmpty()) addRow("Inputs on Home", homeInputs().isEmpty() ? null : homeInputs().size() + " on Home",
+                this::openHomeInputs, false);
         final View[] ds = new View[1];
         ds[0] = addRow("Dock size", dockSize() + " apps", () -> {
             int n = dockSize() + 1;
@@ -3310,12 +3491,10 @@ public class HomeActivity extends Activity {
         final View[] adb = new View[1];
         adb[0] = addRow("Network debugging", "Checking…", this::openNetworkDebugging, false);
         checkNetworkDebugging(st -> { if (adb[0].isAttachedToWindow()) setStatus(adb[0], st); });
-        final View[] wake = new View[1];
-        wake[0] = addRow("Talkies at power-on", wakeLabel(), () -> {
+        powerOnRow = addRow("At power-on", wakeLabel(), () -> {
             if (!SleepService.isRunning()) { needsTurnOffSetup(); return; }
-            prefs.edit().putString("home_at_power_on", SleepService.homeOnWake(this) ? "boot" : "always").apply();
-            setStatus(wake[0], wakeLabel());
-        }, true);
+            openPowerOn();
+        }, false);
         final View[] ports = new View[1];
         ports[0] = addRow("Empty inputs", prefs.getBoolean("inputs_connected_only", false) ? "Under More inputs" : "Shown", () -> {
             boolean only = !prefs.getBoolean("inputs_connected_only", false);
@@ -3795,8 +3974,38 @@ public class HomeActivity extends Activity {
         }
     }
 
-    /** After a restart only (the default), or every time the TV wakes from standby too. */
-    private String wakeLabel() { return SleepService.homeOnWake(this) ? "Every time" : "After a restart"; }
+    /** Talkies after a restart only (the default), Talkies every time the TV wakes too, or an app or input. */
+    private String wakeLabel() {
+        if (SleepService.openAtPowerOn(this) != null) return prefs.getString("power_on_label", "An app");
+        return SleepService.homeOnWake(this) ? "Talkies, every time" : "Talkies, after a restart";
+    }
+
+    /**
+     * Talkies settings → At power-on: Talkies after a restart, Talkies each time the TV wakes, or an app or input you
+     * choose (HDMI 1, with the set-top box on it), each time. An idea from Aerial (aerial-tv, MIT).
+     */
+    private void openPowerOn() {
+        beginMenu(settingsAt, "At power-on  ·  now: " + wakeLabel());
+        addRow("Talkies, after a restart", "the TV's last input or app after standby", () -> setPowerOn("boot", null, null), false);
+        addRow("Talkies, every time", null, () -> setPowerOn("always", null, null), false);
+        for (Port port : ports()) addRow(port.row(), null, () -> setPowerOn("open", AppEntry.INPUT + port.id, port.row()), false);
+        addRow("Open an app", null, this::openPowerOnApps, false);
+        showMenu(460);
+    }
+
+    private void openPowerOnApps() {
+        beginMenu(settingsAt, "Open which app at power-on?");
+        for (AppEntry a : apps) if (a.input == null) addRow(a.label, null, () -> setPowerOn("open", a.pkg, a.label), false);
+        showMenu(360);
+    }
+
+    private void setPowerOn(String mode, String open, String label) {
+        prefs.edit().putString("home_at_power_on", mode).putString("power_on_open", open).putString("power_on_label", label).apply();
+        Toast.makeText(this, "At power-on: " + wakeLabel(), Toast.LENGTH_SHORT).show();
+        openTalkiesSettings(settingsAt);
+        int at = menuItems.indexOf(powerOnRow);
+        if (at >= 0) focusMenu(at);
+    }
 
     /** Credits for the data Talkies shows; TMDB's wording is what its terms ask for. */
     private void openAbout() {
@@ -3815,6 +4024,7 @@ public class HomeActivity extends Activity {
         addRow("Made by", "Raju  ·  TechPP (techpp.com)", () -> { }, true);
         addRow("Source code", "github.com/rajupp/talkies", () -> { }, true);
         addRow("Support Talkies", "buymeacoffee.com/rajupp", this::showSupport, true);
+        addRow("Report a problem", "QR code", this::showReport, true);
         // TMDB's terms ask for its logo with the credit: smaller than anything identifying Talkies.
         LinearLayout picks = (LinearLayout) addRow("Picks", null, () -> { }, true);
         ImageView logo = new ImageView(this);
@@ -3840,14 +4050,13 @@ public class HomeActivity extends Activity {
 
     /**
      * Control Center → Recent apps (or a remote button set to it): the apps you opened last, newest first, each with
-     * its banner. OK opens one. At the end, close them all (apps in the background only, never system apps).
+     * its banner. OK opens one.
      */
     private void openRecents() {
         if (menuScroll.getVisibility() == View.VISIBLE) closeMenu();
         List<String> recent = RecentApps.list(this);
         beginMenu(P_CONTROL, recent.isEmpty() ? "Recent apps" : "Recent apps  ·  newest first");
         int shown = 0;
-        Map<String, View> rows = new java.util.LinkedHashMap<>();
         for (String pkg : recent) {
             Intent launch = pm.getLeanbackLaunchIntentForPackage(pkg);
             if (launch == null) launch = pm.getLaunchIntentForPackage(pkg);
@@ -3874,33 +4083,9 @@ public class HomeActivity extends Activity {
             lp.setMarginEnd(px(12));
             lp.gravity = Gravity.CENTER_VERTICAL;
             row.addView(thumb, 0, lp);
-            rows.put(pkg, row);
             shown++;
         }
-        if (shown == 0) {
-            addRow("Apps you open show up here", null, () -> { }, true);
-        } else {
-            final View[] close = new View[1];
-            close[0] = addRow("Close them all", "frees memory", () -> {
-                ActivityManager am = getSystemService(ActivityManager.class);
-                long before = availableMb();
-                for (Map.Entry<String, View> e : rows.entrySet()) {
-                    // Preinstalled apps too (YouTube, Netflix, Prime Video are system apps on many TVs); never
-                    // Talkies or Android's always-on ones. An app in front or playing keeps running regardless.
-                    try {
-                        if (e.getKey().equals(getPackageName())
-                                || (pm.getApplicationInfo(e.getKey(), 0).flags & ApplicationInfo.FLAG_PERSISTENT) != 0) continue;
-                        am.killBackgroundProcesses(e.getKey());
-                        setStatus(e.getValue(), "closed");
-                        e.getValue().setAlpha(0.5f);
-                    } catch (PackageManager.NameNotFoundException ignored) { }
-                }
-                close[0].postDelayed(() -> {
-                    long freed = availableMb() - before;
-                    setStatus(close[0], freed > 0 ? "Freed " + freed + " MB" : "Nothing more to free");
-                }, 800);
-            }, true);
-        }
+        if (shown == 0) addRow("Apps you open show up here", null, () -> { }, true);
         showMenu(460);
     }
 
@@ -4161,13 +4346,6 @@ public class HomeActivity extends Activity {
         start(i);
     }
 
-    private long availableMb() {
-        ActivityManager am = getSystemService(ActivityManager.class);
-        ActivityManager.MemoryInfo mi = new ActivityManager.MemoryInfo();
-        am.getMemoryInfo(mi);
-        return mi.availMem / (1024 * 1024);
-    }
-
     /** "12.4 GB free of 32 GB": the TV's own storage, where apps and their data live. */
     private String storageLine() {
         try {
@@ -4216,22 +4394,6 @@ public class HomeActivity extends Activity {
                     || (Build.VERSION.SDK_INT >= 31 && d.getType() == AudioDeviceInfo.TYPE_HDMI_EARC)) return true;
         }
         return false;
-    }
-
-    /** Stops cached background apps (never system apps) and shows how much memory came back. */
-    private void freeMemory(View row) {
-        ActivityManager am = getSystemService(ActivityManager.class);
-        long before = availableMb();
-        setStatus(row, "Freeing…");
-        for (ApplicationInfo ai : pm.getInstalledApplications(0)) {
-            if ((ai.flags & ApplicationInfo.FLAG_SYSTEM) != 0) continue;
-            if (ai.packageName.equals(getPackageName())) continue;
-            am.killBackgroundProcesses(ai.packageName);
-        }
-        row.postDelayed(() -> {
-            long after = availableMb();
-            setStatus(row, "Freed " + Math.max(0, after - before) + " MB · " + after + " MB free");
-        }, 800);
     }
 
     // ---------------------------------------------------------------- network, wallpaper

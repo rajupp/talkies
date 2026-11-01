@@ -9,14 +9,23 @@ import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.drawable.Drawable;
 
-/** One launchable TV app. Drawables and the glow colour are loaded lazily and cached. */
+/**
+ * One launchable TV app, or one of the TV's inputs you put on Home (Talkies settings → Inputs on Home). Drawables and
+ * the glow colour are loaded lazily and cached.
+ */
 final class AppEntry {
+    /** The package, or {@link #INPUT} and the input's ID for an input. */
     final String pkg;
     final String label;
     final ComponentName component;
     private final ActivityInfo info;
     /** False for a phone app with no TV entry (Chrome, MacroDroid…): opened as a phone launcher would. */
     final boolean tv;
+    static final String INPUT = "input:";
+    /** An input's ID (null for an app), the device's colour and the input glyph its tile is drawn with. */
+    final String input;
+    private final int inputColor;
+    private final Drawable inputGlyph;
 
     private boolean loaded;
     private Drawable banner;
@@ -31,9 +40,30 @@ final class AppEntry {
         this.label = label;
         this.component = new ComponentName(info.packageName, info.name);
         this.tv = tv;
+        input = null;
+        inputColor = 0;
+        inputGlyph = null;
+    }
+
+    /** An input: its tile is the glyph and the name on the device's colour. */
+    AppEntry(String inputId, String label, int color, Drawable glyph) {
+        info = null;
+        pkg = INPUT + inputId;
+        this.label = label;
+        component = null;
+        tv = true;
+        input = inputId;
+        inputColor = color;
+        inputGlyph = glyph;
     }
 
     Intent launchIntent() {
+        if (input != null) {
+            // Switches the TV to that input, as Inputs does.
+            return new Intent(Intent.ACTION_VIEW)
+                    .setDataAndType(android.media.tv.TvContract.buildChannelUriForPassthroughInput(input), "vnd.android.cursor.item/channel")
+                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+        }
         return new Intent(Intent.ACTION_MAIN)
                 .addCategory(tv ? Intent.CATEGORY_LEANBACK_LAUNCHER : Intent.CATEGORY_LAUNCHER)
                 .setComponent(component)
@@ -44,7 +74,10 @@ final class AppEntry {
     /** Pictures you gave apps (hold OK → Change image), as files/tiles/<package>.jpg; set by HomeActivity. */
     static java.io.File customDir;
 
-    static java.io.File customImage(String pkg) { return customDir == null ? null : new java.io.File(customDir, pkg + ".jpg"); }
+    static java.io.File customImage(String pkg) {
+        // An input's ID has slashes ("com.vendor.tvinput/.HdmiService/HW5").
+        return customDir == null ? null : new java.io.File(customDir, pkg.replaceAll("[^A-Za-z0-9._-]", "_") + ".jpg");
+    }
 
     /** The pixel size banners are prepared at: the largest a tile is ever drawn. */
     static void setBannerSize(int w, int h) { bannerW = w; bannerH = h; }
@@ -53,6 +86,16 @@ final class AppEntry {
         if (loaded) return;
         loaded = true;
         banner = customBanner();
+        if (banner == null && input != null) {
+            try {
+                Bitmap tile = Tiles.input(inputGlyph, label, inputColor, bannerW, bannerH);
+                tile.setDensity(android.util.DisplayMetrics.DENSITY_DEFAULT);
+                banner = new android.graphics.drawable.BitmapDrawable(null, tile);
+            } catch (RuntimeException e) {
+                icon = inputGlyph;
+            }
+            return;
+        }
         if (banner == null) banner = sharpBanner(pm);
         if (banner == null) banner = info.loadBanner(pm);
         if (banner == null) banner = info.applicationInfo.loadBanner(pm);

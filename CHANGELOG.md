@@ -6,13 +6,22 @@ features, a new fix number only fixes. The version shows in Talkies settings →
 ## Unreleased
 
 ### New
+- **Inputs on Home.** Talkies settings → Inputs on Home puts an HDMI or AV port on Home as a tile, named after the
+  device on it (*PlayStation 5*, *Set-top box*): one press switches the TV to it. An idea from Aerial.
+- **Open an app or input at power-on.** Talkies settings → At power-on can now open HDMI 1 (with your set-top box),
+  or any app, each time the TV turns on, instead of Talkies. An idea from Aerial.
+- **Effects: Lite** for slow TVs: no glow behind the apps, and focus and scrolling move at once instead of gliding.
+  **Auto**, the default, picks Lite on TVs with under 1.6 GB of memory. An idea from Aerial.
+- **Report a problem** (Talkies settings → About): a QR code that opens a GitHub bug report on your phone with your
+  TV's model, versions and key settings already filled in.
 - **A weather icon** before the weather at the top left: a small line drawing of the sky (sun, moon, partly cloudy
   by day or night, cloud, rain, snow, thunder, fog), in the text's colour.
 
-### Fixed
-- **Close them all closes YouTube, Netflix and Prime Video too.** On many TVs they came preinstalled, and Talkies
-  skipped preinstalled apps. Each app it closes now shows "closed", and the row says how much memory was freed.
-  Thanks @arjunmr97.
+### Removed
+- **Free up memory and Close them all.** Android lets an app close only its own background processes (on Android 14,
+  and on some TVs before it), so neither could close YouTube, Netflix or anything else, and the memory they reported
+  as freed was just the TV's own coming and going. Android closes apps itself when memory runs low. Thanks
+  @arjunmr97 for noticing.
 
 ## 1.2.5 — 1 November 2026
 

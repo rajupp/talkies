@@ -8,6 +8,7 @@ import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
+import android.content.SharedPreferences;
 import android.graphics.PixelFormat;
 import android.graphics.drawable.GradientDrawable;
 import android.os.Bundle;
@@ -44,8 +45,9 @@ import java.util.List;
  * given a job in Talkies settings → Remote keys (RemoteKeys); every other key passes through untouched. A button with a
  * hold job does it when held for HOLD_MS, and its press job when let go sooner.
  *
- * With "Home at power-on: Always" set, Talkies also comes up each time the TV wakes from standby, unless you press a
- * button first (an idea from CleanYourTV's power_on_home_always, MIT).
+ * With "At power-on: Talkies, every time" set, Talkies also comes up each time the TV wakes from standby, unless you
+ * press a button first (an idea from CleanYourTV's power_on_home_always, MIT); with an app or input chosen there, that
+ * opens instead, after a restart too (an idea from Aerial, MIT).
  * The sleep warning is a small card drawn as an accessibility overlay, so no "display over other apps" permission.
  * You switch it on yourself in Settings → Device Preferences → Accessibility; if a force stop switches it off,
  * ServiceRepair can put it back (see there).
@@ -89,9 +91,18 @@ public class SleepService extends AccessibilityService {
         return running != null && running.performGlobalAction(GLOBAL_ACTION_POWER_DIALOG);
     }
 
-    /** Talkies settings → Home at power-on: "boot" (after a restart only) or "always" (every wake from standby). */
+    /**
+     * Talkies settings → At power-on: "boot" (Talkies after a restart only), "always" (every wake from standby too) or
+     * "open" (an app or input, every time). True when waking from standby does something.
+     */
     static boolean homeOnWake(Context c) {
-        return "always".equals(c.getSharedPreferences("home", MODE_PRIVATE).getString("home_at_power_on", "boot"));
+        return !"boot".equals(c.getSharedPreferences("home", MODE_PRIVATE).getString("home_at_power_on", "boot"));
+    }
+
+    /** The app's package, or AppEntry.INPUT and an input's ID, to open at power-on; null for Talkies. */
+    static String openAtPowerOn(Context c) {
+        SharedPreferences p = c.getSharedPreferences("home", MODE_PRIVATE);
+        return "open".equals(p.getString("home_at_power_on", "boot")) ? p.getString("power_on_open", null) : null;
     }
 
     /** Types {@code text} into JioHotstar's search box once it shows up. False if the service is off. */
@@ -107,7 +118,7 @@ public class SleepService extends AccessibilityService {
         findStockHomes();
         ServiceRepair.connected(this, SleepService.class);
         // After a restart the Google TV home screen is up before this service binds: take over once.
-        if (SystemClock.elapsedRealtime() < BOOT_WINDOW_MS) openHome();
+        if (SystemClock.elapsedRealtime() < BOOT_WINDOW_MS) powerOn();
         // After Talkies updates itself (or the service comes back for any other reason), Android shows the built-in
         // launcher while this service is unbound, so the window event that would bring Talkies back is missed: if
         // that launcher is what's in front now, take over once.
@@ -123,7 +134,7 @@ public class SleepService extends AccessibilityService {
                     if (!homeOnWake(c)) return;
                     long on = SystemClock.elapsedRealtime();
                     // After the TV has put its last source back; not if you've already pressed a button.
-                    main.postDelayed(() -> { if (keyAt < on) openHome(); }, WAKE_DELAY_MS);
+                    main.postDelayed(() -> { if (keyAt < on) powerOn(); }, WAKE_DELAY_MS);
                 }
             };
             registerReceiver(screenOn, new IntentFilter(Intent.ACTION_SCREEN_ON));
@@ -374,6 +385,26 @@ public class SleepService extends AccessibilityService {
         String pkg = r.activityInfo.packageName;
         return !pkg.equals(getPackageName()) && !pkg.equals("android") && !stockPackages.contains(pkg)
                 && (r.activityInfo.applicationInfo.flags & android.content.pm.ApplicationInfo.FLAG_SYSTEM) == 0;
+    }
+
+    /** At power-on: the app or input you chose, else Talkies (also when that app is gone). */
+    private void powerOn() {
+        String open = openAtPowerOn(this);
+        Intent i = null;
+        if (open != null && open.startsWith(AppEntry.INPUT)) {
+            i = new Intent(Intent.ACTION_VIEW).setDataAndType(android.media.tv.TvContract.buildChannelUriForPassthroughInput(
+                    open.substring(AppEntry.INPUT.length())), "vnd.android.cursor.item/channel");
+        } else if (open != null) {
+            i = getPackageManager().getLeanbackLaunchIntentForPackage(open);
+            if (i == null) i = getPackageManager().getLaunchIntentForPackage(open);
+        }
+        if (i == null) { openHome(); return; }
+        try {
+            startActivity(i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
+        } catch (Exception e) {
+            Log.w(TAG, "Couldn't open " + open + ": " + e);
+            openHome();
+        }
     }
 
     void openHome() {

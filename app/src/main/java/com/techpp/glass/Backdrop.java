@@ -33,6 +33,7 @@ public class Backdrop extends View {
     private long fadeStart;
     private Paint veil;         // with a wallpaper: the veil's gradient, made again when the veil or the height changes
     private int veilHeight;
+    private boolean lite;       // Lite effects: no glow, and a new background shows at once
 
     public Backdrop(Context c, AttributeSet a) {
         super(c, a);
@@ -50,6 +51,13 @@ public class Backdrop extends View {
         compose(false);
     }
 
+    /** Lite effects: the theme's gradient alone, changed without a crossfade. */
+    void setLite(boolean on) {
+        lite = on;
+        if (on) glow = 0;
+        compose(false);
+    }
+
     /** The current pick's image (or null), crossfaded in. Ignored while a wallpaper is set. */
     void setAmbient(Bitmap small, float alpha) {
         if (wallpaper) return;
@@ -61,6 +69,7 @@ public class Backdrop extends View {
 
     /** A glow in {@code color} (the focused app's), crossfaded in, in place of a pick's image; 0 for none. */
     void setGlow(int color) {
+        if (lite) color = 0;
         if (wallpaper || (image == null && color == glow)) return;
         image = null;
         glow = color;
@@ -119,7 +128,7 @@ public class Backdrop extends View {
         int[] scrim = wallpaper && scrimStops != null ? scrimStops : new int[]{scrimTop, scrimMid, scrimBottom};
         p.setShader(new LinearGradient(0, 0, 0, h, scrim, null, Shader.TileMode.CLAMP));
         c.drawRect(0, 0, w, h, p);
-        prev = fade && cur != null ? cur : null;
+        prev = fade && !lite && cur != null ? cur : null;
         cur = out;
         fadeStart = SystemClock.uptimeMillis();
         invalidate();
