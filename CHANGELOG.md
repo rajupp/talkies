@@ -9,6 +9,11 @@ features, a new fix number only fixes. The version shows in Talkies settings →
 - **A weather icon** before the weather at the top left: a small line drawing of the sky (sun, moon, partly cloudy
   by day or night, cloud, rain, snow, thunder, fog), in the text's colour.
 
+### Fixed
+- **Close them all closes YouTube, Netflix and Prime Video too.** On many TVs they came preinstalled, and Talkies
+  skipped preinstalled apps. Each app it closes now shows "closed", and the row says how much memory was freed.
+  Thanks @arjunmr97.
+
 ## 1.2.5 — 1 November 2026
 
 ### New

@@ -3847,6 +3847,7 @@ public class HomeActivity extends Activity {
         List<String> recent = RecentApps.list(this);
         beginMenu(P_CONTROL, recent.isEmpty() ? "Recent apps" : "Recent apps  ·  newest first");
         int shown = 0;
+        Map<String, View> rows = new java.util.LinkedHashMap<>();
         for (String pkg : recent) {
             Intent launch = pm.getLeanbackLaunchIntentForPackage(pkg);
             if (launch == null) launch = pm.getLaunchIntentForPackage(pkg);
@@ -3873,6 +3874,7 @@ public class HomeActivity extends Activity {
             lp.setMarginEnd(px(12));
             lp.gravity = Gravity.CENTER_VERTICAL;
             row.addView(thumb, 0, lp);
+            rows.put(pkg, row);
             shown++;
         }
         if (shown == 0) {
@@ -3882,12 +3884,21 @@ public class HomeActivity extends Activity {
             close[0] = addRow("Close them all", "frees memory", () -> {
                 ActivityManager am = getSystemService(ActivityManager.class);
                 long before = availableMb();
-                for (String pkg : RecentApps.list(this)) {
+                for (Map.Entry<String, View> e : rows.entrySet()) {
+                    // Preinstalled apps too (YouTube, Netflix, Prime Video are system apps on many TVs); never
+                    // Talkies or Android's always-on ones. An app in front or playing keeps running regardless.
                     try {
-                        if ((pm.getApplicationInfo(pkg, 0).flags & ApplicationInfo.FLAG_SYSTEM) == 0) am.killBackgroundProcesses(pkg);
+                        if (e.getKey().equals(getPackageName())
+                                || (pm.getApplicationInfo(e.getKey(), 0).flags & ApplicationInfo.FLAG_PERSISTENT) != 0) continue;
+                        am.killBackgroundProcesses(e.getKey());
+                        setStatus(e.getValue(), "closed");
+                        e.getValue().setAlpha(0.5f);
                     } catch (PackageManager.NameNotFoundException ignored) { }
                 }
-                close[0].postDelayed(() -> setStatus(close[0], "Freed " + Math.max(0, availableMb() - before) + " MB"), 800);
+                close[0].postDelayed(() -> {
+                    long freed = availableMb() - before;
+                    setStatus(close[0], freed > 0 ? "Freed " + freed + " MB" : "Nothing more to free");
+                }, 800);
             }, true);
         }
         showMenu(460);
