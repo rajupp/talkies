@@ -206,7 +206,9 @@ YouTube Music) are left out.
 
 **Permissions:** Watch Next needs the *TV listings* permission: Talkies asks for it the first time it starts (or Talkies settings → **Finish setup**), and `build-and-install.sh` grants it.
 For the "while playing" titles, Android only shares what's playing with an app that has *notification access*.
-On the TV: **Settings → Apps → Special app access → Notification access → Talkies → Allow.**
+On the TV: **Settings → Apps → Special app access → Notification access → Talkies → Allow.** Many Android 8 TVs
+have no such screen: there, with the `WRITE_SECURE_SETTINGS` grant, Finish setup switches it on itself; without it,
+`adb shell cmd notification allow_listener com.techpp.glass/com.techpp.glass.WatchService` from a computer does.
 Talkies reads no notifications; it uses the access only to see apps' media sessions (what's playing), and
 keeps the list on the TV (`/sdcard/Android/data/com.techpp.glass/files/recent/`). To stop it, switch the same toggle off;
 to clear the list:

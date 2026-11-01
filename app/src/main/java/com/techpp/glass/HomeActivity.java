@@ -2954,9 +2954,57 @@ public class HomeActivity extends Activity {
         return on != null && on.contains(getPackageName() + "/");
     }
 
+    /**
+     * The TV's Notification access screen. Many Android 8 TVs have none, so there notification access is only a step
+     * to do while Talkies can switch it on itself (allowNotifications); otherwise it's optional and needs a computer.
+     */
+    private boolean notificationScreen() {
+        return pm.resolveActivity(new Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS), 0) != null;
+    }
+
+    private boolean notificationsDoable() { return notificationScreen() || ServiceRepair.canRepair(this); }
+
+    private static final String NOTIFICATION_COMMAND =
+            "adb shell cmd notification allow_listener com.techpp.glass/com.techpp.glass.WatchService";
+
+    /** Switches notification access on with the WRITE_SECURE_SETTINGS grant, for TVs without the screen. */
+    private boolean allowNotifications() {
+        if (!ServiceRepair.canRepair(this)) return false;
+        String me = new android.content.ComponentName(this, WatchService.class).flattenToString();
+        String on = Settings.Secure.getString(getContentResolver(), "enabled_notification_listeners");
+        try {
+            return Settings.Secure.putString(getContentResolver(), "enabled_notification_listeners",
+                    on == null || on.isEmpty() ? me : on + ":" + me);
+        } catch (SecurityException e) {
+            return false;
+        }
+    }
+
+    /**
+     * A TV without the Notification access screen: what it's for, and the one command that switches it on from a
+     * computer. Everything else works without it.
+     */
+    private void showNotificationCommand() {
+        TextView cmd = new TextView(this);
+        cmd.setText(NOTIFICATION_COMMAND);
+        cmd.setTextSize(13);
+        cmd.setTypeface(Typeface.MONOSPACE);
+        cmd.setTextIsSelectable(true);
+        cmd.setPadding(px(24), px(8), px(24), 0);
+        new android.app.AlertDialog.Builder(this, android.R.style.Theme_DeviceDefault_Dialog_Alert)
+                .setTitle("Notification access")
+                .setMessage("This TV's settings have no Notification access screen, so it can't be switched on here. "
+                        + "It's optional: only Continue watching, Now playing and the update bell need it. From a computer "
+                        + "connected with adb, this one command switches it on:")
+                .setView(cmd)
+                .setNegativeButton("Close", null)
+                .show();
+    }
+
     /** How many first-time steps are still to do: the Home button service, notification access, the permissions. */
     private int setupMissing() {
-        return (SleepService.isRunning() ? 0 : 1) + (notificationAccess() ? 0 : 1) + (permissionsMissing() ? 1 : 0);
+        return (SleepService.isRunning() ? 0 : 1) + (notificationAccess() || !notificationsDoable() ? 0 : 1)
+                + (permissionsMissing() ? 1 : 0);
     }
 
     /**
@@ -2986,10 +3034,14 @@ public class HomeActivity extends Activity {
                         + "has the one command that allows it", Toast.LENGTH_LONG).show();
                 start(new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:" + getPackageName())));
             }, false);
-        if (!notificationAccess()) addRow("Notification access", "Continue, Now playing, the bell", () -> {
+        if (!notificationAccess() && notificationScreen()) addRow("Notification access", "Continue, Now playing, the bell", () -> {
             Toast.makeText(this, "Switch on Talkies here", Toast.LENGTH_LONG).show();
             start(new Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS));
         }, false);
+        else if (!notificationAccess() && ServiceRepair.canRepair(this)) addRow("Notification access", "OK switches it on", () ->
+            Toast.makeText(this, allowNotifications() ? "Notification access is on: Continue fills in a moment"
+                    : "Couldn't switch it on", Toast.LENGTH_LONG).show(), false);
+        else if (!notificationAccess()) addRow("Notification access", "Optional · no switch on this TV", this::showNotificationCommand, true);
         if (permissionsMissing()) addRow("Wi-Fi name and Watch Next", "OK asks", () -> {
             closeMenu();
             requestPermissions(SETUP_PERMISSIONS, REQ_SETUP);

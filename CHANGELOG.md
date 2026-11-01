@@ -17,6 +17,12 @@ features, a new fix number only fixes. The version shows in Talkies settings →
 - **A weather icon** before the weather at the top left: a small line drawing of the sky (sun, moon, partly cloudy
   by day or night, cloud, rain, snow, thunder, fog), in the text's colour.
 
+### Fixed
+- **Finish setup no longer gets stuck on Notification access** on TVs whose settings have no such screen (many
+  Android 8 TVs), where OK did nothing. It switches it on itself when Talkies has the `WRITE_SECURE_SETTINGS` grant;
+  otherwise the step is marked optional, stops counting as a step left, and OK shows the one adb command that
+  switches it on. Thanks @123nitin.
+
 ### Removed
 - **Free up memory and Close them all.** Android lets an app close only its own background processes (on Android 14,
   and on some TVs before it), so neither could close YouTube, Netflix or anything else, and the memory they reported
