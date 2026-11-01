@@ -30,7 +30,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * Talkies settings → Keys and location → Send from your phone: the page a phone opens from the QR code, to paste the
- * TMDB key, the CricketData key and the weather area instead of typing them with the remote. Its address is
+ * TMDB key and the weather area instead of typing them with the remote. Its address is
  * http://(the TV's address on the home network):(a free port)/(a one-time random token). It takes one form (one
  * POST), has the TV check each key with its service, answers with the result and stops; after 5 minutes it stops
  * anyway. Plain HTTP, since a phone can't check a certificate for a LAN address; it listens only on that address, and
@@ -47,7 +47,7 @@ final class PhonePage {
     interface Listener {
         /** A phone sent the form: the TV checks it now. */
         void checking();
-        /** Checks and saves what was filled in ("tmdb", "cricket", "location"; empty ones left out): a line for each. */
+        /** Checks and saves what was filled in ("tmdb", "location"; empty ones left out): a line for each. */
         List<String> accept(Map<String, String> fields);
         /** The page stopped: after the form, after 5 minutes (expired) or close(). Called once. */
         void closed(boolean expired);
@@ -231,7 +231,7 @@ final class PhonePage {
         }
         String form = new String(body, StandardCharsets.US_ASCII);
         Map<String, String> fields = new LinkedHashMap<>();
-        for (String name : new String[]{"tmdb", "cricket", "location"}) {
+        for (String name : new String[]{"tmdb", "location"}) {
             String v = field(form, name).trim();
             if (!v.isEmpty()) fields.put(name, v);
         }
@@ -294,7 +294,7 @@ final class PhonePage {
 
     // ---------------------------------------------------------------- the pages
 
-    /** Three fields, each optional: fill in what you have. */
+    /** Two fields, each optional: fill in what you have. */
     private byte[] form() {
         StringBuilder b = top();
         b.append("<p>Fill in what you have; an empty box leaves that setting as it is.</p>")
@@ -302,8 +302,6 @@ final class PhonePage {
                 .append(box("tmdb", "TMDB key", "For the Trending and New picks. Free at "
                         + "<a href=\"https://www.themoviedb.org/settings/api\" target=_blank rel=noreferrer>themoviedb.org → Settings → API</a>: "
                         + "the API Key or the API Read Access Token.", true))
-                .append(box("cricket", "CricketData key", "For live cricket scores. Free at "
-                        + "<a href=\"https://cricketdata.org\" target=_blank rel=noreferrer>cricketdata.org</a>.", true))
                 .append(box("location", "Weather location", "A town or area, like “Camden, London”, or latitude,longitude.", false))
                 .append("<button>Send to the TV</button></form><p class=s>")
                 .append("It all stays on your TV. This page works once, for 5 minutes.</p>");

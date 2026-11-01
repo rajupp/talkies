@@ -70,7 +70,7 @@ Control Center → **Talkies settings**, or **hold OK on the ⚙ icon** (a press
 | Row | What OK does |
 |---|---|
 | Finish setup | Only while a first-time step is left: lists them (the Home button's Accessibility switch, notification access, the Wi-Fi name and Watch Next permissions), and OK opens each one's switch or asks |
-| Keys and location | Your TMDB key (picks), CricketData key (scores) and weather area. **Send from your phone** shows a QR code: scan it with a phone on the same Wi-Fi and paste them into the page it opens (it works once, for 5 minutes, only on your home network, and the keys stay on the TV). Or type or paste each one; keys are tried with the service first and only saved if it accepts them. **Remove** clears one |
+| Keys and location | Your TMDB key (picks) and weather area. **Send from your phone** shows a QR code: scan it with a phone on the same Wi-Fi and paste them into the page it opens (it works once, for 5 minutes, only on your home network, and the keys stay on the TV). Or type or paste each one; keys are tried with the service first and only saved if it accepts them. **Remove** clears one |
 | Effects | **Auto** (default): Lite on a TV with under 1.6 GB of memory, Full elsewhere. **Full**: the background glows in the focused app's colour and focus and scrolling glide. **Lite**: no glow, and focus and scrolling move at once, which keeps slow TVs responsive |
 | Appearance | Cycles Auto (light by day, dark at night) → Light → Dark. With a wallpaper, Auto picks the look that suits the photo instead, and every look adds just enough veil behind the text to keep it readable |
 | For You | Shown or Hidden. Hidden removes the tabs and picks (the weather, time and date stay, larger), Up from the dock goes to the icons, and TMDB picks aren't fetched |
@@ -273,7 +273,7 @@ While a match is live or on today, the line under the weather shows the most rel
 status ("LIVE · Test · Day 4: 3rd Session…"); the caption under it names the series.
 
 At stumps, lunch, tea or a rain delay nobody is playing, so a match isn't shown as live: the line reads
-"Test · AUS v RSA 329 · Day 1: Stumps", it's still checked every 15 minutes for play to resume, and a football match
+"Test · AUS v RSA 329 · Day 1: Stumps", it's still checked every 2 minutes for play to resume, and a football match
 being played comes first (the Football row then sits above Cricket).
 
 - **Match type:** Test, ODI or T20I for internationals; First-class, One-day or T20 for domestic matches.
@@ -294,23 +294,14 @@ being played comes first (the Football row then sits above Cricket).
   ignore the text, so the Talkies accessibility service types it (see [Talkies settings](#talkies-settings)); with the service off,
   the search page opens empty. JioHotstar's results list highlights and replays too, and a series it doesn't stream
   shows only older clips.
-- **Data:** [CricketData.org](https://cricketdata.org)'s `cricScore` (all current matches in one request). The free
-  key allows 100 requests a day, so it refreshes every 15 minutes while a match is live and hourly otherwise, only
-  while Talkies is in front with the TV's display on, and stops for the day at 92. The quick list only has each team's latest innings,
-  so a live Test's full innings come from one extra request (`match_info`): every 15 minutes for the Test shown first,
-  every 45 for up to two more (45 for all once 70 requests are used). The feed sometimes credits an innings to the
-  wrong team (a follow-on came through as the other side's); the launcher checks the latest innings against the
-  status ("Australia trail by 242 runs") and moves it to the side the numbers fit. Scores can lag the TV broadcast by a few minutes.
+- **Data:** ESPN's public score panel (`site.web.api.espn.com/…/cricket/scorepanel`, no key; like football's, not a
+  documented API), one request for each day (ESPN's days are UTC) that your day touches. It refreshes every 2 minutes
+  while a match is on and every 30 minutes otherwise, only while Talkies is in front with the TV's display on.
+  Internationals are told apart by ESPN's match class (Test, ODI, T20I and the women's), so A sides and under-19s
+  stay out. Scores can lag the TV broadcast by a minute or two. Thanks @Swakshan for pointing at it.
 
-Set your key once (a free account at cricketdata.org gives one), the same way as the TMDB key: on the TV in Talkies
-settings → **Keys and location**, or from a computer:
-
-```bash
-./set-cricket-key.sh
-```
-
-`./set-cricket-key.sh --remove` turns cricket off. Both scripts press Home on the TV when done. The log shows what it
-found and where each Watch button points: `adb -s "$TALKIES_TV" logcat -d -s GlassCricket`.
+To hide cricket, Talkies settings → **Live scores**. The log shows what it found and where each Watch button points:
+`adb -s "$TALKIES_TV" logcat -d -s GlassCricket`.
 
 ## Football
 

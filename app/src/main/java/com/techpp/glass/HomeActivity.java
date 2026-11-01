@@ -1541,8 +1541,13 @@ public class HomeActivity extends Activity {
             Map.Entry<View, Spring> e = it.next();
             Spring sp = e.getValue();
             boolean m = sp.step(dt);
-            e.getKey().setScaleX(sp.value);
-            e.getKey().setScaleY(sp.value);
+            View v = e.getKey();
+            // Grow from the centre, said outright: some TVs (Sony) drew the default pivot at the top-left corner, so
+            // the card spilled right and down while the ring, placed from the centre, left a gap above and to the left.
+            v.setPivotX(v.getWidth() / 2f);
+            v.setPivotY(v.getHeight() / 2f);
+            v.setScaleX(sp.value);
+            v.setScaleY(sp.value);
             if (m) moving = true;
             else if (sp.target == 1f) it.remove();
         }
@@ -2494,21 +2499,18 @@ public class HomeActivity extends Activity {
     // ---------------------------------------------------------------- keys and location
 
     /**
-     * Control Center → Keys and location: your own TMDB key (picks), CricketData key (scores) and weather area, typed
+     * Control Center → Keys and location: your own TMDB key (picks) and weather area, typed
      * with the remote or pasted from a phone with the Google TV app's keyboard. Keys are tried before they're saved.
      * They go in the same files the set-*.sh scripts push over adb (see Keys).
      */
     private void openKeysAndLocation(int focus) {
         beginMenu(settingsAt, "Keys and location");
-        String tmdb = Keys.read(this, Keys.TMDB), cricket = Keys.read(this, Keys.CRICKET), area = Keys.read(this, Keys.LOCATION);
+        String tmdb = Keys.read(this, Keys.TMDB), area = Keys.read(this, Keys.LOCATION);
         String paste = "\n\nTip: Send from your phone (above) is easier, or the Google TV app's keyboard on your phone can paste it.";
         addRow("Send from your phone", "QR code", this::openPhonePage, true);
         addRow("TMDB key", tmdb == null ? "Not set" : Keys.masked(tmdb), () -> askText("TMDB key",
                 "For the Trending and New picks. Free at themoviedb.org → Settings → API: the API Key or the API Read "
                         + "Access Token." + paste, null, true, tmdb != null, text -> saveKey(Keys.TMDB, "TMDB", text, 1)), true);
-        addRow("Cricket key", cricket == null ? "Not set" : Keys.masked(cricket), () -> askText("CricketData key",
-                "For live cricket scores. Free at cricketdata.org (100 requests a day, enough for Talkies)." + paste,
-                null, true, cricket != null, text -> saveKey(Keys.CRICKET, "CricketData", text, 2)), true);
         // Coordinates pinpoint a home, so the row (and any screenshot of it) just says so; place names show as typed.
         String where = area == null ? "Not set" : area.matches("[-+0-9.,\\s]+") ? "Coordinates"
                 : area.length() > 22 ? area.substring(0, 21) + "…" : area;
@@ -2557,7 +2559,7 @@ public class HomeActivity extends Activity {
         String key = text.replaceAll("\\s", "");
         Toast.makeText(this, "Checking the key with " + service + "…", Toast.LENGTH_SHORT).show();
         new Thread(() -> {
-            int result = file.equals(Keys.TMDB) ? Trending.check(key) : Cricket.check(key);
+            int result = Trending.check(key);
             runOnUiThread(() -> {
                 if (result == Keys.REJECTED) {
                     Toast.makeText(this, service + " didn't accept that key, so it wasn't saved", Toast.LENGTH_LONG).show();
@@ -2568,7 +2570,7 @@ public class HomeActivity extends Activity {
                     return;
                 }
                 Toast.makeText(this, result == Keys.OK
-                        ? "The key works. " + (file.equals(Keys.TMDB) ? "Picks arrive" : "Scores arrive") + " in a minute"
+                        ? "The key works. Picks arrive in a minute"
                         : "Couldn't reach " + service + " to check it. Saved; Talkies will try it later", Toast.LENGTH_LONG).show();
                 if (zone == Z_MENU) openKeysAndLocation(row);
                 refreshOnline();
@@ -2587,7 +2589,7 @@ public class HomeActivity extends Activity {
         }
         Toast.makeText(this, text.isEmpty() ? "Weather location removed" : "Saved. The weather appears in a moment",
                 Toast.LENGTH_SHORT).show();
-        if (zone == Z_MENU) openKeysAndLocation(3);
+        if (zone == Z_MENU) openKeysAndLocation(2);
         refreshOnline();
     }
 
@@ -2607,13 +2609,12 @@ public class HomeActivity extends Activity {
         try {
             page = new PhonePage(lan, new PhonePage.Listener() {
                 @Override public void checking() {
-                    runOnUiThread(() -> status.setText("Checking with TMDB and CricketData…"));
+                    runOnUiThread(() -> status.setText("Checking with TMDB…"));
                 }
 
                 @Override public List<String> accept(Map<String, String> fields) {
                     List<String> lines = new ArrayList<>();
                     if (fields.containsKey("tmdb")) lines.add(acceptKey(Keys.TMDB, "TMDB", fields.get("tmdb")));
-                    if (fields.containsKey("cricket")) lines.add(acceptKey(Keys.CRICKET, "CricketData", fields.get("cricket")));
                     if (fields.containsKey("location")) lines.add(Keys.write(HomeActivity.this, Keys.LOCATION, fields.get("location"))
                             ? "Weather location saved." : "Couldn't save the weather location.");
                     runOnUiThread(() -> {
@@ -2649,8 +2650,8 @@ public class HomeActivity extends Activity {
         box.addView(status);
         dialog[0] = new android.app.AlertDialog.Builder(this, android.R.style.Theme_DeviceDefault_Dialog_Alert)
                 .setTitle("Send from your phone")
-                .setMessage("Scan this with your phone's camera (on the same Wi-Fi as the TV), then paste the keys and your "
-                        + "weather area there.")
+                .setMessage("Scan this with your phone's camera (on the same Wi-Fi as the TV), then paste your TMDB key "
+                        + "and weather area there.")
                 .setView(box)
                 .setNegativeButton("Close", null)
                 .setOnDismissListener(d -> page.close())
@@ -2744,7 +2745,7 @@ public class HomeActivity extends Activity {
     /** Checks a key from the phone page with its service and saves it unless turned down; the line the phone shows. */
     private String acceptKey(String file, String service, String text) {
         String key = text.replaceAll("\\s", "");
-        int result = file.equals(Keys.TMDB) ? Trending.check(key) : Cricket.check(key);
+        int result = Trending.check(key);
         if (result == Keys.REJECTED) return service + " didn't accept that key, so it wasn't saved.";
         if (!Keys.write(this, file, key)) return "Couldn't save the " + service + " key.";
         return result == Keys.OK ? service + " key saved, and it works." : service + " key saved. The TV couldn't reach "
@@ -4067,8 +4068,7 @@ public class HomeActivity extends Activity {
         String[][] credits = {
                 {"Weather", "Open-Meteo.com (CC BY 4.0)"},
                 {"Airport temperatures", "aviationweather.gov (NOAA)"},
-                {"Cricket scores", "CricketData.org"},
-                {"Football scores", "ESPN (public scoreboard)"},
+                {"Cricket and football scores", "ESPN (public scoreboard)"},
                 {"Speed test", "Cloudflare"},
                 {"Code from", "tv-vibehack, CleanYourTV, Free My TV, Matinee, Luma, GlassLauncher"},
                 {"Font", "Outfit (SIL OFL)"},

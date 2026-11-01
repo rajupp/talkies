@@ -32,7 +32,7 @@ final class Backup {
     private static final int VERSION = 1;
     /** Preference files kept whole: they hold settings only. */
     private static final String[] WHOLE = {"home", "remote_keys", "channels"};
-    private static final String[] KEYS = {Keys.TMDB, Keys.CRICKET, Keys.LOCATION};
+    private static final String[] KEYS = {Keys.TMDB, Keys.LOCATION};
 
     private Backup() { }
 

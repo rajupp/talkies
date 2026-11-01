@@ -11,12 +11,12 @@ import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
 
 /**
- * Your own keys and weather area, in the app's folder on the TV (files/tmdb_key.txt, cricket_key.txt, location.txt):
+ * Your own keys and weather area, in the app's folder on the TV (files/tmdb_key.txt, location.txt):
  * the same files the set-*.sh scripts push over adb, and what Control Center → Keys and location writes. Each reader
- * (Trending, Cricket, Weather) notices a new file on its next refresh. Never in the APK.
+ * (Trending, Weather) notices a new file on its next refresh. Never in the APK.
  */
 final class Keys {
-    static final String TMDB = "tmdb_key.txt", CRICKET = "cricket_key.txt", LOCATION = "location.txt";
+    static final String TMDB = "tmdb_key.txt", LOCATION = "location.txt";
     /** A key check's answer: the service accepted it, turned it down, or couldn't be reached. */
     static final int OK = 0, REJECTED = 1, OFFLINE = 2;
 

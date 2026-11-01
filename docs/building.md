@@ -69,7 +69,6 @@ Gradle, so it takes a few minutes.
 4. **Keys and your weather area**: on the TV in Talkies settings → **Keys and location**, or from here:
    ```bash
    ./set-tmdb-key.sh                    # picks (paste the key when it asks)
-   ./set-cricket-key.sh                 # cricket scores
    ./set-location.sh "Camden, London"   # weather: a place, or "lat,lon"
    ```
    Keys are stored on the TV and in git-ignored files next to the scripts; your location only on the TV. Neither is
@@ -93,7 +92,6 @@ Optional keys are plain text files the app reads from its folder on the TV:
 ```bash
 adb -s 192.168.1.20:5555 shell mkdir -p /sdcard/Android/data/com.techpp.glass/files
 adb -s 192.168.1.20:5555 push tmdb_key.txt /sdcard/Android/data/com.techpp.glass/files/
-adb -s 192.168.1.20:5555 push cricket_key.txt /sdcard/Android/data/com.techpp.glass/files/
 ```
 
 **Google TV only:** leave its launcher and setup wizard (`com.google.android.tungsten.setupwraith`) on, although both
@@ -108,7 +106,7 @@ Google Photos. More in the guide: [Google TV's setup wizard](guide.md#google-tvs
 ./restore.sh --keep-talkies            # the TV's own home screen back, Talkies kept
 ./switch-home.sh list|talkies|stock    # choose the home screen (see the guide)
 ./set-region.sh GB                     # use another country for picks, cricket and °C/°F (--remove: the TV's own)
-./set-tmdb-key.sh / set-cricket-key.sh / set-location.sh   # keys and weather area (--remove clears one)
+./set-tmdb-key.sh / set-location.sh   # key and weather area (--remove clears one)
 ./backup-settings.sh                   # copy Talkies' settings from the TV to talkies-backup.json here
 ./restore-settings.sh                  # put them back (after reinstalling, or on another TV)
 ./release-apk.sh                       # maintainer only: attach the signed talkies.apk to this version's release

@@ -139,7 +139,7 @@ opens its switch.
 | **1. Home button** | Settings → Device Preferences → **Accessibility → Talkies** → on | Keeps the Home button on Talkies instead of the TV's own launcher. Also powers Turn off, the sleep timer and remote buttons |
 | **2. Notification access** | Settings → Apps → Special app access → **Notification access → Talkies** → on | Continue watching, Now playing and the update bell. Talkies reads no notifications except the Play Store's update ones |
 | **3. Two permissions** | Talkies asks the first time it opens: allow both | Your Wi-Fi name (Android shares it only with location) and Android TV's Watch Next list |
-| **4. Keys and weather** (optional) | Talkies settings → **Keys and location → Send from your phone** | Scan the QR code with your phone and paste a free [TMDB](https://www.themoviedb.org/settings/api) key (picks), a free [CricketData](https://cricketdata.org) key (cricket) and your town (weather) |
+| **4. Keys and weather** (optional) | Talkies settings → **Keys and location → Send from your phone** | Scan the QR code with your phone and paste a free [TMDB](https://www.themoviedb.org/settings/api) key (picks) and your town (weather) |
 
 > [!TIP]
 > **Android 13 and newer** (Google TV Streamer, newer TVs) grey out the Accessibility and Notification access
@@ -153,8 +153,8 @@ opens its switch.
 > button and the buttons you give a job, and notices only when the TV's own launcher, the Assistant or JioHotstar
 > comes up; it reads nothing on screen except JioHotstar's search box, when you open a cricket match there.
 
-Football scores need no key. Without a TMDB key, Trending and *New in your country* stay away (Continue still
-works); without a CricketData key, so does cricket.
+Cricket and football scores need no key. Without a TMDB key, Trending and *New in your country* stay away (Continue
+still works).
 
 ### TVs and boxes
 
@@ -193,7 +193,7 @@ settings to another TV.
 - **No account, no ads, no analytics.** Nothing about what you watch leaves the TV (except the opt-in YouTube
   lookup below), and your weather area goes only to the weather services.
 - **What it connects to, and only while it's on screen:** TMDB for the picks (with your key), Open-Meteo and
-  NOAA's aviationweather.gov for the weather, CricketData for cricket (with your key), ESPN's public scoreboard for
+  NOAA's aviationweather.gov for the weather, ESPN's public scoreboard for cricket and
   football, Bing for the wallpaper (if you turn it on), GitHub once a day for updates, and Cloudflare when you run a
   speed test. Sharp YouTube pictures (off by default) looks a video's title up on YouTube.
 - **Your keys, location and wallpaper** stay on the TV. *Send from your phone* (keys, and Wallpaper → From your
@@ -259,8 +259,7 @@ Data (also listed in the app, Talkies settings → About):
 - **Weather:** [Weather data by Open-Meteo.com](https://open-meteo.com/), under
   [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/); airport temperatures from NOAA's
   [aviationweather.gov](https://aviationweather.gov).
-- **Cricket:** [CricketData.org](https://cricketdata.org), with your own key.
-- **Football:** ESPN's public scoreboard (not an official API; Talkies isn't affiliated with ESPN).
+- **Cricket and football:** ESPN's public scoreboard (not an official API; Talkies isn't affiliated with ESPN).
 - **Speed test:** Cloudflare's public speed-test endpoint.
 
 Code (details and license texts in `THIRD_PARTY_NOTICES.md`, all MIT):

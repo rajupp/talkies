@@ -17,11 +17,18 @@ features, a new fix number only fixes. The version shows in Talkies settings →
 - **A weather icon** before the weather at the top left: a small line drawing of the sky (sun, moon, partly cloudy
   by day or night, cloud, rain, snow, thunder, fog), in the text's colour.
 
+### Changed
+- **Cricket needs no key.** Scores now come from ESPN, like football: no CricketData account, no daily limit, and
+  they refresh every 2 minutes during a match instead of every 15. The Cricket key row, its box on the phone page and
+  `set-cricket-key.sh` are gone. Thanks @Swakshan.
+
 ### Fixed
 - **Finish setup no longer gets stuck on Notification access** on TVs whose settings have no such screen (many
   Android 8 TVs), where OK did nothing. It switches it on itself when Talkies has the `WRITE_SECURE_SETTINGS` grant;
   otherwise the step is marked optional, stops counting as a step left, and OK shows the one adb command that
   switches it on. Thanks @123nitin.
+- **The focused card fills its ring** on Sony and some other TVs, where it grew from its top-left corner and left a
+  gap above and to the left of it, in All apps, the dock and the channel rows. Thanks @ag7tweets and @taurus77777.
 
 ### Removed
 - **Free up memory and Close them all.** Android lets an app close only its own background processes (on Android 14,
