@@ -103,8 +103,11 @@ final class PhonePage {
     }
 
     /**
-     * The TV's private IPv4 address (10/8, 172.16/12, 192.168/16) on its Wi-Fi or Ethernet, the active network first;
-     * never a VPN's (a phone on the Wi-Fi can't reach it) nor a public one (anyone could). Null: no page.
+     * The TV's IPv4 address on its Wi-Fi or Ethernet that a phone on the same network can reach: the active network
+     * first, and a private one (10/8, 172.16/12, 192.168/16) ahead of any other. Some home routers hand out addresses
+     * from a range that isn't private (a 192.68.1.x Wi-Fi, say); they're still the TV's address on the home network and
+     * still unreachable from outside it, so they're taken when there is no private one. Never a VPN's (a phone on the
+     * Wi-Fi can't reach it), nor a loopback or link-local (169.254/16) one. Null: no page.
      */
     @SuppressWarnings("deprecation")   // getAllNetworks: still there
     static InetAddress lanAddress(Context c) {
@@ -115,6 +118,7 @@ final class PhonePage {
             List<Network> networks = new ArrayList<>();
             if (active != null) networks.add(active);
             for (Network n : cm.getAllNetworks()) if (!n.equals(active)) networks.add(n);
+            InetAddress other = null;
             for (Network n : networks) {
                 NetworkCapabilities caps = cm.getNetworkCapabilities(n);
                 if (caps == null || caps.hasTransport(NetworkCapabilities.TRANSPORT_VPN)
@@ -125,9 +129,12 @@ final class PhonePage {
                 if (link == null) continue;
                 for (LinkAddress a : link.getLinkAddresses()) {
                     InetAddress ip = a.getAddress();
-                    if (ip instanceof Inet4Address && ip.isSiteLocalAddress()) return ip;
+                    if (!(ip instanceof Inet4Address) || ip.isLoopbackAddress() || ip.isLinkLocalAddress()) continue;
+                    if (ip.isSiteLocalAddress()) return ip;
+                    if (other == null) other = ip;
                 }
             }
+            return other;
         } catch (RuntimeException e) {
             Log.w(TAG, "No address: " + e);
         }
