@@ -74,6 +74,7 @@ Control Center → **Talkies settings**, or **hold OK on the ⚙ icon** (a press
 | Effects | **Auto** (default): Lite on a TV with under 1.6 GB of memory, Full elsewhere. **Full**: the background glows in the focused app's colour and focus and scrolling glide. **Lite**: no glow, and focus and scrolling move at once, which keeps slow TVs responsive |
 | Appearance | Cycles Auto (light by day, dark at night) → Light → Dark. With a wallpaper, Auto picks the look that suits the photo instead, and every look adds just enough veil behind the text to keep it readable |
 | For You | Shown or Hidden. Hidden removes the tabs and picks (the weather, time and date stay, larger), Up from the dock goes to the icons, and TMDB picks aren't fetched |
+| Picks from | India only: TMDB or StreamRadar, where the picks come from ([In India without a key](#in-india-without-a-key)) |
 | Picks languages | Only while For You is shown: **All** (the default) or the languages you choose for Trending and New in …. See [Languages](#languages) |
 | Hide spoilers | Off (default) or On. On: an episode you haven't started yet shows the show's own art in Continue instead of the app's still from that episode, or the still blurred when the app gives nothing else. Episodes you're partway through keep their still |
 | Dock apps | Every app, the dock's first (numbered): OK puts one in the dock or takes it out, the same as **Add to dock** and **Remove from dock** when you hold OK on an app. To change the order, hold OK on an app in the dock and choose **Move** |
@@ -163,6 +164,10 @@ a free, open list of what's on Indian apps (an idea from Swakshan):
 
 StreamRadar's lists don't give genres or languages, so the line under the card is just film or series and the app,
 and **Picks languages** isn't offered. Add a TMDB key and TMDB's picks take over at once.
+
+**Picks from** (Talkies settings, India only) switches between the two at any time: **TMDB** (needs your key; picks
+in your languages, with genres) or **StreamRadar** (each app's own Top 10, and OK opens the title). The picks refetch
+straight away.
 
 The picks come from [TMDB](https://www.themoviedb.org), which needs a free key of your own (in India, StreamRadar
 fills in until you add one):

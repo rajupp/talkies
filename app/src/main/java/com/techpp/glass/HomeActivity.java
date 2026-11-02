@@ -3626,7 +3626,16 @@ public class HomeActivity extends Activity {
             buildPicksRow(0);
             if (forYou) refreshOnline();
         }, true);
-        // StreamRadar's lists (India, no TMDB key) don't say a title's language.
+        if (forYou && trending.inIndia()) {
+            final View[] pf = new View[1];
+            pf[0] = addRow("Picks from", picksFromLabel(), () -> {
+                trending.setPicksFrom(Trending.RADAR.equals(trending.source()) ? "tmdb" : Trending.RADAR);
+                setStatus(pf[0], picksFromLabel());
+                onPicks(null);   // TMDB without a key: the old picks go now; otherwise the new ones replace them shortly
+                refreshOnline();
+            }, true);
+        }
+        // StreamRadar's lists don't say a title's language.
         if (forYou && !Trending.RADAR.equals(trending.source())) addRow("Picks languages", languagesLabel(), this::openPicksLanguages, false);
         final View[] sp = new View[1];
         sp[0] = addRow("Hide spoilers", WatchNext.hideSpoilers(this) ? "On" : "Off", () -> {
@@ -3774,6 +3783,12 @@ public class HomeActivity extends Activity {
      * Talkies settings → Picks languages: the languages Trending and New in … show, from those the country's lists
      * bring up. OK on one shows only the ones you choose; OK again leaves it out; All languages goes back to all.
      */
+    /** Talkies settings → Picks from (India): TMDB, needing your key, or StreamRadar's Top 10s, needing none. */
+    private String picksFromLabel() {
+        if (Trending.RADAR.equals(trending.source())) return "StreamRadar";
+        return Keys.read(this, Keys.TMDB) == null ? "TMDB (needs a key)" : "TMDB";
+    }
+
     private void openPicksLanguages() {
         List<String> codes = new ArrayList<>(trending.seenLanguages());
         for (String c : trending.languages()) if (!codes.contains(c)) codes.add(c);

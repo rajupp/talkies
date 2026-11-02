@@ -179,11 +179,21 @@ final class Trending {
 
     private File keyFile() { return new File(dir.getParentFile(), "tmdb_key.txt"); }
 
-    /** Where picks come from: the TMDB key, StreamRadar (RADAR) in India without one, or null: none. */
+    /**
+     * Where picks come from: the TMDB key, StreamRadar (RADAR), or null: none. Outside India, the key. In India,
+     * Talkies settings → Picks from chooses; until then, TMDB with a key and StreamRadar without one.
+     */
     String source() {
         String k = key();
-        return k != null ? k : "IN".equals(Region.country(ctx)) ? RADAR : null;
+        if (!inIndia()) return k;
+        return RADAR.equals(prefs.getString("picks_from", k != null ? "tmdb" : RADAR)) ? RADAR : k;
     }
+
+    /** StreamRadar only knows India's apps, so only a TV in India gets the choice. */
+    boolean inIndia() { return "IN".equals(Region.country(ctx)); }
+
+    /** Talkies settings → Picks from: "tmdb" or RADAR. The next refresh check fetches from it right away. */
+    void setPicksFrom(String from) { prefs.edit().putString("picks_from", from).apply(); }
 
     String key() {
         try (InputStream in = new FileInputStream(keyFile())) {

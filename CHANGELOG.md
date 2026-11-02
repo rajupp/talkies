@@ -9,7 +9,8 @@ features, a new fix number only fixes. The version shows in Talkies settings →
 - **Picks in India without a key.** Until you add a TMDB key, a TV in India fills Trending with the Top 10s of its
   apps (JioHotstar, Netflix, Prime Video, ZEE5, SonyLIV, Apple TV) and *New in India* with what's just come out on
   them, from StreamRadar India. OK opens the title's page in its app where StreamRadar has a link. A TMDB key takes
-  over at once. Thanks to Swakshan for pointing it out.
+  over at once, and Talkies settings → **Picks from** (on TVs in India) switches between TMDB and StreamRadar any
+  time. Thanks to Swakshan for pointing it out.
 
 ### Fixed
 - **Picks on flaky networks.** A TMDB request whose connection is reset is tried once more, instead of the whole
