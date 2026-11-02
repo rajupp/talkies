@@ -166,9 +166,10 @@ What people have told us, besides the OnePlus TV it's made on. Yours isn't here,
 |---|---|
 | OnePlus TV (Google TV, Android 11) | Everything; it's built and tested on one. |
 | Google TV Streamer (Android 14) | Works. The Accessibility switch needs [one `adb` command](#first-time-setup); Inputs shows only Live TV and there's no Screensaver button, since the Streamer allows neither. |
-| NVIDIA SHIELD (Android 11) | Installs from the release APK ([#2](https://github.com/rajupp/talkies/issues/2)). |
+| NVIDIA SHIELD (Android 11) | Installs from the release APK ([#2](https://github.com/rajupp/talkies/issues/2)); a SHIELD TV Pro runs it as its main home screen. |
 | Xiaomi Mi Box S | Holding Home opens Google TV's dashboard since 1.2.5. |
 | Sony (Google TV) | Sound output opens Display & sound, where Audio output picks the speakers. |
+| Sony XF9005 (2018, Android TV) | Responsive, with CleanYourTV alongside. |
 | TCL with 1 GB of memory | Can feel slow; Effects switches to Lite on its own on TVs like these (Talkies settings → Effects). |
 
 ## Updates
