@@ -3,7 +3,7 @@
 Versions are numbered *major.minor.fix*. While Talkies is in beta they start with 0: a new minor number brings new
 features, a new fix number only fixes. The version shows in Talkies settings → About.
 
-## Unreleased
+## 1.2.6 — 2 November 2026
 
 ### New
 - **Inputs on Home.** Talkies settings → Inputs on Home puts an HDMI or AV port on Home as a tile, named after the
