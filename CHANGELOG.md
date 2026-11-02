@@ -36,6 +36,8 @@ features, a new fix number only fixes. The version shows in Talkies settings →
 - **The first card in a row is no longer cut off** when it grows on focus: the first card of each channel row and
   the first column and row of All apps lost a strip at their left (and All apps' top) edge. Thanks @ag7tweets and
   @taurus77777.
+- **Picks no longer go blank for a moment** as you move along Trending or New in your country: the card that grows
+  kept showing its poster until its wide picture was ready, instead of an empty card on slower TVs.
 
 ### Removed
 - **Free up memory and Close them all.** Android lets an app close only its own background processes (on Android 14,

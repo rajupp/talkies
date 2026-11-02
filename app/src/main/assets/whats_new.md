@@ -12,6 +12,7 @@
 
 ### Fixed
 - **Finish setup on older TVs.** It no longer gets stuck on Notification access when the TV has no such screen.
+- **No blank picks.** Picks no longer go blank for a moment as you move along them.
 - **First cards in full.** The first card in a row is no longer cut off at the left when you're on it.
 
 ### Removed

@@ -1337,11 +1337,15 @@ public class HomeActivity extends Activity {
             ImageView back = item.findViewWithTag("backdrop"), poster = item.findViewWithTag("poster");
             if (back == null || poster == null) continue;
             boolean large = i == anchor, usePoster = !large && p.poster != null && p.poster.isFile();
-            if (usePoster) loadInto(poster, p.poster, 1);
-            poster.animate().alpha(usePoster ? 1f : 0f).setDuration(250).start();
-            if (p.image == null || !p.image.isFile()) continue;
-            if (large) loadInto(back, p.image, 1);
-            else if (!usePoster) loadInto(back, p.image, 2);
+            if (usePoster) loadInto(poster, p.poster, 1, null);
+            boolean hasImage = p.image != null && p.image.isFile();
+            // Becoming the large card: the poster stays until the landscape picture is decoded (it was let go while
+            // covered), else the card shows blank for a moment on slower TVs.
+            if (large && hasImage) loadInto(back, p.image, 1, () -> poster.animate().alpha(0f).setDuration(250).start());
+            else poster.animate().alpha(usePoster ? 1f : 0f).setDuration(250).start();
+            if (!hasImage) continue;
+            if (large) continue;
+            else if (!usePoster) loadInto(back, p.image, 2, null);
             else {
                 // Covered by the poster: let it go once the fade is done.
                 final ImageView b = back;
@@ -1385,15 +1389,32 @@ public class HomeActivity extends Activity {
                 Math.round(Color.blue(a) + (Color.blue(b) - Color.blue(a)) * t));
     }
 
-    /** Decodes `file` at 1/`sample` size in the background and shows it, unless it's already showing. */
-    private void loadInto(ImageView v, File file, int sample) {
+    /**
+     * Decodes `file` at 1/`sample` size in the background and shows it, unless it's already showing; then runs `shown`
+     * (if any), also when it was already there or couldn't be decoded.
+     */
+    private void loadInto(ImageView v, File file, int sample, Runnable shown) {
         String want = file.getName() + "@" + sample;
-        if (want.equals(v.getTag(R.id.img_state))) return;
+        if (want.equals(v.getTag(R.id.img_state))) {
+            // Showing, or on its way from an earlier call.
+            if (shown != null) whenShown(v, want, shown, 0);
+            return;
+        }
         v.setTag(R.id.img_state, want);
         background.execute(() -> {
             Bitmap b = decode(file, sample);
-            runOnUiThread(() -> { if (want.equals(v.getTag(R.id.img_state)) && b != null) v.setImageBitmap(b); });
+            runOnUiThread(() -> {
+                if (!want.equals(v.getTag(R.id.img_state))) return;
+                if (b != null) v.setImageBitmap(b);
+                if (shown != null) shown.run();
+            });
         });
+    }
+
+    /** Runs `shown` once `v` has its picture (checked every frame or so, for a second at most). */
+    private void whenShown(ImageView v, String want, Runnable shown, int tries) {
+        if (v.getDrawable() != null || tries > 60 || !want.equals(v.getTag(R.id.img_state))) shown.run();
+        else v.postDelayed(() -> whenShown(v, want, shown, tries + 1), 16);
     }
 
     private void stylePickText(View item) {
