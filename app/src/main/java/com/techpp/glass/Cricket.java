@@ -38,8 +38,9 @@ import java.util.concurrent.Executors;
 /**
  * Cricket scores from ESPN's public score panel (site.web.api.espn.com, no key; like Football, it isn't a documented
  * API and may change without notice): international matches (men's and women's) and the domestic competitions of the
- * TV's country (Region), live or on today; the home nation's matches come first. Asks every 2 minutes while a match is
- * on and every 30 minutes otherwise, only while the home screen is showing.
+ * TV's country (Region), live or on today; the home nation's matches come first. Asks every minute while a match is
+ * on (at least 30 s apart, so every minute tick of the home screen gets one; ESPN updates ball by ball) and every 30
+ * minutes otherwise, only while the home screen is showing.
  * Watching: the apps' own TV channels are searched for a card naming both teams (that card's link opens the stream).
  * Otherwise, in India, the app that holds the rights there opens; elsewhere rights vary too much to guess, so the
  * card opens nothing and says so.
@@ -47,7 +48,7 @@ import java.util.concurrent.Executors;
 final class Cricket {
     private static final String TAG = "GlassCricket";
     private static final String API = "https://site.web.api.espn.com/apis/site/v2/sports/cricket/scorepanel?dates=";
-    private static final long LIVE_MS = 2 * 60_000L, IDLE_MS = 30 * 60_000L, RETRY_MS = 5 * 60_000L;
+    private static final long LIVE_MS = 30_000L, IDLE_MS = 30 * 60_000L, RETRY_MS = 5 * 60_000L;
     /** Statuses of a match that's on but not being played right now ("Stumps", "Lunch", "Rain delay"). */
     private static final java.util.regex.Pattern PAUSED = java.util.regex.Pattern.compile(
             "\\b(stumps|lunch|tea|dinner|rain|wet outfield|bad light|delay|delayed|play stopped|no play|suspended)\\b",

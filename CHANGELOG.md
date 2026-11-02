@@ -25,7 +25,7 @@ features, a new fix number only fixes. The version shows in Talkies settings →
 - **Focus without a ring.** The focused card or app grows and lifts on a soft shadow, like Plume's, instead of
   wearing a white ring with a glow. Only an app you're moving (hold OK → Move) gets a ring, a thin one.
 - **Cricket needs no key.** Scores now come from ESPN, like football: no CricketData account, no daily limit, and
-  they refresh every 2 minutes during a match instead of every 15. The Cricket key row, its box on the phone page and
+  they refresh every minute during a match instead of every 15. The Cricket key row, its box on the phone page and
   `set-cricket-key.sh` are gone. Thanks @Swakshan.
 
 ### Fixed

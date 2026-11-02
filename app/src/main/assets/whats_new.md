@@ -8,7 +8,7 @@
 
 ### Changed
 - **Cleaner focus.** The card you're on grows and lifts on a soft shadow, with no white ring around it.
-- **Cricket without a key.** Scores now come from ESPN, like football, and refresh every 2 minutes during a match.
+- **Cricket without a key.** Scores now come from ESPN, like football, and refresh every minute during a match.
 
 ### Fixed
 - **Finish setup on older TVs.** It no longer gets stuck on Notification access when the TV has no such screen.

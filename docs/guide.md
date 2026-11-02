@@ -273,7 +273,7 @@ While a match is live or on today, the line under the weather shows the most rel
 status ("LIVE · Test · Day 4: 3rd Session…"); the caption under it names the series.
 
 At stumps, lunch, tea or a rain delay nobody is playing, so a match isn't shown as live: the line reads
-"Test · AUS v RSA 329 · Day 1: Stumps", it's still checked every 2 minutes for play to resume, and a football match
+"Test · AUS v RSA 329 · Day 1: Stumps", it's still checked every minute for play to resume, and a football match
 being played comes first (the Football row then sits above Cricket).
 
 - **Match type:** Test, ODI or T20I for internationals; First-class, One-day or T20 for domestic matches.
@@ -295,10 +295,10 @@ being played comes first (the Football row then sits above Cricket).
   the search page opens empty. JioHotstar's results list highlights and replays too, and a series it doesn't stream
   shows only older clips.
 - **Data:** ESPN's public score panel (`site.web.api.espn.com/…/cricket/scorepanel`, no key; like football's, not a
-  documented API), one request for each day (ESPN's days are UTC) that your day touches. It refreshes every 2 minutes
+  documented API), one request for each day (ESPN's days are UTC) that your day touches. It refreshes every minute
   while a match is on and every 30 minutes otherwise, only while Talkies is in front with the TV's display on.
   Internationals are told apart by ESPN's match class (Test, ODI, T20I and the women's), so A sides and under-19s
-  stay out. Scores can lag the TV broadcast by a minute or two. Thanks @Swakshan for pointing at it.
+  stay out. ESPN updates ball by ball; scores can still lag the TV broadcast by a minute. Thanks @Swakshan for pointing at it.
 
 To hide cricket, Talkies settings → **Live scores**. The log shows what it found and where each Watch button points:
 `adb -s "$TALKIES_TV" logcat -d -s GlassCricket`.
