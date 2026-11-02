@@ -43,6 +43,7 @@ import java.util.concurrent.Executors;
  *
  * The TMDB key lives in a file on the TV (files/tmdb_key.txt), never in the APK. Picks and their backdrops are
  * cached in files/trending/. The list is refreshed at most every 6 hours, and only when the home screen asks.
+ * In India without a key, the picks come from StreamRadar instead (fetchRadar).
  */
 final class Trending {
     private static final String TAG = "GlassTrending";
@@ -54,7 +55,7 @@ final class Trending {
     private static final long REFRESH_MS = 6 * 3600_000L, RETRY_MS = 30 * 60_000L;
     private static final int MAX_PICKS = 24, MAX_CHECKS = 72;
     static final int SHOWN = 4;
-    static final String TRENDING = "trending", INDIA = "india";
+    static final String TRENDING = "trending", INDIA = "india", RADAR = "streamradar";
     /** Bump when picks.json changes shape; the next home screen refreshes right away. */
     private static final int CACHE_VERSION = 9;
     /** YouTube on Android TV, Fire TV, then the phone app, for the trailers when no streaming app is installed. */
@@ -178,6 +179,12 @@ final class Trending {
 
     private File keyFile() { return new File(dir.getParentFile(), "tmdb_key.txt"); }
 
+    /** Where picks come from: the TMDB key, StreamRadar (RADAR) in India without one, or null: none. */
+    String source() {
+        String k = key();
+        return k != null ? k : "IN".equals(Region.country(ctx)) ? RADAR : null;
+    }
+
     String key() {
         try (InputStream in = new FileInputStream(keyFile())) {
             String k = new String(readAll(in), StandardCharsets.UTF_8).trim();
@@ -196,7 +203,7 @@ final class Trending {
 
     List<Pick> cached() {
         List<Pick> out = new ArrayList<>();
-        if (key() == null) return out;
+        if (source() == null) return out;
         try (InputStream in = new FileInputStream(new File(dir, "picks.json"))) {
             JSONArray a = new JSONArray(new String(readAll(in), StandardCharsets.UTF_8));
             for (int i = 0; i < a.length(); i++) {
@@ -246,7 +253,7 @@ final class Trending {
     }
 
     void refreshIfStale(Listener l) {
-        String key = key();
+        String key = source();
         if (key == null || running) return;
         long now = System.currentTimeMillis();
         // A new key fetches right away instead of waiting out the old key's timers.
@@ -287,7 +294,8 @@ final class Trending {
         net = Executors.newFixedThreadPool(PARALLEL);
         providerLookups.clear();
         try {
-            fetchWith(key);
+            if (RADAR.equals(key)) fetchRadar();
+            else fetchWith(key);
         } finally {
             net.shutdownNow();
             providerLookups.clear();
@@ -393,6 +401,135 @@ final class Trending {
         save(downloadImages(picks));
     }
 
+    /**
+     * India without a TMDB key: StreamRadar's lists. Trending is the Top 10s of the apps installed here, taken in turn,
+     * films and series alternating; New in India is its "Just In", kept to titles on those apps. OK on a pick opens
+     * the title's page in its app where StreamRadar has a link. No genres or languages: its lists don't say.
+     */
+    private void fetchRadar() throws Exception {
+        List<String[]> apps = new ArrayList<>();
+        for (String[] a : StreamRadar.APPS) if (installed(a[2])) apps.add(a);
+        prefs.edit().putInt("matched", apps.size()).apply();
+        Log.i(TAG, "StreamRadar for " + apps.size() + " installed apps");
+        if (apps.isEmpty()) { save(new ArrayList<>()); return; }
+        List<java.util.concurrent.Future<JSONArray>> tops = new ArrayList<>();
+        for (String[] a : apps) {
+            tops.add(net.submit(() -> StreamRadar.top(a[0], "movie")));
+            tops.add(net.submit(() -> StreamRadar.top(a[0], "series")));
+        }
+        java.util.concurrent.Future<JSONArray> newFilms = net.submit(() -> StreamRadar.justIn("movie"));
+        java.util.concurrent.Future<JSONArray> newShows = net.submit(() -> StreamRadar.justIn("series"));
+
+        // Trending: each app's first title, then each app's second…; a list that fails is left out.
+        List<List<JSONObject>> queues = new ArrayList<>();
+        for (int i = 0; i < apps.size(); i++) {
+            List<JSONObject> q = alternate(radarList(tops.get(2 * i)), radarList(tops.get(2 * i + 1)));
+            for (JSONObject m : q) m.put("_app", apps.get(i)[0]);
+            queues.add(q);
+        }
+        List<Pick> trend = new ArrayList<>();
+        Set<String> taken = new HashSet<>();
+        for (int j = 0; trend.size() < MAX_PICKS; j++) {
+            boolean any = false;
+            for (List<JSONObject> q : queues) {
+                if (j >= q.size() || trend.size() >= MAX_PICKS) continue;
+                any = true;
+                JSONObject m = q.get(j);
+                if (m.optString("background").isEmpty() || !taken.add(m.getString("id"))) continue;
+                trend.add(radarPick(m, StreamRadar.app(m.getString("_app")), TRENDING));
+            }
+            if (!any) break;
+        }
+
+        // New in India: newest first, films and series alternating, on an app installed here (one lookup each).
+        List<JSONObject> fresh = alternate(radarList(newFilms), radarList(newShows));
+        fresh.removeIf(m -> m.optString("background").isEmpty() || taken.contains(m.optString("id")));
+        if (fresh.size() > MAX_CHECKS) fresh = fresh.subList(0, MAX_CHECKS);
+        List<java.util.concurrent.Future<String[]>> found = new ArrayList<>();
+        for (JSONObject m : fresh) found.add(net.submit(() -> StreamRadar.where(m.getString("type"), m.getString("id"), this::installed)));
+        List<Pick> india = new ArrayList<>();
+        for (int i = 0; i < fresh.size() && india.size() < MAX_PICKS; i++) {
+            String[] w = radarGet(found.get(i));
+            if (w == null) continue;
+            Pick p = radarPick(fresh.get(i), StreamRadar.app(w[0]), INDIA);
+            p.intentUri = link(w[1], p.pkg);
+            india.add(p);
+        }
+
+        // Trending's links, all at once.
+        List<java.util.concurrent.Future<String[]>> links = new ArrayList<>();
+        for (Pick p : trend) {
+            String type = p.kind.equals("tv") ? "series" : "movie", id = p.intentUri;
+            links.add(net.submit(() -> StreamRadar.where(type, id, pkg -> pkg.equals(p.pkg))));
+        }
+        for (int i = 0; i < trend.size(); i++) {
+            String[] w = radarGet(links.get(i));
+            trend.get(i).intentUri = w == null ? null : link(w[1], trend.get(i).pkg);
+        }
+        Log.i(TAG, "StreamRadar: " + trend.size() + " trending, " + india.size() + " new");
+        List<Pick> picks = new ArrayList<>(trend);
+        picks.addAll(india);
+        save(downloadImages(picks));
+    }
+
+    /** Films and series taken in turn. */
+    private static List<JSONObject> alternate(JSONArray films, JSONArray shows) throws Exception {
+        List<JSONObject> out = new ArrayList<>();
+        for (int j = 0; j < Math.max(films.length(), shows.length()); j++) {
+            if (j < films.length()) out.add(films.getJSONObject(j));
+            if (j < shows.length()) out.add(shows.getJSONObject(j));
+        }
+        return out;
+    }
+
+    /** A StreamRadar title as a pick on this app. Until its link is looked up, intentUri holds StreamRadar's id. */
+    private Pick radarPick(JSONObject m, String[] app, String tab) throws Exception {
+        Pick p = new Pick();
+        String id = m.getString("id");
+        p.id = id.matches("tt\\d{1,9}") ? Integer.parseInt(id.substring(2)) : id.hashCode() & 0x7fffffff;
+        p.kind = "series".equals(m.optString("type")) ? "tv" : "movie";
+        p.tab = tab;
+        p.title = m.optString("name");
+        p.pkg = app[2];
+        p.service = app[3];
+        p.meta = (p.kind.equals("tv") ? "Series" : "Film") + " · " + p.service;
+        p.intentUri = id;
+        p.image = new File(dir, "sr_" + p.kind + "_" + p.id + "_w1280.jpg");
+        p.backdropPath = m.getString("background");
+        // Only TMDB's posters: the others come from many sites, some small or cropped. The backdrop does without.
+        String poster = m.optString("poster");
+        if (poster.startsWith("https://image.tmdb.org/")) {
+            p.poster = new File(dir, "sr_" + p.kind + "_" + p.id + "_poster.jpg");
+            p.posterPath = poster.replaceFirst("/t/p/[^/]+/", "/t/p/w342/");
+        }
+        return p;
+    }
+
+    /** The app's page for the title, opened in that app. */
+    private static String link(String url, String pkg) {
+        if (url == null || !url.startsWith("https://")) return null;
+        return new android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(url)).setPackage(pkg)
+                .toUri(android.content.Intent.URI_INTENT_SCHEME);
+    }
+
+    /** A StreamRadar list, or none if it failed: the other apps' lists still make picks. */
+    private static JSONArray radarList(java.util.concurrent.Future<JSONArray> f) {
+        try {
+            return f.get();
+        } catch (Exception e) {
+            Log.w(TAG, "StreamRadar list failed: " + e.getCause());
+            return new JSONArray();
+        }
+    }
+
+    private static String[] radarGet(java.util.concurrent.Future<String[]> f) {
+        try {
+            return f.get();
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
     /** A candidate list's titles; none for a list that wasn't asked for. */
     private static JSONArray results(java.util.concurrent.Future<JSONObject> list) throws Exception {
         return list == null ? new JSONArray() : list.get().getJSONArray("results");
@@ -420,9 +557,14 @@ final class Trending {
         List<java.util.concurrent.Future<Boolean>> jobs = new ArrayList<>();
         for (Pick p : picks) {
             jobs.add(net.submit(() -> {
-                if (!p.image.isFile()) download(BACKDROPS + p.backdropPath, p.image);
+                // StreamRadar's pictures come as whole addresses.
+                if (!p.image.isFile()) download(p.backdropPath.startsWith("http") ? p.backdropPath : BACKDROPS + p.backdropPath, p.image);
                 if (p.poster != null && !p.poster.isFile()) {
-                    try { download(POSTERS + p.posterPath, p.poster); } catch (IOException e) { p.poster = null; }
+                    try {
+                        download(p.posterPath.startsWith("http") ? p.posterPath : POSTERS + p.posterPath, p.poster);
+                    } catch (IOException e) {
+                        p.poster = null;
+                    }
                 }
                 return true;
             }));
@@ -681,8 +823,20 @@ final class Trending {
         }
     }
 
-    /** TMDB accepts either a v3 API key (query parameter) or a v4 read access token (Bearer header). */
+    /**
+     * TMDB accepts either a v3 API key (query parameter) or a v4 read access token (Bearer header). A connection
+     * reset is tried once more: some Indian networks drop the odd TMDB connection, and one lost request out of a
+     * hundred would otherwise lose the whole refresh.
+     */
     private static JSONObject get(String key, String path) throws Exception {
+        try {
+            return getOnce(key, path);
+        } catch (java.net.SocketException e) {
+            return getOnce(key, path);
+        }
+    }
+
+    private static JSONObject getOnce(String key, String path) throws Exception {
         boolean bearer = key.length() > 40;
         String url = API + path + (bearer ? "" : (path.contains("?") ? "&" : "?") + "api_key=" + key);
         HttpURLConnection c = (HttpURLConnection) new URL(url).openConnection();

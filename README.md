@@ -155,7 +155,8 @@ opens its switch.
 > comes up; it reads nothing on screen except JioHotstar's search box, when you open a cricket match there.
 
 Cricket and football scores need no key. Without a TMDB key, Trending and *New in your country* stay away (Continue
-still works).
+still works), except in India, where they come from [StreamRadar](https://streamradar.bricksgenius.com) until you add
+one.
 
 ### TVs and boxes
 
@@ -196,7 +197,7 @@ settings to another TV.
   lookup below), and your weather area goes only to the weather services.
 - **What it connects to, and only while it's on screen:** TMDB for the picks (with your key), Open-Meteo and
   NOAA's aviationweather.gov for the weather, ESPN's public scoreboard for cricket and
-  football, Bing for the wallpaper (if you turn it on), GitHub once a day for updates, and Cloudflare when you run a
+  football, StreamRadar for the picks in India without a TMDB key, Bing for the wallpaper (if you turn it on), GitHub once a day for updates, and Cloudflare when you run a
   speed test. Sharp YouTube pictures (off by default) looks a video's title up on YouTube.
 - **Your keys, location and wallpaper** stay on the TV. *Send from your phone* (keys, and Wallpaper → From your
   phone) runs a one-time page on your home network for 5 minutes, and what you send goes straight to the TV. A photo
@@ -214,7 +215,7 @@ Control Center and remote-button remapping. They work together: run CleanYourTV 
 |---|---|
 | **Home opens Google TV** (or the TV's own launcher) | The Talkies Accessibility switch is off ([First-time setup](#first-time-setup), step 1). A force stop turns it off; with the optional `pm grant` from the install, Talkies turns it back on by itself. |
 | **Accessibility switch greyed out**, or "Restricted setting" | Android 13 and newer: see the tip under [First-time setup](#first-time-setup). On a Google TV Streamer it needs the one `adb` command there. |
-| **No Trending or New tabs**, only Continue | No TMDB key yet: Talkies settings → **Keys and location** → *Send from your phone*. With a key, picks arrive within a minute of opening Talkies with the TV online. No streaming app Talkies recognises and no YouTube: the row says so. |
+| **No Trending or New tabs**, only Continue | No TMDB key yet (outside India): Talkies settings → **Keys and location** → *Send from your phone*. With a key, picks arrive within a minute of opening Talkies with the TV online. No streaming app Talkies recognises and no YouTube: the row says so. |
 | **No weather** | Talkies needs your town for it: Talkies settings → **Keys and location**. |
 | **Continue stays empty** | Notification access or the Watch Next permission is missing: Talkies settings → **Finish setup**. |
 | **No Notification access screen** (many Android 8 TVs) | The TV's settings don't have one, so Finish setup leaves it out: it's optional, for Continue, Now playing and the bell. From a computer: `adb shell cmd notification allow_listener com.techpp.glass/com.techpp.glass.WatchService`. With the `WRITE_SECURE_SETTINGS` grant from the install steps, Finish setup switches it on itself. |
@@ -261,6 +262,8 @@ Data (also listed in the app, Talkies settings → About):
 - **Weather:** [Weather data by Open-Meteo.com](https://open-meteo.com/), under
   [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/); airport temperatures from NOAA's
   [aviationweather.gov](https://aviationweather.gov).
+- **Picks in India without a key:** [StreamRadar India](https://streamradar.bricksgenius.com), a free Stremio add-on;
+  pointed out by Swakshan.
 - **Cricket and football:** ESPN's public scoreboard (not an official API; Talkies isn't affiliated with ESPN).
 - **Speed test:** Cloudflare's public speed-test endpoint.
 

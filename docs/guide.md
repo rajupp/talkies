@@ -150,7 +150,22 @@ stretched; only the large card's full-size picture is kept in memory.
 **OK** on a pick opens that app.
 TMDB doesn't know each title's ID inside Netflix, Hotstar and the rest, so the app opens to its home screen, not the title.
 
-The picks come from [TMDB](https://www.themoviedb.org), which needs a free key of your own:
+### In India without a key
+
+Until you add a TMDB key, a TV in India gets its picks from [StreamRadar India](https://streamradar.bricksgenius.com),
+a free, open list of what's on Indian apps (an idea from Swakshan):
+
+- **Trending**: the Top 10 films and series of each app on this TV (JioHotstar, Netflix, Prime Video, ZEE5, SonyLIV,
+  Apple TV), taken in turn.
+- **New in India**: what's just come out on those apps, newest first.
+- **OK** opens the title's own page in its app where StreamRadar has a link (JioHotstar, ZEE5 and SonyLIV checked),
+  else the app.
+
+StreamRadar's lists don't give genres or languages, so the line under the card is just film or series and the app,
+and **Picks languages** isn't offered. Add a TMDB key and TMDB's picks take over at once.
+
+The picks come from [TMDB](https://www.themoviedb.org), which needs a free key of your own (in India, StreamRadar
+fills in until you add one):
 
 1. Create an account at [themoviedb.org](https://www.themoviedb.org/signup) and open
    [Settings → API](https://www.themoviedb.org/settings/api). Request a developer key (personal use).

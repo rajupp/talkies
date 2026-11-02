@@ -1247,10 +1247,12 @@ public class HomeActivity extends Activity {
         boolean show = forYou && rowPicks.isEmpty();
         picksHint.setVisibility(show ? View.VISIBLE : View.GONE);
         if (!show) return;
-        picksHint.setText(Keys.read(this, Keys.TMDB) == null
+        boolean radar = Trending.RADAR.equals(trending.source());
+        picksHint.setText(trending.source() == null
                 ? "Trending and new picks need a free TMDB key: Control Center → Talkies settings → Keys and location"
                 : trending.matchedApps() == 0
-                ? "Trending shows what's on your streaming apps, and none Talkies knows is installed. With YouTube installed, it shows trailers instead."
+                ? "Trending shows what's on your streaming apps, and none Talkies knows is installed."
+                        + (radar ? "" : " With YouTube installed, it shows trailers instead.")
                 : !trending.languages().isEmpty()
                 ? "Nothing in " + languagesLabel() + " on your apps here right now. More languages: Talkies settings → Picks languages."
                 : "Picks appear here once Talkies is online. Shows you watch show up under Continue.");
@@ -3624,7 +3626,8 @@ public class HomeActivity extends Activity {
             buildPicksRow(0);
             if (forYou) refreshOnline();
         }, true);
-        if (forYou) addRow("Picks languages", languagesLabel(), this::openPicksLanguages, false);
+        // StreamRadar's lists (India, no TMDB key) don't say a title's language.
+        if (forYou && !Trending.RADAR.equals(trending.source())) addRow("Picks languages", languagesLabel(), this::openPicksLanguages, false);
         final View[] sp = new View[1];
         sp[0] = addRow("Hide spoilers", WatchNext.hideSpoilers(this) ? "On" : "Off", () -> {
             boolean on = !WatchNext.hideSpoilers(this);
