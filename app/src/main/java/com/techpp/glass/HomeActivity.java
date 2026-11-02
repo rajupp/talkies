@@ -2063,6 +2063,7 @@ public class HomeActivity extends Activity {
         menuMode = MENU_PLAIN;
         menuScroll.animate().cancel();
         menu.removeAllViews();
+        menu.setPadding(px(8), px(8), px(8), px(8));  // What's new widens it
         menuScroll.setBackground(rounded(theme.menuBg, theme.menuStroke, 20));
         menuScroll.scrollTo(0, 0);
         if (heading != null) {
@@ -2141,6 +2142,12 @@ public class HomeActivity extends Activity {
         for (int r = 0; r < menuItems.size(); r++) {
             View row = menuItems.get(r);
             boolean f = r == i;
+            if ("note".equals(row.getTag())) {
+                // A paragraph (What's new): the focused one reads bright, the rest dimmed, like Plume's.
+                row.setBackground(null);
+                ((TextView) row.findViewById(R.id.input_label)).setTextColor(f ? theme.text : theme.text2);
+                continue;
+            }
             row.setBackground(f ? rounded(theme.menuFocusBg, 0, 12) : null);
             ((TextView) row.findViewById(R.id.input_label)).setTextColor(f ? theme.menuFocusText : theme.text);
             ((TextView) row.findViewById(R.id.input_status)).setTextColor(f ? (theme.menuFocusText & 0x00FFFFFF) | 0x99000000 : theme.text2);
@@ -3341,6 +3348,121 @@ public class HomeActivity extends Activity {
         if (!any && zone == Z_MENU && menuAnchor == P_BELL) closeMenu();
     }
 
+    /** Talkies settings → Updates (and the top of What's new): the latest version; OK checks again and installs it. */
+    private void addUpdatesRow() {
+        final View[] up = new View[1];
+        up[0] = addRow("Updates", SelfUpdate.summary(this), () -> SelfUpdate.checkAndInstall(this, st -> runOnUiThread(() -> {
+            if (up[0].isAttachedToWindow()) setStatus(up[0], st);
+        })), true);
+    }
+
+    private String versionName() {
+        try { return pm.getPackageInfo(getPackageName(), 0).versionName; } catch (PackageManager.NameNotFoundException e) { return ""; }
+    }
+
+    /** A paragraph in a menu: wraps, and the arrows step through it like a row (focusMenu brightens it). */
+    private View addNote(CharSequence text, float sizeSp) {
+        View row = addRow("", null, () -> { }, true);
+        row.setTag("note");
+        TextView t = row.findViewById(R.id.input_label);
+        t.setText(text);
+        t.setSingleLine(false);
+        t.setTextSize(sizeSp);
+        t.setLineSpacing(0, 1.12f);
+        row.getLayoutParams().height = ViewGroup.LayoutParams.WRAP_CONTENT;
+        row.setPadding(row.getPaddingLeft(), px(6), row.getPaddingRight(), px(6));
+        return row;
+    }
+
+    /** A section's name in a menu ("New", "Fixed"): not a row, the arrows pass over it. */
+    private void addMenuHeading(String text) {
+        TextView h = new TextView(this);
+        h.setText(text);
+        h.setTextSize(14);
+        h.setTextColor(theme.text);
+        h.setTypeface(getResources().getFont(R.font.outfit));
+        h.setFontVariationSettings("'wght' 650");
+        h.setPadding(px(14), px(14), px(14), px(2));
+        menu.addView(h);
+    }
+
+    private TextView menuTitle(String text) {
+        TextView t = new TextView(this);
+        t.setText(text);
+        t.setTextSize(21);
+        t.setTextColor(theme.text);
+        t.setTypeface(getResources().getFont(R.font.outfit));
+        t.setFontVariationSettings("'wght' 600");
+        t.setPadding(px(14), px(10), px(14), px(8));
+        menu.addView(t);
+        return t;
+    }
+
+    /**
+     * Talkies settings → About → What's new (and the card's See all changes): this version's notes in a panel down the
+     * right edge, like Plume's, with Updates at the top.
+     */
+    private void openWhatsNew() {
+        beginMenu(settingsAt, null);
+        menuTitle("What's new in " + versionName());
+        addUpdatesRow();
+        List<WhatsNew.Section> all = WhatsNew.read(this);
+        for (WhatsNew.Section sec : all) {
+            addMenuHeading(sec.title);
+            for (String it : sec.items) addNote(WhatsNew.styled(it), 14);
+        }
+        setFocus(null, 1f, 0);  // from the card, the dock's ring would show behind it
+        showMenu(400);
+        // Full height against the right edge, square on that side.
+        FrameLayout.LayoutParams lp = (FrameLayout.LayoutParams) menuScroll.getLayoutParams();
+        lp.leftMargin = getResources().getDisplayMetrics().widthPixels - px(400);
+        lp.topMargin = 0;
+        lp.height = getResources().getDisplayMetrics().heightPixels;
+        menuScroll.setLayoutParams(lp);
+        GradientDrawable bg = rounded(theme.menuBg, 0, 0);
+        float r = px(22);
+        bg.setCornerRadii(new float[]{r, r, 0, 0, 0, 0, r, r});
+        menuScroll.setBackground(bg);
+        menu.setPadding(px(18), px(22), px(18), px(22));
+    }
+
+    /** Once after an update, on Home: a few of the notes, Done, and See all changes. In the middle of the screen. */
+    private void showNewsCard() {
+        if (!inFront || zone == Z_MENU || moving || !WhatsNew.due(this, prefs)) return;
+        List<String> items = WhatsNew.highlights(WhatsNew.read(this), 4);
+        WhatsNew.markSeen(this, prefs);
+        if (items.isEmpty()) return;
+        beginMenu(P_SETTINGS, null);
+        menuTitle("New in Talkies " + versionName());
+        for (String it : items) {
+            TextView t = new TextView(this);
+            t.setText(WhatsNew.styled("•  " + it));
+            t.setTextSize(16);
+            t.setTextColor(theme.text);
+            t.setTypeface(getResources().getFont(R.font.outfit));
+            t.setPadding(px(14), px(5), px(14), px(5));
+            menu.addView(t);
+        }
+        View gap = new View(this);
+        menu.addView(gap, new LinearLayout.LayoutParams(1, px(12)));
+        addRow("Done", null, () -> { }, false);
+        addRow("See all changes", null, () -> {
+            openWhatsNew();
+            menuClosed = () -> focusDock(dockIdx);
+        }, false);
+        // Over Home, not opened from an icon: no ring on the tile behind it, and closing it goes back to the dock.
+        setFocus(null, 1f, 0);
+        menuClosed = () -> focusDock(dockIdx);
+        menu.setPadding(px(16), px(16), px(16), px(12));
+        showMenu(680);
+        FrameLayout.LayoutParams lp = (FrameLayout.LayoutParams) menuScroll.getLayoutParams();
+        menu.measure(View.MeasureSpec.makeMeasureSpec(px(680), View.MeasureSpec.EXACTLY), View.MeasureSpec.UNSPECIFIED);
+        lp.leftMargin = (getResources().getDisplayMetrics().widthPixels - px(680)) / 2;
+        lp.topMargin = Math.max(px(24), (getResources().getDisplayMetrics().heightPixels - menu.getMeasuredHeight()) / 2);
+        lp.height = ViewGroup.LayoutParams.WRAP_CONTENT;
+        menuScroll.setLayoutParams(lp);
+    }
+
     /** One row per Play Store notification ("3 updates available" · "YouTube, Netflix…"); OK opens it in the Play Store. */
     private void openUpdates() {
         List<Updates.Item> list = Updates.list();
@@ -3589,10 +3711,7 @@ public class HomeActivity extends Activity {
             setStatus(yt[0], on ? "On" : "Off");
             if (on) refreshOnline();
         }, true);
-        final View[] up = new View[1];
-        up[0] = addRow("Updates", SelfUpdate.summary(this), () -> SelfUpdate.checkAndInstall(this, st -> runOnUiThread(() -> {
-            if (up[0].isAttachedToWindow()) setStatus(up[0], st);
-        })), true);
+        addUpdatesRow();
         addRow("About", null, this::openAbout, false);
         showMenu(350);
     }
@@ -4070,6 +4189,7 @@ public class HomeActivity extends Activity {
                 {"Code from", "tv-vibehack, CleanYourTV, Free My TV, Matinee, Luma, GlassLauncher"},
                 {"Font", "Outfit (SIL OFL)"},
         };
+        addRow("What's new", null, this::openWhatsNew, false);
         addRow("Made by", "Raju  ·  TechPP (techpp.com)", () -> { }, true);
         addRow("Source code", "github.com/rajupp/talkies", () -> { }, true);
         addRow("Support Talkies", "buymeacoffee.com/rajupp", this::showSupport, true);
@@ -4667,6 +4787,8 @@ public class HomeActivity extends Activity {
         if (prefs.getBoolean("bing_wallpaper", false)) bing.refreshIfStale(this::loadWallpaper);
         nextFromFolder(null);  // no network needed, but the same moments: a new day's picture while you can see it
         if (forYou) trending.refreshIfStale(this::onPicks);
+        // Just updated: what's new, once (showNewsCard checks again when it's time).
+        if (zone != Z_MENU && WhatsNew.due(this, prefs)) root.postDelayed(this::showNewsCard, 1500);
         // Once a day: is there a newer Talkies? Said once per version.
         background.execute(() -> {
             boolean news = SelfUpdate.checkIfStale(this);

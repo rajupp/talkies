@@ -132,6 +132,8 @@ screen the same way whatever density the TV reports.
 - **The release APK** (`talkies.apk` on each release) is signed with the project's key, which only the maintainer
   has (`release.properties`, never in git). Talkies only installs updates signed with that key.
 - **Making a release** (maintainer): bump `versionCode` and `versionName` in `app/build.gradle` and the CHANGELOG,
+  write the short notes Talkies shows after the update in `app/src/main/assets/whats_new.md` (a bold name, one
+  sentence, where to find it),
   commit, tag `vX.Y.Z`, push, `gh release create vX.Y.Z`, then `./release-apk.sh` builds, checks the signature and
   attaches `talkies.apk`.
 - Talkies uses an accessibility service, which is fine for sideloading but not allowed on Google Play for this

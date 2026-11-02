@@ -14,6 +14,10 @@ features, a new fix number only fixes. The version shows in Talkies settings →
   **Auto**, the default, picks Lite on TVs with under 1.6 GB of memory. An idea from Aerial.
 - **Report a problem** (Talkies settings → About): a QR code that opens a GitHub bug report on your phone with your
   TV's model, versions and key settings already filled in.
+- **What's new after an update.** The first time Home shows after Talkies updates, a card lists a few of the new
+  version's changes in a line each; **See all changes** (also in Talkies settings → About → What's new) opens all of
+  them in a panel on the right, with Updates at the top. Short notes written for the TV, built in, so it works
+  offline. An idea from Plume.
 - **A weather icon** before the weather at the top left: a small line drawing of the sky (sun, moon, partly cloudy
   by day or night, cloud, rain, snow, thunder, fog), in the text's colour.
 
