@@ -18,7 +18,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/rajupp/talkies/releases/latest"><b>Latest release</b></a> (about 200 KB) · free and open source (MIT) · made by Raju · <a href="https://techpp.com">TechPP</a>
+  <a href="https://github.com/rajupp/talkies/releases/latest"><b>Latest release</b></a> (about 220 KB) · free and open source (MIT) · made by Raju · <a href="https://techpp.com">TechPP</a>
 </p>
 
 ## What you get
@@ -32,7 +32,8 @@
 - **Weather** at a glance, with the next hours and days in Control Center.
 - **Control Center:** what's playing (pause, skip), sleep timer, turn off, recent apps, speed test, Bluetooth,
   sound output and more, one button away.
-- **Inputs** that know your devices: "PlayStation 5 · On", "Fire TV · Standby".
+- **Inputs** that know your devices: "PlayStation 5 · On", "Fire TV · Standby". Put any of them on Home as a tile,
+  or have the TV open one (or an app) each time it turns on.
 - **Remote buttons with a new job:** make any spare button open an app, and give it a second job when held.
 - **Your apps' channel rows** below the dock (Netflix, YouTube, JioHotstar…), the ones you pick, in your order.
 - **Light by day, dark at night**, following your sunrise and sunset. **Your own wallpaper**, sent from your phone or
@@ -49,7 +50,7 @@ stay on "English (United States)" wherever they are), and almost everything on t
 | **Dock** | — | Which apps (Talkies settings → **Dock apps**, or hold OK on any app), how many (**Dock size**, 5 to 10) and their order (hold OK → **Move**); All apps in your order, recently opened first, or A to Z (**All apps order**); your own picture on any app (hold OK → **Change image**) |
 | **Cricket** | Your team's matches first, then other internationals and your domestic competitions (IPL, Ranji Trophy… in India) | On or off |
 | **Football** | Your country's leagues by default (Premier League, Champions League and ISL in India; MLS first in the US; Süper Lig in Turkey…) | Pick any leagues |
-| **Channels, keys, look** | — | Which channel rows and their order, what each remote button does (tap and hold), Light, Dark or Auto, wallpaper |
+| **Channels, keys, look** | — | Which channel rows and their order, what each remote button does (tap and hold), Light, Dark or Auto, wallpaper, Full or Lite effects |
 
 | | |
 |---|---|
@@ -150,7 +151,7 @@ opens its switch.
 
 > [!NOTE]
 > Android shows the same strong warning for every accessibility service. Talkies' service filters only the Home
-> button and the buttons you give a job, and notices only when the TV's own launcher, the Assistant or JioHotstar
+> button, the buttons you give a job and OK while the sleep timer's warning is up, and notices only when the TV's own launcher, the Assistant or JioHotstar
 > comes up; it reads nothing on screen except JioHotstar's search box, when you open a cricket match there.
 
 Cricket and football scores need no key. Without a TMDB key, Trending and *New in your country* stay away (Continue
@@ -275,7 +276,8 @@ Code (details and license texts in `THIRD_PARTY_NOTICES.md`, all MIT):
 Ideas (no code; Talkies' own implementation):
 
 - The hold-OK menu (Move, Uninstall, App info), removing a card from Continue, giving remote buttons a new job, and
-  the Finish setup checklist: [Plume](https://github.com/aradhyas8/Plume_Launcher). Remote keys also follow CleanYourTV's.
+  the Finish setup checklist, the What's new card after an update and focus without a ring:
+  [Plume](https://github.com/aradhyas8/Plume_Launcher). Remote keys also follow CleanYourTV's.
 - Bing wallpaper, channel cards in last-watched order and apps opening from their tile: Plume. Spotting a stopped
   accessibility service: [Matinee](https://github.com/Jarvis322/matinee).
 - Starting the screensaver the way Google Assistant does, Recent apps and Control Center shortcuts:
