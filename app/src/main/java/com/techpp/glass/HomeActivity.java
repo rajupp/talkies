@@ -985,6 +985,8 @@ public class HomeActivity extends Activity {
             LinearLayout track = new LinearLayout(this);
             track.setOrientation(LinearLayout.HORIZONTAL);
             track.setClipChildren(false);
+            // Its padding mustn't clip either: the first card grows past it when focused (else a gap in the ring).
+            track.setClipToPadding(false);
             track.setPadding(px(40), 0, px(960), 0);
             List<View> cards = new ArrayList<>();
             int w = cardW(ch);
@@ -1541,13 +1543,8 @@ public class HomeActivity extends Activity {
             Map.Entry<View, Spring> e = it.next();
             Spring sp = e.getValue();
             boolean m = sp.step(dt);
-            View v = e.getKey();
-            // Grow from the centre, said outright: some TVs (Sony) drew the default pivot at the top-left corner, so
-            // the card spilled right and down while the ring, placed from the centre, left a gap above and to the left.
-            v.setPivotX(v.getWidth() / 2f);
-            v.setPivotY(v.getHeight() / 2f);
-            v.setScaleX(sp.value);
-            v.setScaleY(sp.value);
+            e.getKey().setScaleX(sp.value);
+            e.getKey().setScaleY(sp.value);
             if (m) moving = true;
             else if (sp.target == 1f) it.remove();
         }

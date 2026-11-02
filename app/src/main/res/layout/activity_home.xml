@@ -240,6 +240,7 @@
             android:layout_height="wrap_content"
             android:layout_marginTop="606dp"
             android:clipChildren="false"
+            android:clipToPadding="false"
             android:orientation="vertical"
             android:paddingStart="40dp"
             android:paddingEnd="40dp"
