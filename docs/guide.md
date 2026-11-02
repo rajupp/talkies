@@ -343,7 +343,7 @@ the score and the minute ("LIVE · Premier League · 67'"), kick-off time ("star
 
 ## Rearrange apps
 
-1. **Hold OK** on any app in the dock or All apps and choose **Move**. It lifts out, with a thicker ring,
+1. **Hold OK** on any app in the dock or All apps and choose **Move**. It lifts out, with a ring around it,
    and a hint appears at the top.
 2. **Use the arrows** to move it. Within a row it trades places with its neighbour; in the grid, Up and Down move it a
    row and the other apps shift along. Moving between the dock and All apps swaps it with the app there, so the dock

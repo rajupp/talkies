@@ -22,6 +22,8 @@ features, a new fix number only fixes. The version shows in Talkies settings →
   by day or night, cloud, rain, snow, thunder, fog), in the text's colour.
 
 ### Changed
+- **Focus without a ring.** The focused card or app grows and lifts on a soft shadow, like Plume's, instead of
+  wearing a white ring with a glow. Only an app you're moving (hold OK → Move) gets a ring, a thin one.
 - **Cricket needs no key.** Scores now come from ESPN, like football: no CricketData account, no daily limit, and
   they refresh every 2 minutes during a match instead of every 15. The Cricket key row, its box on the phone page and
   `set-cricket-key.sh` are gone. Thanks @Swakshan.
@@ -31,8 +33,9 @@ features, a new fix number only fixes. The version shows in Talkies settings →
   Android 8 TVs), where OK did nothing. It switches it on itself when Talkies has the `WRITE_SECURE_SETTINGS` grant;
   otherwise the step is marked optional, stops counting as a step left, and OK shows the one adb command that
   switches it on. Thanks @123nitin.
-- **The focused card fills its ring.** The first card of each channel row and the first column and row of All apps
-  were cut off at their left (and All apps' top) edge as they grew, leaving a gap inside the ring. Thanks @ag7tweets and @taurus77777.
+- **The first card in a row is no longer cut off** when it grows on focus: the first card of each channel row and
+  the first column and row of All apps lost a strip at their left (and All apps' top) edge. Thanks @ag7tweets and
+  @taurus77777.
 
 ### Removed
 - **Free up memory and Close them all.** Android lets an app close only its own background processes (on Android 14,

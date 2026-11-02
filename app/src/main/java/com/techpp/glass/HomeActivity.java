@@ -1476,7 +1476,12 @@ public class HomeActivity extends Activity {
     /** Grows the focused card or tile (and shrinks the previous one); the ring sits on it. */
     private void setFocus(View v, float scale, float radiusDp) {
         View old = focusedView;
-        if (old != null && old != v) scaleTo(old, 1f);
+        if (old != null && old != v) {
+            scaleTo(old, 1f);
+            old.animate().translationZ(0).setDuration(lite ? 0 : 150).start();
+        }
+        // Lifted on a soft shadow (no ring, like Plume): it shows on white and bright tiles too.
+        if (v != null && v != old) v.animate().translationZ(px(14)).setDuration(lite ? 0 : 150).start();
         focusedView = v;
         ringRadius = px(radiusDp);
         ring.animate().alpha(v == null ? 0f : 1f).setDuration(150).start();
@@ -1587,7 +1592,7 @@ public class HomeActivity extends Activity {
         picksRow.setAnchor(i, moved);
         updatePickImages(i);
         updateAmbient();
-        setFocus(picksRow.anchorCard(), 1.02f, 14);
+        setFocus(picksRow.anchorCard(), 1.04f, 14);
         styleTop();
         followRing(moved ? 360 : 220);
     }

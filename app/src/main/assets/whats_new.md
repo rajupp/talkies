@@ -7,11 +7,12 @@
 - **Weather icon.** A small drawing of the sky beside the temperature.
 
 ### Changed
+- **Cleaner focus.** The card you're on grows and lifts on a soft shadow, with no white ring around it.
 - **Cricket without a key.** Scores now come from ESPN, like football, and refresh every 2 minutes during a match.
 
 ### Fixed
 - **Finish setup on older TVs.** It no longer gets stuck on Notification access when the TV has no such screen.
-- **The focus ring.** The first card in a row fills its ring again.
+- **First cards in full.** The first card in a row is no longer cut off at the left when you're on it.
 
 ### Removed
 - **Free up memory.** Android lets an app close only its own background apps, so it couldn't free anything.
