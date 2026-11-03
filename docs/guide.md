@@ -84,7 +84,7 @@ Control Center → **Talkies settings**, or **hold OK on the ⚙ icon** (a press
 | Phone apps | Only on a TV with any (with how many): **Shown** (default) or Hidden: apps with no TV version (Chrome, MacroDroid… installed from a file) in All apps, with a tile made from their icon. Hidden leaves them out, for TVs that list odd system screens this way; hold OK → **Hide** hides just one |
 | RAM and storage | Shown (default) or Hidden: the two meters beside the icon buttons, with free RAM and free storage, updated every minute |
 | Live scores | Cricket and football (default), Cricket, Football or Off: what the score line and the score rows show |
-| Football leagues | The leagues the Football row follows; see [Football](#football) |
+| Leagues | The football leagues, and the NBA and NFL, the Football row follows; see [Football](#football) |
 | Channels | Choose which app channels show below the dock, and their order |
 | Hidden apps | Shown once you've hidden an app: the apps you hid; OK shows one again |
 | Remote keys | Give a remote button another job: open an app, Inputs, Recent apps, Talkies, or nothing. **Add a key**, press the button, choose. Once it has a job, **When held** gives it a second one for holding it (over half a second). Navigation, OK, Back, Home, volume and power can't be changed. A button Android has no name for shows as *Button 0x…* (its code from the remote). If a button still just does its own job while Talkies waits for it (the app buttons on some TVs), the TV's software handles it before Android sees it, and no app can change it. **Remote keys: On or Off** at the top, On by default: Home goes straight to Talkies. On some TVs, while it's on, holding Volume changes it only one step per press, in every app: Android stops repeating a held button once an app watches the remote, and the TV acts on Volume before any app sees it, so no app can repeat it either. Off, holding Volume works, and Home reaches Talkies with Google TV's home showing for a moment first |
@@ -330,10 +330,13 @@ Football works like cricket, with no key: the line under the weather shows the m
 the score and the minute ("LIVE · Premier League · 67'"), kick-off time ("starts Wed 7:30 pm") or result.
 
 - **Which matches:** live now, starting within a day, or finished in the last 12 hours, from your leagues.
-- **Your leagues:** Talkies settings → **Football leagues**. Each country starts with its own (India: Premier League,
+- **Your leagues:** Talkies settings → **Leagues**. Each country starts with its own (India: Premier League,
   Champions League and Indian Super League; the UK: Premier League, Champions League and the Scottish Premiership;
-  the US: MLS, Premier League and Champions League; Turkey: Süper Lig, Champions League and Premier League…), plus the World Cup and the Euros when they're on. Press OK to
+  the US and Canada: NFL, NBA, MLS, Premier League and Champions League; Turkey: Süper Lig, Champions League and Premier League…), plus the World Cup and the Euros when they're on. Press OK to
   turn one on or off; **Back to the defaults** undoes your changes.
+- **NBA and NFL:** in the same list, picked like a league. Their games read the American way, away team first
+  ("CHI at SEA", "8:28 - 4th"). The row is called **Football**, **NBA** or **NFL** when that's all it has, and
+  **Sports** when it's a mix.
 - **Updates:** every 15 minutes, and every minute for a league with a match on, only while Talkies is in front.
 - **Data:** ESPN's public scoreboard. It's free and needs no key, but it isn't an official API: ESPN can change it
   without notice, and then the Football row just stays away until Talkies is updated.

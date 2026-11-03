@@ -545,7 +545,7 @@ public class HomeActivity extends Activity {
                 b.setSpan(new ForegroundColorSpan(0xFFFF453A), 0, 6, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
                 b.append(m.league).append("  ·  ").append(m.status).append("  ·  ").append(result);
             } else if (!m.ended) {
-                b.append(m.league).append("  ·  ").append(m.short1).append(" v ").append(m.short2)
+                b.append(m.league).append("  ·  ").append(m.short1).append(" ").append(m.vs).append(" ").append(m.short2)
                         .append(m.start == null ? "" : "  ·  " + m.start);
             } else {
                 b.append(m.league).append("  ·  ").append(result).append("  ·  ").append(m.status);
@@ -851,9 +851,10 @@ public class HomeActivity extends Activity {
         // The row with a match being played goes first: Football above Cricket while only football is live.
         boolean footballFirst = !footballRow.isEmpty() && footballRow.get(0).live
                 && (cricketRow.isEmpty() || !cricketRow.get(0).live);
-        if (footballFirst) list.add(scoresRow("football", "Football", footballRow));
+        String sports = sportsTitle(footballRow);
+        if (footballFirst) list.add(scoresRow("football", sports, footballRow));
         if (!cricketRow.isEmpty()) list.add(scoresRow("cricket", "Cricket", cricketRow));
-        if (!footballRow.isEmpty() && !footballFirst) list.add(scoresRow("football", "Football", footballRow));
+        if (!footballRow.isEmpty() && !footballFirst) list.add(scoresRow("football", sports, footballRow));
         list.addAll(apps);
         {
             {
@@ -893,6 +894,13 @@ public class HomeActivity extends Activity {
                 refocusChannels = false;
             }
         }
+    }
+
+    /** The row's name: "Football", or "NBA" or "NFL" when that's all it has, "Sports" when it's a mix. */
+    private static String sportsTitle(List<Cricket.Match> list) {
+        Set<String> kinds = new HashSet<>();
+        for (Cricket.Match m : list) kinds.add("at".equals(m.vs) ? m.kind : "Football");
+        return kinds.size() == 1 ? kinds.iterator().next() : "Sports";
     }
 
     /** What a card shows, unchanged by a new score: the match, or the pick itself. */
@@ -1914,7 +1922,7 @@ public class HomeActivity extends Activity {
         }
         Intent i = p.pkg == null ? null : pm.getLeanbackLaunchIntentForPackage(p.pkg);
         if (i != null) startFromTile(i);
-        else if (p.extra instanceof Cricket.Match && ((Cricket.Match) p.extra).football) Toast.makeText(this, "Talkies doesn't know where to watch football yet", Toast.LENGTH_SHORT).show();
+        else if (p.extra instanceof Cricket.Match && ((Cricket.Match) p.extra).football) Toast.makeText(this, "Talkies doesn't know where to watch " + ("at".equals(((Cricket.Match) p.extra).vs) ? "this game" : "football") + " yet", Toast.LENGTH_SHORT).show();
         else if (p.extra instanceof Cricket.Match) Toast.makeText(this, "None of your apps has a card for this match", Toast.LENGTH_SHORT).show();
     }
 
@@ -2501,8 +2509,8 @@ public class HomeActivity extends Activity {
 
     /** One row per league, On when it's shown; OK turns it on or off. Leaving the menu fetches the new set. */
     private void openFootballLeagues(int focus) {
-        beginMenu(settingsAt, football.customLeagues() ? "Football leagues"
-                : "Football leagues  ·  defaults for " + Region.name(Region.country(this)));
+        beginMenu(settingsAt, football.customLeagues() ? "Leagues"
+                : "Leagues  ·  defaults for " + Region.name(Region.country(this)));
         List<String> on = football.leagues();
         for (String[] l : Football.LEAGUES) {
             final View[] row = new View[1];
@@ -2510,7 +2518,7 @@ public class HomeActivity extends Activity {
                 football.toggle(l[0]);
                 setStatus(row[0], football.leagues().contains(l[0]) ? "On" : null);
                 View heading = menu.getChildAt(0);
-                if (heading instanceof TextView && !menuItems.contains(heading)) ((TextView) heading).setText("Football leagues");
+                if (heading instanceof TextView && !menuItems.contains(heading)) ((TextView) heading).setText("Leagues");
             }, true);
         }
         if (football.customLeagues()) addRow("Back to the defaults", null, () -> {
@@ -3691,7 +3699,7 @@ public class HomeActivity extends Activity {
             showChannels(appChannels);
             refreshOnline();
         }, true);
-        if (!scores().equals("off") && !scores().equals("cricket")) addRow("Football leagues", football.leagues().size() + " on",
+        if (!scores().equals("off") && !scores().equals("cricket")) addRow("Leagues", football.leagues().size() + " on",
                 () -> openFootballLeagues(0), false);
         addRow("Channels", null, this::openChannelsEditor, false);
         int hiddenCount = hiddenApps().size();

@@ -34,16 +34,18 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 /**
- * Football scores from ESPN's public scoreboard (site.api.espn.com): no key, every major league. It isn't a documented
+ * Football scores from ESPN's public scoreboard (site.api.espn.com): no key, every major league, and the NBA and NFL
+ * (picked like a league; their games show away team first, "CHI at SEA", as Americans write them). It isn't a documented
  * API, so it may change without notice; if it fails, the Football row just stays away. Leagues: the ones you chose in
- * Control Center → Football leagues, else a default set for the TV's country (Region). Shows matches live now,
+ * Talkies settings → Leagues, else a default set for the TV's country (Region). Shows matches live now,
  * starting in the next day, or finished in the last 12 hours. Asks every 15 minutes, and every minute for the
  * leagues with a match on (at least 30 s apart, so every minute tick of the home screen gets one), only while the home screen is showing. The matches reuse Cricket.Match, so the score line,
  * row and cards are drawn the same way.
  */
 final class Football {
     private static final String TAG = "GlassFootball";
-    private static final String API = "https://site.api.espn.com/apis/site/v2/sports/soccer/";
+    /** Followed by the league's path: "soccer/eng.1", or the id itself for the other sports ("basketball/nba"). */
+    private static final String API = "https://site.api.espn.com/apis/site/v2/sports/";
     private static final long FULL_MS = 15 * 60_000L, LIVE_MS = 30_000L, RETRY_MS = 5 * 60_000L;
     private static final long PAST_MS = 12 * 3600_000L, AHEAD_MS = 24 * 3600_000L;
     private static final int MAX = 12;
@@ -56,7 +58,8 @@ final class Football {
             {"eng.1", "Premier League", "EPL"}, {"uefa.champions", "Champions League", "UCL"},
             {"esp.1", "LaLiga", "LaLiga"}, {"ger.1", "Bundesliga", "Bundesliga"}, {"ita.1", "Serie A", "Serie A"},
             {"fra.1", "Ligue 1", "Ligue 1"}, {"uefa.europa", "Europa League", "UEL"},
-            {"ind.1", "Indian Super League", "ISL"}, {"usa.1", "MLS", "MLS"}, {"ned.1", "Eredivisie", "Eredivisie"},
+            {"ind.1", "Indian Super League", "ISL"}, {"usa.1", "MLS", "MLS"},
+            {"football/nfl", "NFL", "NFL"}, {"basketball/nba", "NBA", "NBA"}, {"ned.1", "Eredivisie", "Eredivisie"},
             {"por.1", "Primeira Liga", "Primeira"}, {"sco.1", "Scottish Premiership", "SPFL"},
             {"tur.1", "S\u00fcper Lig", "S\u00fcper Lig"},
             {"bra.1", "Brasileirão", "Brazil"}, {"arg.1", "Liga Profesional", "Argentina"},
@@ -70,8 +73,8 @@ final class Football {
         DEFAULTS.put("TR", new String[]{"tur.1", "uefa.champions", "eng.1"});
         DEFAULTS.put("GB", new String[]{"eng.1", "uefa.champions", "sco.1"});
         DEFAULTS.put("IE", new String[]{"eng.1", "uefa.champions"});
-        DEFAULTS.put("US", new String[]{"usa.1", "eng.1", "uefa.champions"});
-        DEFAULTS.put("CA", new String[]{"usa.1", "eng.1", "uefa.champions"});
+        DEFAULTS.put("US", new String[]{"football/nfl", "basketball/nba", "usa.1", "eng.1", "uefa.champions"});
+        DEFAULTS.put("CA", new String[]{"football/nfl", "basketball/nba", "usa.1", "eng.1", "uefa.champions"});
         DEFAULTS.put("ES", new String[]{"esp.1", "uefa.champions"});
         DEFAULTS.put("DE", new String[]{"ger.1", "uefa.champions"});
         DEFAULTS.put("AT", new String[]{"ger.1", "uefa.champions"});
@@ -108,6 +111,9 @@ final class Football {
         for (String[] l : LEAGUES) if (l[0].equals(id)) return l[1];
         return id;
     }
+
+    /** The NBA and NFL: not football as the rest of the world means it. */
+    static boolean american(String id) { return id.contains("/"); }
 
     static String leagueShort(String id) {
         for (String[] l : LEAGUES) if (l[0].equals(id)) return l[2];
@@ -225,7 +231,7 @@ final class Football {
             if (!on.contains(league)) continue;
             JSONObject d;
             try {
-                d = get(API + league + "/scoreboard?dates=" + date);
+                d = get(API + (american(league) ? league : "soccer/" + league) + "/scoreboard?dates=" + date);
             } catch (IOException e) {
                 Log.w(TAG, league + " " + date + ": " + e.getMessage());
                 continue;
@@ -291,6 +297,8 @@ final class Football {
         if (teams.length() != 2) return null;
         JSONObject home = teams.getJSONObject(0), away = teams.getJSONObject(1);
         if ("away".equals(home.optString("homeAway"))) { JSONObject t = home; home = away; away = t; }
+        // The NBA and NFL put the away team first ("CHI at SEA"); "home" is just whichever comes first below.
+        if (american(league)) { JSONObject t = home; home = away; away = t; }
         Date at = parseUtc(e.optString("date"));
         if (at == null) return null;
         String state = type.optString("state");  // pre, in, post
@@ -305,7 +313,8 @@ final class Football {
         // "67'", "HT", "FT", "Postponed": what the card and the score line say.
         String status;
         if (name.contains("POSTPONED") || name.contains("CANCELED") || name.contains("ABANDONED")) status = type.optString("description");
-        else if ("in".equals(state)) status = name.contains("HALFTIME") ? "Half-time" : st.optString("displayClock");
+        else if ("in".equals(state) && name.contains("HALFTIME")) status = "Half-time";
+        else if ("in".equals(state)) status = american(league) ? type.optString("shortDetail") : st.optString("displayClock");  // "8:28 - 4th"
         else if ("post".equals(state)) status = type.optString("detail", "FT").replace("FT", "Full time");
         else status = "";
         o.put("status", status);
@@ -341,7 +350,8 @@ final class Football {
         m.img1 = o.optString("img1");
         m.img2 = o.optString("img2");
         m.status = o.optString("status");
-        m.name = m.full1 + " v " + m.full2;
+        if (american(o.optString("league"))) m.vs = "at";
+        m.name = m.full1 + " " + m.vs + " " + m.full2;
         m.start = m.live || m.ended ? null
                 : new SimpleDateFormat("h:mm a", Locale.US).format(new Date(o.optLong("at"))).toLowerCase(Locale.ROOT);
         if (!m.live && !m.ended && m.status.isEmpty()) {

@@ -12,6 +12,10 @@ features, a new fix number only fixes. The version shows in Talkies settings →
   over at once, and Talkies settings → **Picks from** (on TVs in India) switches between TMDB and StreamRadar any
   time. Thanks to Swakshan for pointing it out.
 
+- **NBA and NFL scores.** Talkies settings → **Leagues** (was Football leagues) now has the NBA and NFL, from
+  the same ESPN scoreboard: live games, start times and results, away team first ("CHI at SEA"). On by default in
+  the US and Canada.
+
 ### Fixed
 - **Picks on flaky networks.** A TMDB request whose connection is reset is tried once more, instead of the whole
   refresh failing until the next try half an hour later.

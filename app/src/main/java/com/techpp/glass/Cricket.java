@@ -104,6 +104,7 @@ final class Cricket {
         boolean football;                         // a Football match (same card): kind is the league, status the clock
         String short1, short2;                    // football: three-letter names for the score line ("ARS")
         String league;                            // football: the league's short name for the score line ("EPL")
+        String vs = "v";                          // between the teams: "at" for the NBA and NFL, away team first
     }
 
     interface Listener { void onMatches(List<Match> matches); }

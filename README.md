@@ -28,7 +28,7 @@
   any app to move, hide or uninstall it.
 - **For You:** what's trending on *your* streaming apps in *your* country, what's new there, and Continue watching.
   Only titles that stream on a subscription you can use; hide it for a big clean clock instead.
-- **Live cricket and football** on the home screen, with your country's teams and leagues first.
+- **Live cricket, football, NBA and NFL** on the home screen, with your country's teams and leagues first.
 - **Weather** at a glance, with the next hours and days in Control Center.
 - **Control Center:** what's playing (pause, skip), sleep timer, turn off, recent apps, speed test, Bluetooth,
   sound output and more, one button away.
@@ -49,7 +49,7 @@ stay on "English (United States)" wherever they are), and almost everything on t
 | **For You** | Trending and *New in your country* only show titles that stream on a subscription where you are, on your apps (no streaming apps: their trailers in YouTube) | Show or hide it |
 | **Dock** | — | Which apps (Talkies settings → **Dock apps**, or hold OK on any app), how many (**Dock size**, 5 to 10) and their order (hold OK → **Move**); All apps in your order, recently opened first, or A to Z (**All apps order**); your own picture on any app (hold OK → **Change image**) |
 | **Cricket** | Your team's matches first, then other internationals and your domestic competitions (IPL, Ranji Trophy… in India) | On or off |
-| **Football** | Your country's leagues by default (Premier League, Champions League and ISL in India; MLS first in the US; Süper Lig in Turkey…) | Pick any leagues |
+| **Football** | Your country's leagues by default (Premier League, Champions League and ISL in India; the NFL, NBA and MLS in the US; Süper Lig in Turkey…) | Pick any leagues, the NBA and NFL too |
 | **Channels, keys, look** | — | Which channel rows and their order, what each remote button does (tap and hold), Light, Dark or Auto, wallpaper, Full or Lite effects |
 
 | | |
