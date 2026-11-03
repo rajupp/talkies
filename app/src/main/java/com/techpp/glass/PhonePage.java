@@ -68,6 +68,8 @@ final class PhonePage {
     private final Listener listener;
     private final AtomicBoolean taken = new AtomicBoolean();
     private final AtomicInteger answering = new AtomicInteger();
+    /** For a non-private address: the TV's subnet, the only one answered (address as an int, mask); null: any. */
+    private final int[] subnet;
     private volatile boolean closed;
 
     PhonePage(InetAddress lan, Listener listener) throws IOException { this(lan, false, listener); }
@@ -86,6 +88,7 @@ final class PhonePage {
         byte[] random = new byte[12];
         new SecureRandom().nextBytes(random);
         path = "/" + Base64.getUrlEncoder().withoutPadding().encodeToString(random);
+        subnet = lan.isSiteLocalAddress() ? null : subnet(lan);
         server = new ServerSocket(0, 4, lan);   // port 0: a free one the system picks
         url = "http://" + lan.getHostAddress() + ":" + server.getLocalPort() + path;
         Thread t = new Thread(this::serve, "PhonePage");
@@ -103,8 +106,10 @@ final class PhonePage {
     }
 
     /**
-     * The TV's private IPv4 address (10/8, 172.16/12, 192.168/16) on its Wi-Fi or Ethernet, the active network first;
-     * never a VPN's (a phone on the Wi-Fi can't reach it) nor a public one (anyone could). Null: no page.
+     * The TV's IPv4 address on its Wi-Fi or Ethernet, the active network first; never a VPN's (a phone on the Wi-Fi
+     * can't reach it). A private one (10/8, 172.16/12, 192.168/16) if there is one, else any other the router handed
+     * out (some home networks use other ranges, #20): the page then answers only phones on the TV's own subnet, so even
+     * a public address isn't open to the internet. Null: no page.
      */
     @SuppressWarnings("deprecation")   // getAllNetworks: still there
     static InetAddress lanAddress(Context c) {
@@ -113,6 +118,7 @@ final class PhonePage {
             if (cm == null) return null;
             Network active = cm.getActiveNetwork();
             List<Network> networks = new ArrayList<>();
+            InetAddress other = null;   // a non-private address, if that's all there is
             if (active != null) networks.add(active);
             for (Network n : cm.getAllNetworks()) if (!n.equals(active)) networks.add(n);
             for (Network n : networks) {
@@ -125,9 +131,13 @@ final class PhonePage {
                 if (link == null) continue;
                 for (LinkAddress a : link.getLinkAddresses()) {
                     InetAddress ip = a.getAddress();
-                    if (ip instanceof Inet4Address && ip.isSiteLocalAddress()) return ip;
+                    if (!(ip instanceof Inet4Address)) continue;
+                    if (ip.isSiteLocalAddress()) return ip;
+                    if (other == null && !ip.isLoopbackAddress() && !ip.isLinkLocalAddress() && !ip.isAnyLocalAddress()) other = ip;
                 }
             }
+            if (other != null) Log.i(TAG, "No private address: using the network's own, for its subnet only");
+            return other;
         } catch (RuntimeException e) {
             Log.w(TAG, "No address: " + e);
         }
@@ -153,6 +163,10 @@ final class PhonePage {
                     continue;
                 }
                 requests++;
+                if (subnet != null && !onSubnet(socket.getInetAddress())) {   // not a phone on the TV's own network
+                    socket.close();
+                    continue;
+                }
                 // Each connection on its own thread, a few at most: a browser's idle preconnection doesn't hold up the page.
                 if (answering.incrementAndGet() > MAX_ANSWERING) {
                     answering.decrementAndGet();
@@ -169,6 +183,30 @@ final class PhonePage {
             close();
             listener.closed(expired);
         }
+    }
+
+    /** The address's subnet, from its interface's prefix length; /24 if the interface doesn't say. */
+    private static int[] subnet(InetAddress lan) {
+        int prefix = 24;
+        try {
+            java.net.NetworkInterface nif = java.net.NetworkInterface.getByInetAddress(lan);
+            if (nif != null) for (java.net.InterfaceAddress a : nif.getInterfaceAddresses()) {
+                if (lan.equals(a.getAddress()) && a.getNetworkPrefixLength() > 0 && a.getNetworkPrefixLength() <= 32) prefix = a.getNetworkPrefixLength();
+            }
+        } catch (IOException ignored) {
+            // Keep /24.
+        }
+        int mask = prefix == 32 ? -1 : ~(-1 >>> prefix);
+        return new int[]{ipv4(lan) & mask, mask};
+    }
+
+    private boolean onSubnet(InetAddress client) {
+        return client instanceof Inet4Address && (ipv4(client) & subnet[1]) == subnet[0];
+    }
+
+    private static int ipv4(InetAddress a) {
+        byte[] b = a.getAddress();
+        return (b[0] & 0xFF) << 24 | (b[1] & 0xFF) << 16 | (b[2] & 0xFF) << 8 | (b[3] & 0xFF);
     }
 
     private void answer(Socket socket) {
