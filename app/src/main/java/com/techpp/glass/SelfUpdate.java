@@ -10,7 +10,9 @@ import android.content.pm.PackageInstaller;
 import android.content.pm.PackageManager;
 import android.content.pm.Signature;
 import android.os.Build;
+import android.provider.Settings;
 import android.util.Log;
+import android.widget.Toast;
 
 import org.json.JSONArray;
 import org.json.JSONObject;
@@ -23,6 +25,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.HttpURLConnection;
+import java.net.InetAddress;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
@@ -46,6 +49,8 @@ final class SelfUpdate {
     private static final long MAX_SIZE = 20L << 20;   // the APK is about 200 KB
     private static final long DAY = 24 * 3600_000L;
     static final String ACTION = "com.techpp.glass.UPDATE_STATUS";
+    /** Set once Android's installer turned out to be missing here, so the row says how the update does arrive. */
+    private static final String NO_INSTALLER = "noInstaller";
 
     /** What the row shows; the latest version found is in "latest". */
     interface Listener { void changed(String status); }
@@ -86,7 +91,9 @@ final class SelfUpdate {
     static String summary(Context c) {
         String mine = installed(c), v = available(c);
         if (v == null) return mine + "  ·  " + (prefs(c).contains("checked") ? "Up to date" : "Check now");
-        return takesReleases(c) ? v + " is out  ·  OK installs" : v + " is out  ·  build it again";
+        if (!takesReleases(c)) return v + " is out  ·  build it again";
+        // Where Android has no package installer the update can't come from the app: it comes over adb.
+        return v + " is out  ·  " + (prefs(c).getBoolean(NO_INSTALLER, false) ? "update over adb" : "OK installs");
     }
 
     /** The daily check (no download): true when it found a newer version it hadn't mentioned yet. Background thread. */
@@ -230,15 +237,38 @@ final class SelfUpdate {
             int status = intent.getIntExtra(PackageInstaller.EXTRA_STATUS, PackageInstaller.STATUS_FAILURE);
             if (status == PackageInstaller.STATUS_PENDING_USER_ACTION) {
                 Intent confirm = intent.getParcelableExtra(Intent.EXTRA_INTENT);
+                if (confirm == null) return;
+                confirm.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                if (c.getPackageManager().resolveActivity(confirm, 0) == null) {
+                    // Nothing on this TV can ask to install it, usual on some operator set-top boxes (Jio's, for
+                    // one). The update would end here without a word, so say what does work: adb goes straight to
+                    // Android's package manager, and -r keeps the settings and keys.
+                    Log.w(TAG, "No installer to confirm the update");
+                    prefs(c).edit().putBoolean(NO_INSTALLER, true).apply();
+                    Toast.makeText(c, overAdb(c), Toast.LENGTH_LONG).show();
+                    return;
+                }
                 try {
-                    if (confirm != null) c.startActivity(confirm.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
+                    c.startActivity(confirm);
                 } catch (RuntimeException e) {
                     Log.w(TAG, "Android's installer didn't open: " + e);
                 }
             } else if (status != PackageInstaller.STATUS_SUCCESS) {
                 Log.w(TAG, "Not installed (" + status + "): " + intent.getStringExtra(PackageInstaller.EXTRA_STATUS_MESSAGE));
+            } else {
+                prefs(c).edit().putBoolean(NO_INSTALLER, false).apply();
             }
         }
+    }
+
+    /** For a TV that can't install apps itself: the command that does, and where the TV answers if debugging is on. */
+    private static String overAdb(Context c) {
+        String at = "";
+        if (Settings.Global.getInt(c.getContentResolver(), Settings.Global.ADB_ENABLED, 0) != 0) {
+            InetAddress lan = PhonePage.lanAddress(c);
+            if (lan != null) at = " (debugging is on at " + lan.getHostAddress() + ":5555)";
+        }
+        return "This TV can't install apps. From a computer: adb install -r talkies.apk" + at;
     }
 
     /** "0.10.0" vs "0.9.1": numbers compared one by one, missing ones as 0. */
