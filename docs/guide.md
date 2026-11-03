@@ -82,8 +82,8 @@ Control Center → **Talkies settings**, or **hold OK on the ⚙ icon** (a press
 | Picks languages | Only while For You is shown: **All** (the default) or the languages you choose for Trending and New in …. See [Languages](#languages) |
 | Hide spoilers | Off (default) or On. On: an episode you haven't started yet shows the show's own art in Continue instead of the app's still from that episode, or the still blurred when the app gives nothing else. Episodes you're partway through keep their still |
 | Sharp YouTube pictures | Off by default. On: YouTube cards in Continue get YouTube's 1280-pixel thumbnails, looked up by title and channel |
-| Live scores | Cricket and football (default), Cricket, Football or Off: what the score line and the score rows show |
-| Leagues | The football leagues, and the NBA and NFL, the Football row follows; see [Football](#football) |
+| Sports | Cricket, Football, NBA and NFL, each On or Off: what the score line and the score rows show. Cricket and football to start, plus the NBA and NFL in the US and Canada |
+| Football leagues | Only while Football is on: the leagues the Football row follows; see [Football](#football) |
 | Channels | Choose which app channels show below the dock, and their order |
 | **Apps and inputs** | |
 | Dock apps | Every app, the dock's first (numbered): OK puts one in the dock or takes it out, the same as **Add to dock** and **Remove from dock** when you hold OK on an app. To change the order, hold OK on an app in the dock and choose **Move** |
@@ -325,7 +325,7 @@ being played comes first (the Football row then sits above Cricket).
   Internationals are told apart by ESPN's match class (Test, ODI, T20I and the women's), so A sides and under-19s
   stay out. ESPN updates ball by ball; scores can still lag the TV broadcast by a minute. Thanks @Swakshan for pointing at it.
 
-To hide cricket, Talkies settings → **Live scores**. The log shows what it found and where each Watch button points:
+To hide cricket, Talkies settings → **Sports** → Cricket. The log shows what it found and where each Watch button points:
 `adb -s "$TALKIES_TV" logcat -d -s GlassCricket`.
 
 ## Football
@@ -335,11 +335,14 @@ Football works like cricket, with no key: the line under the weather shows the m
 the score and the minute ("LIVE · Premier League · 67'"), kick-off time ("starts Wed 7:30 pm") or result.
 
 - **Which matches:** live now, starting within a day, or finished in the last 12 hours, from your leagues.
-- **Your leagues:** Talkies settings → **Leagues**. Each country starts with its own (India: Premier League,
+- **Your leagues:** Talkies settings → **Football leagues**. Each country starts with its own (India: Premier League,
   Champions League and Indian Super League; the UK: Premier League, Champions League and the Scottish Premiership;
-  the US and Canada: NFL, NBA, MLS, Premier League and Champions League; Turkey: Süper Lig, Champions League and Premier League…), plus the World Cup and the Euros when they're on. Press OK to
+  the US: MLS, Premier League and Champions League; Turkey: Süper Lig, Champions League and Premier League…), plus the World Cup and the Euros when they're on. Press OK to
   turn one on or off; **Back to the defaults** undoes your changes.
-- **NBA and NFL:** in the same list, picked like a league. Their games read the American way, away team first
+- **Soccer:** in the US and Canada, where football means the NFL, Talkies says Soccer instead (Sports, **Soccer
+  leagues**, the row's name).
+- **NBA and NFL:** Talkies settings → **Sports**, anywhere (on to start in the US and Canada). Their games read the
+  American way, away team first
   ("CHI at SEA", "8:28 - 4th"). The row is called **Football**, **NBA** or **NFL** when that's all it has, and
   **Sports** when it's a mix.
 - **Updates:** every 15 minutes, and every minute for a league with a match on, only while Talkies is in front.

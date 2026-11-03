@@ -303,6 +303,7 @@ public class HomeActivity extends Activity {
         bing = new Bing(this, background);
         cricket = new Cricket(this);
         football = new Football(this);
+        applySports();
         score = findViewById(R.id.score);
         weatherLine = weather.cached();
         day = isDayNow();
@@ -518,10 +519,40 @@ public class HomeActivity extends Activity {
         updateScore();
     }
 
-    /** Control Center → Live scores: "both" (the default), "cricket", "football" or "off". */
-    private String scores() { return prefs.getString("scores", "both"); }
-    private List<Cricket.Match> cricketShown() { return scores().equals("both") || scores().equals("cricket") ? matches : new ArrayList<>(); }
-    private List<Cricket.Match> footballShown() { return scores().equals("both") || scores().equals("football") ? footballMatches : new ArrayList<>(); }
+    /** Talkies settings → Sports: the ids, with the names shown. */
+    private static final String[][] SPORTS = {{"cricket", "Cricket"}, {"football", "Football"}, {"nba", "NBA"}, {"nfl", "NFL"}};
+    /** "Soccer" in the US and Canada, where football is the NFL; "Football" everywhere else. Set in applySports. */
+    private String soccer = "Football";
+
+    /** A sport's name as shown here: football is soccer in North America. */
+    private String sportName(String[] sp) { return sp[0].equals("football") ? soccer : sp[1]; }
+
+    /** The sports whose scores show (Talkies settings → Sports); worked out in applySports. */
+    private final Set<String> sportsOn = new java.util.LinkedHashSet<>();
+
+    /**
+     * Your choice, or until you make one: cricket and football everywhere, and the NBA and NFL too in the US and
+     * Canada. The old Live scores setting ("both", "cricket", "football", "off") carries over. Tells Football.
+     */
+    private void applySports() {
+        sportsOn.clear();
+        String cc = Region.country(this);
+        soccer = cc.equals("US") || cc.equals("CA") ? "Soccer" : "Football";
+        String saved = prefs.getString("sports", null);
+        if (saved != null) {
+            for (String id : saved.split(",")) if (!id.isEmpty()) sportsOn.add(id);
+        } else {
+            String old = prefs.getString("scores", "both");
+            if (old.equals("both") || old.equals("cricket")) sportsOn.add("cricket");
+            if (old.equals("both") || old.equals("football")) sportsOn.add("football");
+            if (!prefs.contains("scores") && (cc.equals("US") || cc.equals("CA"))) { sportsOn.add("nba"); sportsOn.add("nfl"); }
+        }
+        football.setSports(sportsOn.contains("football"), sportsOn.contains("nfl"), sportsOn.contains("nba"));
+    }
+
+    private boolean anyFootball() { return sportsOn.contains("football") || sportsOn.contains("nba") || sportsOn.contains("nfl"); }
+    private List<Cricket.Match> cricketShown() { return sportsOn.contains("cricket") ? matches : new ArrayList<>(); }
+    private List<Cricket.Match> footballShown() { return anyFootball() ? footballMatches : new ArrayList<>(); }
 
     /**
      * "● LIVE  IND 245/4 (42.3) v AUS" or "● LIVE  67'  ·  ARS 2–1 CHE", or today's next match, or today's result;
@@ -896,10 +927,10 @@ public class HomeActivity extends Activity {
         }
     }
 
-    /** The row's name: "Football", or "NBA" or "NFL" when that's all it has, "Sports" when it's a mix. */
-    private static String sportsTitle(List<Cricket.Match> list) {
+    /** The row's name: "Football" ("Soccer"), or "NBA" or "NFL" when that's all it has, "Sports" when it's a mix. */
+    private String sportsTitle(List<Cricket.Match> list) {
         Set<String> kinds = new HashSet<>();
-        for (Cricket.Match m : list) kinds.add("at".equals(m.vs) ? m.kind : "Football");
+        for (Cricket.Match m : list) kinds.add("at".equals(m.vs) ? m.kind : soccer);
         return kinds.size() == 1 ? kinds.iterator().next() : "Sports";
     }
 
@@ -1922,7 +1953,7 @@ public class HomeActivity extends Activity {
         }
         Intent i = p.pkg == null ? null : pm.getLeanbackLaunchIntentForPackage(p.pkg);
         if (i != null) startFromTile(i);
-        else if (p.extra instanceof Cricket.Match && ((Cricket.Match) p.extra).football) Toast.makeText(this, "Talkies doesn't know where to watch " + ("at".equals(((Cricket.Match) p.extra).vs) ? "this game" : "football") + " yet", Toast.LENGTH_SHORT).show();
+        else if (p.extra instanceof Cricket.Match && ((Cricket.Match) p.extra).football) Toast.makeText(this, "Talkies doesn't know where to watch " + ("at".equals(((Cricket.Match) p.extra).vs) ? "this game" : soccer.toLowerCase(Locale.ROOT)) + " yet", Toast.LENGTH_SHORT).show();
         else if (p.extra instanceof Cricket.Match) Toast.makeText(this, "None of your apps has a card for this match", Toast.LENGTH_SHORT).show();
     }
 
@@ -2498,27 +2529,60 @@ public class HomeActivity extends Activity {
 
     // ---------------------------------------------------------------- live scores
 
-    private String scoresLabel() {
-        switch (scores()) {
-            case "cricket": return "Cricket";
-            case "football": return "Football";
-            case "off": return "Off";
-            default: return "Cricket and football";
+    /** "Cricket, Football", "All", "Off". */
+    private String sportsLabel() {
+        if (sportsOn.isEmpty()) return "Off";
+        if (sportsOn.size() == SPORTS.length) return "All";
+        List<String> names = new ArrayList<>();
+        for (String[] sp : SPORTS) if (sportsOn.contains(sp[0])) names.add(sportName(sp));
+        return String.join(", ", names);
+    }
+
+    /**
+     * Talkies settings → Sports: one row per sport, On when its scores show; OK turns it on or off. Leaving shows the
+     * new set and fetches what's newly on; Football leagues appears in settings only while football is on.
+     */
+    private void openSports() {
+        beginMenu(settingsAt, "Sports");
+        for (String[] sp : SPORTS) {
+            final View[] row = new View[1];
+            row[0] = addRow(sportName(sp), sportsOn.contains(sp[0]) ? "On" : null, () -> {
+                Set<String> next = new java.util.LinkedHashSet<>();
+                for (String[] x : SPORTS) if (sportsOn.contains(x[0]) != x[0].equals(sp[0])) next.add(x[0]);
+                prefs.edit().putString("sports", String.join(",", next)).apply();
+                applySports();
+                setStatus(row[0], sportsOn.contains(sp[0]) ? "On" : null);
+            }, true);
         }
+        menuClosed = () -> {
+            background.execute(() -> {
+                List<Cricket.Match> saved = football.cached();
+                runOnUiThread(() -> {
+                    onFootball(saved);
+                    updateScore();
+                    chanSignature = "";
+                    showChannels(appChannels);
+                    refreshOnline();
+                });
+            });
+            focusTop(settingsAt);
+        };
+        showMenu(360);
+        focusMenu(0);
     }
 
     /** One row per league, On when it's shown; OK turns it on or off. Leaving the menu fetches the new set. */
     private void openFootballLeagues(int focus) {
-        beginMenu(settingsAt, football.customLeagues() ? "Leagues"
-                : "Leagues  ·  defaults for " + Region.name(Region.country(this)));
-        List<String> on = football.leagues();
+        beginMenu(settingsAt, football.customLeagues() ? soccer + " leagues"
+                : soccer + " leagues  ·  defaults for " + Region.name(Region.country(this)));
+        List<String> on = football.footballLeagues();
         for (String[] l : Football.LEAGUES) {
             final View[] row = new View[1];
             row[0] = addRow(l[1], on.contains(l[0]) ? "On" : null, () -> {
                 football.toggle(l[0]);
-                setStatus(row[0], football.leagues().contains(l[0]) ? "On" : null);
+                setStatus(row[0], football.footballLeagues().contains(l[0]) ? "On" : null);
                 View heading = menu.getChildAt(0);
-                if (heading instanceof TextView && !menuItems.contains(heading)) ((TextView) heading).setText("Leagues");
+                if (heading instanceof TextView && !menuItems.contains(heading)) ((TextView) heading).setText(soccer + " leagues");
             }, true);
         }
         if (football.customLeagues()) addRow("Back to the defaults", null, () -> {
@@ -3694,18 +3758,8 @@ public class HomeActivity extends Activity {
             setStatus(yt[0], on ? "On" : "Off");
             if (on) refreshOnline();
         }, true);
-        final View[] sc = new View[1];
-        sc[0] = addRow("Live scores", scoresLabel(), () -> {
-            String[] order = {"both", "cricket", "football", "off"};
-            String next = order[(Arrays.asList(order).indexOf(scores()) + 1) % order.length];
-            prefs.edit().putString("scores", next).apply();
-            setStatus(sc[0], scoresLabel());
-            updateScore();
-            chanSignature = "";
-            showChannels(appChannels);
-            refreshOnline();
-        }, true);
-        if (!scores().equals("off") && !scores().equals("cricket")) addRow("Leagues", football.leagues().size() + " on",
+        addRow("Sports", sportsLabel(), this::openSports, false);
+        if (sportsOn.contains("football")) addRow(soccer + " leagues", football.footballLeagues().size() + " on",
                 () -> openFootballLeagues(0), false);
         addRow("Channels", null, this::openChannelsEditor, false);
         addMenuHeading("Apps and inputs");
@@ -4856,8 +4910,8 @@ public class HomeActivity extends Activity {
             Log.i(TAG, "Refresh skipped: " + (!inFront ? "another app in front" : !hasWindowFocus() ? "screensaver or dialog on top" : "display off"));
             return;
         }
-        if (!scores().equals("off") && !scores().equals("football")) cricket.refreshIfStale(this::onMatches);
-        if (scores().equals("both") || scores().equals("football")) football.refreshIfStale(this::onFootball);
+        if (sportsOn.contains("cricket")) cricket.refreshIfStale(this::onMatches);
+        if (anyFootball()) football.refreshIfStale(this::onFootball);
         weather.refreshIfStale(this::onWeather);
         if (prefs.getBoolean("bing_wallpaper", false)) bing.refreshIfStale(this::loadWallpaper);
         nextFromFolder(null);  // no network needed, but the same moments: a new day's picture while you can see it

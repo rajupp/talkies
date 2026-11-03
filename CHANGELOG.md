@@ -12,9 +12,12 @@ features, a new fix number only fixes. The version shows in Talkies settings →
   over at once, and Talkies settings → **Picks from** (on TVs in India) switches between TMDB and StreamRadar any
   time. Thanks to Swakshan for pointing it out.
 
-- **NBA and NFL scores.** Talkies settings → **Leagues** (was Football leagues) now has the NBA and NFL, from
-  the same ESPN scoreboard: live games, start times and results, away team first ("CHI at SEA"). On by default in
-  the US and Canada.
+- **NBA and NFL scores**, from the same ESPN scoreboard as football: live games, start times and results, away
+  team first ("CHI at SEA").
+- **Sports.** Talkies settings → **Sports** (was Live scores) turns Cricket, Football, NBA and NFL on or off one by
+  one, in any country. Cricket and football to start, plus the NBA and NFL in the US and Canada; your Live scores
+  choice carries over. **Football leagues** shows only while Football is on. In the US and Canada, football is
+  called Soccer.
 
 ### Changed
 - **Talkies settings in groups.** Its rows are now under five headings, most used first: Look, For You and scores,
