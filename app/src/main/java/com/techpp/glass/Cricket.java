@@ -140,6 +140,12 @@ final class Cricket {
         return out;
     }
 
+    /**
+     * Fetch at the next check, not when the last list goes stale: after the country changes, say, when the last fetch
+     * may have found nothing live that counts there and so waits half an hour.
+     */
+    void refreshSoon() { prefs.edit().remove("ok_at").remove("try_at").apply(); }
+
     /** The network is back: a fetch that failed while it was down may run again now, without waiting out the retry. */
     void networkBack() {
         if (prefs.getLong("try_at", 0) > prefs.getLong("ok_at", 0)) prefs.edit().remove("try_at").apply();

@@ -2572,7 +2572,7 @@ public class HomeActivity extends Activity {
         tabs[2].setText("New in " + Region.name(Region.country(this)));
         Toast.makeText(this, "Country: " + countryLabel(), Toast.LENGTH_SHORT).show();
         onPicks(null);
-        refreshOnline();
+        reloadScores();
         // Back to Talkies settings, on the Country row, as Back would from the first list.
         while (menuParents.size() > countryDepth + 1) menuParents.pop();
         back();
@@ -2604,20 +2604,30 @@ public class HomeActivity extends Activity {
             }, true);
         }
         menuClosed = () -> {
-            background.execute(() -> {
-                List<Cricket.Match> saved = football.cached();
-                runOnUiThread(() -> {
-                    onFootball(saved);
-                    updateScore();
-                    chanSignature = "";
-                    showChannels(appChannels);
-                    refreshOnline();
-                });
-            });
+            reloadScores();
             focusTop(settingsAt);
         };
         showMenu(360);
         focusMenu(0);
+    }
+
+    /**
+     * The sports or the country changed: the saved matches again, sorted and filtered for them (which cricket counts
+     * depends on the country), then fresh ones right away.
+     */
+    private void reloadScores() {
+        cricket.refreshSoon();
+        background.execute(() -> {
+            List<Cricket.Match> savedCricket = cricket.cached(), savedFootball = football.cached();
+            runOnUiThread(() -> {
+                matches = savedCricket;
+                footballMatches = savedFootball;
+                updateScore();
+                chanSignature = "";
+                showChannels(appChannels);
+                refreshOnline();
+            });
+        });
     }
 
     /** One row per league, On when it's shown; OK turns it on or off. Leaving the menu fetches the new set. */
