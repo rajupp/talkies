@@ -207,6 +207,9 @@ adb -s 192.168.1.20:5555 install -r talkies.apk
 
 `adb` and the TV's address are set up as under [With a computer](#with-a-computer); the version shows in Talkies
 settings → About. From a clone of this repository, `./update.sh` downloads the latest release and runs that command.
+The optional `WRITE_SECURE_SETTINGS` grant lets Talkies change certain TV settings; it does not give the app ADB shell
+access, so an app on the TV cannot run `adb install` itself. `./update.sh` also needs Python 3 and `apksigner` from
+Android SDK Build Tools to verify the release before installing it.
 
 **Coming from a version you built yourself** (0.4 or earlier)? It's signed with your own computer's key, so the
 release APK can't install over it. Back up your settings (`./backup-settings.sh`), uninstall Talkies, install the
