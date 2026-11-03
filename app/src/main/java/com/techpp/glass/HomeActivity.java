@@ -60,6 +60,8 @@ import android.widget.TextView;
 import android.widget.Toast;
 
 import java.io.File;
+import org.json.JSONObject;
+
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Calendar;
@@ -565,6 +567,7 @@ public class HomeActivity extends Activity {
      * hidden when there's none. A live match wins, cricket before football.
      */
     private void updateScore() {
+        if (showPlaying()) return;
         List<Cricket.Match> c = cricketShown(), f = footballShown();
         Cricket.Match m = !c.isEmpty() && c.get(0).live ? c.get(0) : !f.isEmpty() && f.get(0).live ? f.get(0)
                 : !c.isEmpty() ? c.get(0) : !f.isEmpty() ? f.get(0) : null;
@@ -609,6 +612,50 @@ public class HomeActivity extends Activity {
         credit.setAlpha(0f);  // the score sits where the TMDB credit goes; TMDB is credited in the README too
     }
 
+    // ---------------------------------------------------------------- now playing on Home (an idea from Home Deck, MIT)
+
+    /** The player the line under the icons follows while it plays; null when nothing is playing. */
+    private MediaController playingShown;
+    private final MediaController.Callback playingChanged = new MediaController.Callback() {
+        @Override public void onMetadataChanged(MediaMetadata m) { updateScore(); }
+        @Override public void onPlaybackStateChanged(PlaybackState p) { watchPlaying(); }
+        @Override public void onSessionDestroyed() { watchPlaying(); }
+    };
+
+    /** Follows whatever is playing now (Home showing, each minute, and when the player changes), else nothing. */
+    private void watchPlaying() {
+        MediaController now = inFront ? NowPlaying.current(this) : null;
+        if (now != null && !NowPlaying.playing(now)) now = null;
+        if (playingShown != null && (now == null || !now.getSessionToken().equals(playingShown.getSessionToken()))) {
+            playingShown.unregisterCallback(playingChanged);
+            playingShown = null;
+        }
+        if (now != null && playingShown == null) {
+            playingShown = now;
+            now.registerCallback(playingChanged, new Handler(Looper.getMainLooper()));
+        }
+        updateScore();
+    }
+
+    /**
+     * "♪  Song  ·  Artist  ·  Spotify" in the score line while something plays, over the scores (they're still in their
+     * rows). The remote's Play/Pause works on it as anywhere. False: nothing playing, the line shows the scores.
+     */
+    private boolean showPlaying() {
+        MediaController s = playingShown;
+        if (s == null || !NowPlaying.playing(s) || NowPlaying.title(s).isEmpty()) return false;
+        SpannableStringBuilder b = new SpannableStringBuilder("♪  ");
+        b.append(NowPlaying.title(s));
+        String a = NowPlaying.artist(s);
+        if (!a.isEmpty()) b.append("  ·  ").append(a);
+        b.append("  ·  ").append(appLabel(s.getPackageName()));
+        score.setText(b);
+        score.setTextColor(theme.text);
+        score.setVisibility(View.VISIBLE);
+        credit.setAlpha(0f);
+        return true;
+    }
+
     private void onMatches(List<Cricket.Match> list) {
         matches = list;
         updateScore();
@@ -623,6 +670,7 @@ public class HomeActivity extends Activity {
 
     private void onMinute() {
         updateInfo();
+        watchPlaying();
         refreshOnline();
         boolean nowDay = isDayNow();
         if (nowDay != day) { day = nowDay; applyTheme(); }
@@ -643,7 +691,77 @@ public class HomeActivity extends Activity {
         ActivityManager am = getSystemService(ActivityManager.class);
         ActivityManager.MemoryInfo mi = new ActivityManager.MemoryInfo();
         am.getMemoryInfo(mi);
+        return am.isLowRamDevice() || mi.totalMem < 1600L * 1024 * 1024 || prefs.getBoolean("slow_tv", false);
+    }
+
+    /** "Clock", "Wallpaper", "Picks · may be slow"; "· not in use" when the TV has another screensaver. */
+    private String screensaverLabel() {
+        String m = prefs.getString("screensaver", "clock");
+        // One note at most, the one that matters most, so the row's name still fits.
+        if (m.equals("wallpaper") && wallpaperLabel().equals("Off")) return "Wallpaper  ·  none set";
+        if (m.equals("picks") && lowMemory()) return "Picks  ·  may be slow";
+        String l = m.equals("picks") ? "Picks" : m.equals("wallpaper") ? "Wallpaper" : "Clock";
+        return screensaverChosen() ? l : l + "  ·  not in use";
+    }
+
+    /** Whether the TV's screensaver is Talkies' (Settings → Device Preferences → Screen saver). */
+    private boolean screensaverChosen() {
+        String c = Settings.Secure.getString(getContentResolver(), "screensaver_components");
+        return c != null && c.startsWith(getPackageName() + "/");
+    }
+
+    /** Under 1.6 GB of memory (or Android calls it low-RAM): where Effects' Auto picks Lite. */
+    private boolean lowMemory() {
+        ActivityManager am = getSystemService(ActivityManager.class);
+        ActivityManager.MemoryInfo mi = new ActivityManager.MemoryInfo();
+        am.getMemoryInfo(mi);
         return am.isLowRamDevice() || mi.totalMem < 1600L * 1024 * 1024;
+    }
+
+    // ---------------------------------------------------------------- how smooth this TV is (an idea from Home Deck, MIT)
+
+    /** Frames timed while moving with the arrows, in Full effects, until there are enough to judge (once per TV). */
+    private static final int SMOOTH_FRAMES = 240;
+    private final long[] frameGaps = new long[SMOOTH_FRAMES];
+    private int frameCount;
+    private long lastFrameNs, sampleUntil;
+    private final android.view.Choreographer.FrameCallback sampleFrame = new android.view.Choreographer.FrameCallback() {
+        @Override public void doFrame(long ns) {
+            if (lastFrameNs != 0 && frameCount < SMOOTH_FRAMES) frameGaps[frameCount++] = ns - lastFrameNs;
+            lastFrameNs = ns;
+            if (frameCount >= SMOOTH_FRAMES) judgeSmoothness();
+            else if (android.os.SystemClock.uptimeMillis() < sampleUntil) android.view.Choreographer.getInstance().postFrameCallback(this);
+            else lastFrameNs = 0;
+        }
+    };
+
+    /** An arrow press in Auto · Full on a TV not yet judged: time the next half second of frames, while things glide. */
+    private void sampleSmoothness() {
+        if (lite || prefs.contains("slow_tv") || !prefs.getString("effects", "auto").equals("auto")) return;
+        boolean running = android.os.SystemClock.uptimeMillis() < sampleUntil;
+        sampleUntil = android.os.SystemClock.uptimeMillis() + 500;
+        if (!running) {
+            lastFrameNs = 0;
+            android.view.Choreographer.getInstance().postFrameCallback(sampleFrame);
+        }
+    }
+
+    /**
+     * Enough frames: a TV whose typical frame while gliding takes over 25 ms (under 40 a second) is slow, and Auto
+     * switches it to Lite from then on. Decided once; Talkies settings → Effects can still pick Full.
+     */
+    private void judgeSmoothness() {
+        long[] gaps = frameGaps.clone();
+        Arrays.sort(gaps);
+        long median = gaps[SMOOTH_FRAMES / 2];
+        boolean slow = median > 25_000_000L;
+        prefs.edit().putBoolean("slow_tv", slow).apply();
+        Log.i(TAG, "Smoothness: median frame " + median / 100_000 / 10f + " ms" + (slow ? ", slow: Auto is Lite from now" : ""));
+        if (slow) {
+            lite = true;
+            backdrop.setLite(true);
+            updateAmbient();
+        }
     }
 
     private String effectsLabel() {
@@ -699,7 +817,7 @@ public class HomeActivity extends Activity {
         Set<String> onHome = homeInputs();
         if (!onHome.isEmpty()) {
             Drawable glyph = getDrawable(R.drawable.ic_input);
-            for (Port port : ports()) if (onHome.contains(port.id)) all.add(new AppEntry(port.id, port.tile(), port.color, glyph));
+            for (Port port : shownPorts()) if (onHome.contains(port.id)) all.add(new AppEntry(port.id, port.tile(), port.color, glyph));
         }
         // Your arrangement (hold OK on an app to move it), else dock.xml; the dock fills up to its size.
         int dockSize = dockSize();
@@ -1743,6 +1861,7 @@ public class HomeActivity extends Activity {
         boolean back = k == KeyEvent.KEYCODE_BACK || k == KeyEvent.KEYCODE_ESCAPE;
         if (!select && !nav && !back) return super.dispatchKeyEvent(e);
         lastKeyAt = android.os.SystemClock.uptimeMillis();
+        if (nav && e.getAction() == KeyEvent.ACTION_DOWN) sampleSmoothness();
         // OK and Back act when let go, so a release whose press went to another app must do nothing here: an app
         // that closes as OK goes down (Netflix → Exit) would otherwise have its OK's release open the focused tile,
         // the same app, again.
@@ -2266,7 +2385,8 @@ public class HomeActivity extends Activity {
         int n = 1, hidden = 0, firstEmpty = -1;
         boolean named = false;
         for (TvInputInfo i : hdmi) {
-            String name = fixLabel(label(i), "HDMI " + n++);
+            String name = inputName(i.getId(), fixLabel(label(i), "HDMI " + n++));
+            if (inputHidden(i.getId())) continue;
             if (!connected(tim, i)) {
                 if (!all) { hidden++; continue; }
                 if (firstEmpty < 0) firstEmpty = menuItems.size();
@@ -2283,7 +2403,8 @@ public class HomeActivity extends Activity {
         }
         n = 1;
         for (TvInputInfo i : av) {
-            String name = av.size() == 1 ? "AV" : fixLabel(label(i), "AV " + n++);
+            String name = inputName(i.getId(), av.size() == 1 ? "AV" : fixLabel(label(i), "AV " + n++));
+            if (inputHidden(i.getId())) continue;
             if (!connected(tim, i)) {
                 if (!all) { hidden++; continue; }
                 if (firstEmpty < 0) firstEmpty = menuItems.size();
@@ -2291,7 +2412,7 @@ public class HomeActivity extends Activity {
             addInput(name, tim, i, passthrough(i));
         }
         final TvInputInfo tunerInfo = tuner;
-        addRow("Live TV", null, () -> {
+        if (!inputHidden(LIVE_TV)) addRow(inputName(LIVE_TV, "Live TV"), null, () -> {
             if (tunerInfo != null) {
                 Intent v = new Intent(Intent.ACTION_VIEW);
                 v.setDataAndType(TvContract.buildChannelsUriForInput(tunerInfo.getId()), "vnd.android.cursor.dir/channel");
@@ -2355,11 +2476,170 @@ public class HomeActivity extends Activity {
             String name = fixLabel(label(i), "HDMI " + n++);
             TvInputInfo behind = cec.get(i.getId());
             Devices d = cecStatus(tim, behind) != null ? identify(behind) : null;
-            out.add(new Port(i.getId(), name, d == null ? null : d.name, d == null ? Devices.PLAIN : d.color));
+            // A name you gave it wins over the device's own ("Living room box", not "Set-top box").
+            String own = inputNames().optString(i.getId(), null);
+            out.add(new Port(i.getId(), own != null ? own : name, own != null || d == null ? null : d.name,
+                    d == null ? Devices.PLAIN : d.color));
         }
         n = 1;
-        for (TvInputInfo i : av) out.add(new Port(i.getId(), av.size() == 1 ? "AV" : fixLabel(label(i), "AV " + n++), null, Devices.PLAIN));
+        for (TvInputInfo i : av) out.add(new Port(i.getId(), inputName(i.getId(), av.size() == 1 ? "AV" : fixLabel(label(i), "AV " + n++)), null, Devices.PLAIN));
         return out;
+    }
+
+    /** The ports Inputs shows: all but the ones you hid (Talkies settings → Edit inputs). */
+    private List<Port> shownPorts() {
+        List<Port> out = new ArrayList<>();
+        for (Port p : ports()) if (!inputHidden(p.id)) out.add(p);
+        return out;
+    }
+
+    // ---------------------------------------------------------------- incoming (an idea from Home Deck, MIT)
+
+    /** Which ports had something switched on, as last seen: a port that turns on after this gets the card. */
+    private final Map<String, Boolean> livePorts = new java.util.HashMap<>();
+    private static final long INCOMING_SETTLE_MS = 2000, INCOMING_SHOW_MS = 15_000;
+    private final Runnable checkIncoming = this::checkIncoming;
+    /** Closes the incoming card if it's still the menu that's open (menuGen), untouched. */
+    private int incomingGen = -1;
+
+    private final TvInputManager.TvInputCallback inputWatch = new TvInputManager.TvInputCallback() {
+        @Override public void onInputStateChanged(String inputId, int state) { incomingSoon(); }
+        @Override public void onInputAdded(String inputId) { incomingSoon(); }
+        @Override public void onInputRemoved(String inputId) { incomingSoon(); }
+        @Override public void onInputUpdated(String inputId) { incomingSoon(); }
+    };
+
+    /** While Talkies is on screen: what's switched on now is the baseline, and changes are checked from then on. */
+    private void watchInputs(boolean on) {
+        TvInputManager tim = getSystemService(TvInputManager.class);
+        if (tim == null || ports().isEmpty()) return;
+        if (on) {
+            livePorts.clear();
+            livePorts.putAll(livePortsNow(tim));
+            tim.registerCallback(inputWatch, new Handler(Looper.getMainLooper()));
+        } else {
+            tim.unregisterCallback(inputWatch);
+            root.removeCallbacks(checkIncoming);
+        }
+    }
+
+    /** HDMI-CEC devices announce themselves in a burst: wait for it to settle. */
+    private void incomingSoon() {
+        root.removeCallbacks(checkIncoming);
+        root.postDelayed(checkIncoming, INCOMING_SETTLE_MS);
+    }
+
+    /**
+     * Each HDMI port: true when something on it is switched on. A device that talks HDMI-CEC says so itself (on, not
+     * standby); for one that doesn't, a signal on the port is the sign.
+     */
+    private Map<String, Boolean> livePortsNow(TvInputManager tim) {
+        Map<String, TvInputInfo> behind = new java.util.HashMap<>();
+        List<TvInputInfo> hdmi = new ArrayList<>(), av = new ArrayList<>(), tuners = new ArrayList<>();
+        sortInputs(tim, hdmi, av, tuners, behind);
+        Map<String, Boolean> out = new java.util.HashMap<>();
+        for (TvInputInfo i : hdmi) {
+            TvInputInfo dev = behind.get(i.getId());
+            int state;
+            try { state = tim.getInputState(dev != null ? dev.getId() : i.getId()); } catch (Exception e) { continue; }
+            out.put(i.getId(), state == TvInputManager.INPUT_STATE_CONNECTED);
+        }
+        return out;
+    }
+
+    /** A port just switched on, with Talkies on screen and nothing open: offer to switch to it. */
+    private void checkIncoming() {
+        TvInputManager tim = getSystemService(TvInputManager.class);
+        if (tim == null) return;
+        Map<String, Boolean> now = livePortsNow(tim);
+        String turnedOn = null;
+        for (Map.Entry<String, Boolean> e : now.entrySet()) {
+            if (e.getValue() && !Boolean.TRUE.equals(livePorts.get(e.getKey())) && !inputHidden(e.getKey())) turnedOn = e.getKey();
+        }
+        livePorts.clear();
+        livePorts.putAll(now);
+        if (turnedOn == null || !prefs.getBoolean("incoming", true) || !inFront || zone == Z_MENU || moving) return;
+        for (Port p : ports()) if (p.id.equals(turnedOn)) { showIncoming(p, tim); return; }
+    }
+
+    /** "PlayStation 5 is on": Switch to HDMI 2, or Not now. Goes away by itself after 15 seconds. */
+    private void showIncoming(Port port, TvInputManager tim) {
+        TvInputInfo info = null;
+        for (TvInputInfo i : tim.getTvInputList()) if (i.getId().equals(port.id)) info = i;
+        if (info == null) return;
+        Log.i(TAG, "Incoming: " + port.row());
+        beginMenu(P_INPUTS, null);
+        menuTitle((port.device != null ? port.device : port.name) + " is on");
+        addRow("Switch to " + port.name, null, passthrough(info), false);
+        addRow("Not now", null, () -> { }, false);
+        menuClosed = () -> focusDock(dockIdx);
+        setFocus(null, 1f, 0);
+        showMenu(360);
+        int gen = menuGen;
+        incomingGen = gen;
+        root.postDelayed(() -> { if (zone == Z_MENU && menuGen == gen && incomingGen == gen) closeMenu(); }, INCOMING_SHOW_MS);
+    }
+
+    /** Live TV's key in Edit inputs' names and hidden list. */
+    private static final String LIVE_TV = "live_tv";
+
+    /** Names you gave inputs (Talkies settings → Edit inputs), by input ID. */
+    private JSONObject inputNames() {
+        try { return new JSONObject(prefs.getString("input_names", "{}")); } catch (Exception e) { return new JSONObject(); }
+    }
+
+    private String inputName(String id, String fallback) { return inputNames().optString(id, fallback); }
+
+    private boolean inputHidden(String id) {
+        return Arrays.asList(prefs.getString("hidden_inputs", "").split(",")).contains(id);
+    }
+
+    private void setInputHidden(String id, boolean hide) {
+        Set<String> h = new HashSet<>(Arrays.asList(prefs.getString("hidden_inputs", "").split(",")));
+        h.remove("");
+        if (hide) h.add(id); else h.remove(id);
+        prefs.edit().putString("hidden_inputs", String.join(",", h)).apply();
+    }
+
+    private void setInputName(String id, String name) {
+        JSONObject names = inputNames();
+        try {
+            if (name == null || name.isEmpty()) names.remove(id); else names.put(id, name);
+        } catch (Exception ignored) { }
+        prefs.edit().putString("input_names", names.toString()).apply();
+    }
+
+    /**
+     * Talkies settings → Edit inputs: each port and Live TV; OK on one names it or hides it (a soundbar's ARC port
+     * you never watch, Live TV without an aerial). Hidden ones stay out of Inputs, Inputs on Home and the incoming
+     * card. An idea from Home Deck (MIT).
+     */
+    private void openEditInputs() {
+        beginMenu(settingsAt, "Edit inputs  ·  name or hide");
+        for (Port p : ports()) addRow(p.row(), inputHidden(p.id) ? "Hidden" : null, () -> openEditInput(p.id, p.row()), false);
+        addRow(inputName(LIVE_TV, "Live TV"), inputHidden(LIVE_TV) ? "Hidden" : null, () -> openEditInput(LIVE_TV, inputName(LIVE_TV, "Live TV")), false);
+        showMenu(360);
+    }
+
+    private void openEditInput(String id, String title) {
+        beginMenu(settingsAt, title);
+        String own = inputNames().optString(id, null);
+        addRow("Name", own != null ? own : "Its own", () -> askText("Name for " + title,
+                "What Inputs and its tile on Home call it, like \"Living room box\". Remove goes back to its own name.",
+                own, false, own != null, text -> {
+                    setInputName(id, text);
+                    Toast.makeText(this, text.isEmpty() ? "Back to its own name" : "Named " + text, Toast.LENGTH_SHORT).show();
+                    reloadApps();
+                    back();
+                }), true);
+        final View[] shown = new View[1];
+        shown[0] = addRow("In Inputs", inputHidden(id) ? "Hidden" : "Shown", () -> {
+            boolean hide = !inputHidden(id);
+            setInputHidden(id, hide);
+            setStatus(shown[0], hide ? "Hidden" : "Shown");
+            reloadApps();
+        }, true);
+        showMenu(360);
     }
 
     /** Inputs you put on Home, by input ID. */
@@ -2375,7 +2655,7 @@ public class HomeActivity extends Activity {
     private void openHomeInputs() {
         beginMenu(settingsAt, "Inputs on Home  ·  OK puts one in the dock");
         Set<String> on = homeInputs();
-        for (Port port : ports()) {
+        for (Port port : shownPorts()) {
             final View[] row = new View[1];
             row[0] = addRow(port.row(), on.contains(port.id) ? "On Home" : null, () -> {
                 int at = menuIdx;
@@ -3341,14 +3621,49 @@ public class HomeActivity extends Activity {
         Toast.makeText(this, app.label + " moved to All apps; " + next.label + " is in the dock", Toast.LENGTH_SHORT).show();
     }
 
-    /** Apps you hid (Hide in an app's hold-OK menu): left out of the dock and All apps, still installed. */
+    /**
+     * What TV makers install that nobody opens: manuals, firmware updaters, store demos, setup and factory tools.
+     * Hidden from the start; Talkies settings → Hidden apps shows one again. The list is Home Deck's (MIT).
+     */
+    private static final Set<String> CLUTTER = new HashSet<>(Arrays.asList(
+            "jp.co.sharp.av.android.emanual", "jp.co.sharp.av.android.epopdemo", "rcota.android.av.sharp.co.jp.rcota",
+            "com.google.android.tvtutorials", "fusion.android.tv.demo",
+            "com.tcl.ocean.instructions", "com.tcl.repairguide", "com.tcl.exhibit", "com.tcl.esticker",
+            "com.tcl.versionUpdateApp", "com.tcl.UpdatePeripheral", "com.tcl.useragreement",
+            "com.hisense.fte", "com.vt.fte", "com.hisense.storemode", "com.vt.storemode", "com.hisense.tv.ota",
+            "com.hisense.remoteupgrade", "com.vt.tv.ota", "com.vt.remoteupgrade",
+            "com.sony.dtv.imanual", "com.sony.dtv.demomode", "com.sony.dtv.demosupport", "com.sony.dtv.multiscreendemo",
+            "com.xiaomi.mitv.handbook", "com.xiaomi.mitv.manualhelp", "com.xiaomi.mitv.updateservice",
+            "com.xiaomi.mitv.upgrade", "com.duokan.factorytest", "org.droidtv.demome", "com.Smartdevice.emanual"));
+
+    /** Apps you hid (Hide in an app's hold-OK menu), and installed CLUTTER you haven't shown: still installed. */
     private Set<String> hiddenApps() {
         String s = prefs.getString("hidden_apps", "");
-        return s.isEmpty() ? new HashSet<>() : new HashSet<>(Arrays.asList(s.split(",")));
+        Set<String> out = s.isEmpty() ? new HashSet<>() : new HashSet<>(Arrays.asList(s.split(",")));
+        Set<String> shown = new HashSet<>(Arrays.asList(prefs.getString("clutter_shown", "").split(",")));
+        for (String p : CLUTTER) if (!shown.contains(p) && installed(p)) out.add(p);
+        return out;
+    }
+
+    private boolean installed(String pkg) {
+        try {
+            pm.getApplicationInfo(pkg, 0);
+            return true;
+        } catch (PackageManager.NameNotFoundException e) {
+            return false;
+        }
     }
 
     private void setHidden(String pkg, boolean hide) {
-        Set<String> h = hiddenApps();
+        if (CLUTTER.contains(pkg)) {
+            Set<String> shown = new HashSet<>(Arrays.asList(prefs.getString("clutter_shown", "").split(",")));
+            shown.remove("");
+            if (hide) shown.remove(pkg); else shown.add(pkg);
+            prefs.edit().putString("clutter_shown", String.join(",", shown)).apply();
+            return;
+        }
+        String s = prefs.getString("hidden_apps", "");
+        Set<String> h = s.isEmpty() ? new HashSet<>() : new HashSet<>(Arrays.asList(s.split(",")));
         if (hide) h.add(pkg); else h.remove(pkg);
         prefs.edit().putString("hidden_apps", String.join(",", h)).apply();
     }
@@ -3755,6 +4070,20 @@ public class HomeActivity extends Activity {
             focusMenu(menuIdx);
         }, true);
         addRow("Wallpaper", wallpaperLabel(), this::openWallpaperMenu, false);
+        final View[] ss = new View[1];
+        ss[0] = addRow("Screensaver", screensaverLabel(), () -> {
+            String[] order = {"clock", "wallpaper", "picks"};
+            String next = order[(Arrays.asList(order).indexOf(prefs.getString("screensaver", "clock")) + 1) % order.length];
+            prefs.edit().putString("screensaver", next).apply();
+            setStatus(ss[0], screensaverLabel());
+            if (next.equals("picks") && lowMemory()) {
+                Toast.makeText(this, "Picks can make the screensaver slow on a TV with this little memory. Clock or Wallpaper is lighter",
+                        Toast.LENGTH_LONG).show();
+            } else if (!screensaverChosen()) {
+                Toast.makeText(this, "To use it, pick Talkies in the TV's Settings → Device Preferences → Screen saver",
+                        Toast.LENGTH_LONG).show();
+            }
+        }, true);
         final View[] fx = new View[1];
         fx[0] = addRow("Effects", effectsLabel(), () -> {
             String[] order = {"auto", "full", "lite"};
@@ -3852,6 +4181,13 @@ public class HomeActivity extends Activity {
         // Only on a TV: a streaming box has no inputs of its own.
         if (!ports().isEmpty()) addRow("Inputs on Home", homeInputs().isEmpty() ? null : homeInputs().size() + " on Home",
                 this::openHomeInputs, false);
+        if (!ports().isEmpty()) addRow("Edit inputs", null, this::openEditInputs, false);
+        final View[] inc = new View[1];
+        if (!ports().isEmpty()) inc[0] = addRow("A device turns on", prefs.getBoolean("incoming", true) ? "Offer to switch" : "Nothing", () -> {
+            boolean on = !prefs.getBoolean("incoming", true);
+            prefs.edit().putBoolean("incoming", on).apply();
+            setStatus(inc[0], on ? "Offer to switch" : "Nothing");
+        }, true);
         final View[] ports = new View[1];
         ports[0] = addRow("Empty inputs", prefs.getBoolean("inputs_connected_only", false) ? "Under More inputs" : "Shown", () -> {
             boolean only = !prefs.getBoolean("inputs_connected_only", false);
@@ -4345,7 +4681,7 @@ public class HomeActivity extends Activity {
         beginMenu(settingsAt, "At power-on  ·  now: " + wakeLabel());
         addRow("Talkies, after a restart", "the TV's last input or app after standby", () -> setPowerOn("boot", null, null), false);
         addRow("Talkies, every time", null, () -> setPowerOn("always", null, null), false);
-        for (Port port : ports()) addRow(port.row(), null, () -> setPowerOn("open", AppEntry.INPUT + port.id, port.row()), false);
+        for (Port port : shownPorts()) addRow(port.row(), null, () -> setPowerOn("open", AppEntry.INPUT + port.id, port.row()), false);
         addRow("Open an app", null, this::openPowerOnApps, false);
         showMenu(460);
     }
@@ -4829,6 +5165,7 @@ public class HomeActivity extends Activity {
     @Override
     protected void onStart() {
         super.onStart();
+        watchInputs(true);
         ServiceRepair.restore(this);  // a force stop switched the accessibility service off: put it back
         IntentFilter t = new IntentFilter(Intent.ACTION_TIME_TICK);
         t.addAction(Intent.ACTION_TIME_CHANGED);
@@ -4889,6 +5226,7 @@ public class HomeActivity extends Activity {
     @Override
     protected void onStop() {
         super.onStop();
+        watchInputs(false);
         getContentResolver().unregisterContentObserver(watchNextChanged);
         root.removeCallbacks(rereadWatchNext);
         unregisterReceiver(timeReceiver);
@@ -4901,6 +5239,7 @@ public class HomeActivity extends Activity {
         super.onResume();
         tabs[2].setText("New in " + Region.name(Region.country(this)));  // the country can change (Region)
         inFront = true;
+        watchPlaying();
         root.post(this::snapRing);
         // Give Android time to bind the service after Talkies (re)starts before calling it stopped.
         root.removeCallbacks(checkService);
@@ -4958,6 +5297,7 @@ public class HomeActivity extends Activity {
         pressedHere = 0;
         SleepService.learn(null);
         inFront = false;
+        watchPlaying();   // stops following the player
     }
 
     /**

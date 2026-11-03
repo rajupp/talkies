@@ -163,6 +163,40 @@ SOFTWARE.
 
 ---
 
+The list of TV makers' extras hidden from All apps (`CLUTTER` in `HomeActivity.java`) is Home Deck's
+(https://github.com/glidiandev/home-deck, `Bridge.java`). Under this license:
+
+```
+MIT License
+
+Copyright (c) 2026 Glidian
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+The fonts in app/src/main/assets/www/kit/fonts are under the SIL Open Font
+License 1.1; each one's license is beside it. The app tiles in
+app/src/main/assets/www/icons are fan art of other companies' logos: those
+names and logos belong to their owners and are not covered by this license.
+```
+
+---
+
 `Qr.java` follows Project Nayuki's QR Code generator library (https://www.nayuki.io/page/qr-code-generator-library),
 cut down to byte mode, level M and versions 1 to 10. Copyright (c) Project Nayuki, MIT License; the full notice is at
 the top of `Qr.java`.

@@ -117,6 +117,17 @@
 
         <!-- Recently watched: holds notification access so Android shares which media sessions play and their
              titles (JioHotstar and YouTube only). It reads no notifications. -->
+        <!-- Talkies as the TV's screensaver: a dim clock that moves (Screensaver). -->
+        <service
+            android:name=".Screensaver"
+            android:exported="true"
+            android:label="@string/app_name"
+            android:permission="android.permission.BIND_DREAM_SERVICE">
+            <intent-filter>
+                <action android:name="android.service.dreams.DreamService" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+        </service>
         <service
             android:name=".WatchService"
             android:exported="true"

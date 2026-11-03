@@ -60,7 +60,7 @@ you set once is in **Talkies settings**, at the top.
 | Speed test | A few seconds' download from Cloudflare's speed test; shows e.g. "206 Mbps" |
 | Bluetooth | Shows the connected speaker or headphones. OK lists your paired ones: OK on one connects or disconnects it; **Pair a new device** opens the TV's Bluetooth settings. Bluetooth can't be turned off here, since many remotes use it |
 | Sound output | Shows *TV speakers*, or *Soundbar connected* when one is on HDMI ARC (Android doesn't say whether it's the one playing), and opens the TV's sound settings: on Sony, Display & sound, where Audio output chooses the speakers |
-| Screensaver | Starts the TV's screensaver right away, the way Google Assistant does (or through Android's own shortcut). Not shown on devices that offer apps neither |
+| Screensaver | Starts the TV's screensaver right away (Talkies' own, if you picked it: see below), the way Google Assistant does (or through Android's own shortcut). Not shown on devices that offer apps neither |
 | Restart… | Opens the TV's own power menu, which asks before restarting. On some TVs (OnePlus) that menu puts the TV to sleep after 10 seconds if you choose nothing; Back closes it |
 
 ## Talkies settings
@@ -73,7 +73,8 @@ Control Center → **Talkies settings**, or **hold OK on the ⚙ icon** (a press
 | **Look** | |
 | Appearance | Cycles Auto (light by day, dark at night) → Light → Dark. With a wallpaper, Auto picks the look that suits the photo instead, and every look adds just enough veil behind the text to keep it readable |
 | Wallpaper | A picture of your own **from your phone** (a QR code) or **from this TV** (pictures on the TV or a USB drive, or a folder for a new picture each day), Bing's **picture of the day** (checked every few hours while Talkies is in front), or **Remove your picture**. See [Change the wallpaper](#change-the-wallpaper) |
-| Effects | **Auto** (default): Lite on a TV with under 1.6 GB of memory, Full elsewhere. **Full**: the background glows in the focused app's colour and focus and scrolling glide. **Lite**: no glow, and focus and scrolling move at once, which keeps slow TVs responsive |
+| Screensaver | **Clock** (default), **Wallpaper** or **Picks**: what Talkies' screensaver shows behind its clock ([Screensaver](#screensaver-and-whats-playing)). *Not in use* until you pick Talkies in the TV's Screen saver settings; *none set* in Wallpaper with no wallpaper; *may be slow* in Picks on a TV with little memory |
+| Effects | **Auto** (default): Lite on a TV with under 1.6 GB of memory, or one that turns out slow (Talkies times its frames the first few times you move with the arrows), Full elsewhere. **Full**: the background glows in the focused app's colour and focus and scrolling glide. **Lite**: no glow, and focus and scrolling move at once, which keeps slow TVs responsive |
 | RAM and storage | Shown (default) or Hidden: the two meters beside the icon buttons, with free RAM and free storage, updated every minute |
 | Apps open from their tile | On by default: an app's window grows out of the tile or card you chose. It's Android's normal opening animation, started from the tile, so it costs nothing extra |
 | **For You and scores** | |
@@ -90,9 +91,11 @@ Control Center → **Talkies settings**, or **hold OK on the ⚙ icon** (a press
 | Dock apps | Every app, the dock's first (numbered): OK puts one in the dock or takes it out, the same as **Add to dock** and **Remove from dock** when you hold OK on an app. To change the order, hold OK on an app in the dock and choose **Move** |
 | Dock size | 5, 6, 7 (default), 8, 9 or 10 apps. The tiles grow or shrink so the dock always fills the screen's width; apps that no longer fit move to the front of All apps, and come back when it grows again |
 | All apps order | **Your order** (default: apps you moved with hold OK → Move stay put, the rest A to Z), **Recently opened** (the apps you last opened through Talkies first, the rest A to Z) or **A to Z**. In the two sorted orders only the dock's apps can be moved; the dock always keeps your order |
-| Hidden apps | Shown once you've hidden an app: the apps you hid; OK shows one again |
+| Hidden apps | The apps you hid, and the manuals, updaters, store demos and factory tools TV makers install (hidden from the start; the list comes from Home Deck); OK shows one again |
 | Phone apps | Only on a TV with any (with how many): **Shown** (default) or Hidden: apps with no TV version (Chrome, MacroDroid… installed from a file) in All apps, with a tile made from their icon. Hidden leaves them out, for TVs that list odd system screens this way; hold OK → **Hide** hides just one |
 | Inputs on Home | Only on a TV with HDMI or AV ports: each port, with the device on it when it says (*HDMI 2 · PlayStation 5*). OK puts it on Home as a tile in the dock's first spot, named after that device, which switches the TV to it in one press; OK again takes it off. Hold OK on the tile to move it, give it a picture, or **Remove from Home** |
+| Edit inputs | Only on a TV with HDMI or AV ports: each port and Live TV. OK on one: **Name** (your own, like "Living room box"; Remove goes back to its own) and **In Inputs** (Shown or Hidden: a soundbar's ARC port, or Live TV without an aerial). Hidden ones stay out of Inputs, Inputs on Home and At power-on |
+| A device turns on | **Offer to switch** (default) or **Nothing**. With Home on screen, a console or box on HDMI that switches on gets a small card: "PlayStation 5 is on · Switch to HDMI 2". It goes away after 15 seconds. Many devices switch the TV to themselves anyway (HDMI-CEC); this is for the ones that don't |
 | Empty inputs | **Shown** (default), or **Under More inputs**: Inputs lists only ports with something plugged in, and a More inputs row brings back the rest |
 | **Remote and power** | |
 | Remote keys | Give a remote button another job: open an app, Inputs, Recent apps, Talkies, or nothing. **Add a key**, press the button, choose. Once it has a job, **When held** gives it a second one for holding it (over half a second). Navigation, OK, Back, Home, volume and power can't be changed. A button Android has no name for shows as *Button 0x…* (its code from the remote). If a button still just does its own job while Talkies waits for it (the app buttons on some TVs), the TV's software handles it before Android sees it, and no app can change it. **Remote keys: On or Off** at the top, On by default: Home goes straight to Talkies. On some TVs, while it's on, holding Volume changes it only one step per press, in every app: Android stops repeating a held button once an app watches the remote, and the TV acts on Volume before any app sees it, so no app can repeat it either. Off, holding Volume works, and Home reaches Talkies with Google TV's home showing for a moment first |
@@ -352,6 +355,24 @@ the score and the minute ("LIVE · Premier League · 67'"), kick-off time ("star
 - **Data:** ESPN's public scoreboard. It's free and needs no key, but it isn't an official API: ESPN can change it
   without notice, and then the Football row just stays away until Talkies is updated.
 - **Watching:** not yet. Which app shows which league differs by country, so OK on a match card says so for now.
+
+## Screensaver and what's playing
+
+**Talkies' screensaver:** a dim clock, the date and the weather, moving to a new spot every 20 seconds so nothing
+burns in (handy on OLED TVs). Pick it in the TV's Settings → Device Preferences → Screen saver → **Talkies**; it isn't
+the TV's screensaver until you do. Behind the clock, by Talkies settings → **Screensaver**:
+
+- **Clock** (default): black.
+- **Wallpaper**: your wallpaper (your picture or Bing's), dimmed, drifting and growing slowly so it never holds still.
+- **Picks**: the Trending picks' pictures, a new one each minute, with the title and app under the clock. It keeps two
+  pictures in memory, so on a TV with under 1.6 GB the row says *may be slow*: Clock or Wallpaper is lighter.
+
+It comes on after the TV's idle time, over any app, and any button wakes the TV. If your TV hides that menu, from a
+computer: `adb shell settings put secure screensaver_components com.techpp.glass/.Screensaver`.
+
+**What's playing:** while music (or anything else) plays in the background, the line under the icons shows it
+instead of the score: "♪ Song · Artist · Spotify". The scores stay in their rows, and the line goes back to them
+when the music stops. The remote's Play/Pause works as anywhere; Control Center → Now playing has the buttons.
 
 ## Hold OK: app and Continue menus
 

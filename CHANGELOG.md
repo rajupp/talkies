@@ -5,6 +5,23 @@ features, a new fix number only fixes. The version shows in Talkies settings →
 
 ## Unreleased
 
+### New
+- **A device turns on.** With Home on screen, a console or box on HDMI that switches on gets a card: "PlayStation 5
+  is on · Switch to HDMI 2". Talkies settings → **A device turns on** turns it off. An idea from Home Deck.
+- **Edit inputs.** Talkies settings → **Edit inputs** names a port ("Living room box") or hides it (a soundbar's ARC
+  port, Live TV without an aerial). An idea from Home Deck, and from AndyVRD in Discussion #22.
+- **Talkies screensaver.** A dim clock, the date and the weather, moving every 20 seconds so nothing burns in. Pick
+  it in the TV's Settings → Screen saver. Talkies settings → **Screensaver** puts your wallpaper (dimmed, drifting) or
+  the picks (a new one each minute) behind it. An idea from Home Deck.
+- **What's playing on Home.** While music plays, the line under the icons shows the song, the artist and the app.
+  An idea from Home Deck.
+
+### Changed
+- **TV makers' extras hidden.** Manuals, firmware updaters, store demos and factory tools are left out of All apps
+  from the start (Talkies settings → Hidden apps shows one again). The list is Home Deck's.
+- **Effects: Auto notices a slow TV.** Talkies times its frames the first few times you move with the arrows, and a
+  TV that turns out slow gets Lite. An idea from Home Deck.
+
 ### Fixed
 - **Send from your phone on any home network.** The QR code page now also works when the router hands out
   addresses outside the usual private ranges; there it answers only phones on the TV's own network

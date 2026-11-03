@@ -32,13 +32,20 @@
 - **Weather** at a glance, with the next hours and days in Control Center.
 - **Control Center:** what's playing (pause, skip), sleep timer, turn off, recent apps, speed test, Bluetooth,
   sound output and more, one button away.
-- **Inputs** that know your devices: "PlayStation 5 · On", "Fire TV · Standby". Put any of them on Home as a tile,
-  or have the TV open one (or an app) each time it turns on.
+- **Inputs** that know your devices: "PlayStation 5 · On", "Fire TV · Standby". Name or hide any of them, put one on
+  Home as a tile, or have the TV open one (or an app) each time it turns on. Turn a console on while Home is up and
+  Talkies offers to switch to it.
+- **What's playing** under the icons while music plays, and a **screensaver** of its own: a dim clock that moves so
+  nothing burns in.
 - **Remote buttons with a new job:** make any spare button open an app, and give it a second job when held.
 - **Your apps' channel rows** below the dock (Netflix, YouTube, JioHotstar…), the ones you pick, in your order.
 - **Light by day, dark at night**, following your sunrise and sunset. **Your own wallpaper**, sent from your phone or
   picked from the TV or a USB drive, or Bing's picture of the day.
 - **Updates itself:** a bell tells you when a new version is out, and OK installs it.
+
+<p align="center">
+  <img src="docs/tour.gif" width="720" alt="Moving through Talkies: the dock's apps light up the background in their colour, the picks slide along, then the live Cricket and Sports rows below the dock">
+</p>
 
 **Set for where you live, and yours to change.** Talkies works out your country from the TV's time zone (many TVs
 stay on "English (United States)" wherever they are), or any country you pick in Talkies settings → Country, and
@@ -277,6 +284,7 @@ Code (details and license texts in `THIRD_PARTY_NOTICES.md`, all MIT):
 - The speed test, HDMI-CEC names and the update bell's approach: [Matinee](https://github.com/Jarvis322/matinee).
 - Recognising consoles and players by what they announce over HDMI-CEC: [Luma](https://github.com/0xProbabillity/luma-tv).
 - Tiles for apps without a TV banner: [GlassLauncher](https://github.com/tlfares/GlassLauncher).
+- The list of TV makers' extras to hide: [Home Deck](https://github.com/glidiandev/home-deck).
 
 Ideas (no code; Talkies' own implementation):
 
@@ -293,6 +301,8 @@ Ideas (no code; Talkies' own implementation):
 - Animation speed and Storage in Control Center: [GlassLauncher](https://github.com/tlfares/GlassLauncher).
 - Inputs on Home, an app or input at power-on, Lite effects on low-memory TVs, Report a problem with the TV's details,
   ahead-of-time compiling and a list of TVs: [Aerial](https://github.com/pengchujin/aerial-tv).
+- Offering to switch to a device that turns on, naming and hiding inputs, the screensaver clock, what's playing on
+  Home and noticing a slow TV: [Home Deck](https://github.com/glidiandev/home-deck).
 
 The Outfit typeface is © The Outfit Project Authors, licensed under the SIL Open Font License 1.1 (`OUTFIT-OFL.txt`).
 
