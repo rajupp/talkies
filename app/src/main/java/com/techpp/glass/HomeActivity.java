@@ -669,6 +669,7 @@ public class HomeActivity extends Activity {
     }
 
     private void onMinute() {
+        weatherLine = weather.cached();   // "Rain around 4 PM" goes once that hour comes
         updateInfo();
         watchPlaying();
         refreshOnline();
@@ -700,8 +701,88 @@ public class HomeActivity extends Activity {
         // One note at most, the one that matters most, so the row's name still fits.
         if (m.equals("wallpaper") && wallpaperLabel().equals("Off")) return "Wallpaper  ·  none set";
         if (m.equals("picks") && lowMemory()) return "Picks  ·  may be slow";
-        String l = m.equals("picks") ? "Picks" : m.equals("wallpaper") ? "Wallpaper" : "Clock";
+        String l = m.equals("picks") ? "Picks" : m.equals("wallpaper") ? "Wallpaper" : m.equals("board") ? "Board" : "Clock";
         return screensaverChosen() ? l : l + "  ·  not in use";
+    }
+
+    /** The screensaver message's first words ("Dinner at 8…"), short enough for the row's name to fit; or "None". */
+    private String messageLabel() {
+        String m = Screensaver.message(this);
+        if (m == null) return "None";
+        String first = m.split("\n")[0].trim();
+        return first.length() > 14 || m.contains("\n") ? first.substring(0, Math.min(14, first.length())).trim() + "…" : first;
+    }
+
+    /** When the screensaver dims: "11 PM – 7 AM", or "Off". */
+    private String quietLabel() {
+        switch (prefs.getString("quiet_hours", "23-7")) {
+            case "22-6": return "10 PM – 6 AM  ·  dimmer";
+            case "0-7": return "Midnight – 7 AM  ·  dimmer";
+            case "off": return "Off";
+            default: return "11 PM – 7 AM  ·  dimmer";
+        }
+    }
+
+    /** Screensaver message: two lines typed on the phone (PhonePage's message page), behind a QR code. */
+    private void openPhoneMessage() {
+        java.net.InetAddress lan = PhonePage.lanAddress(this);
+        if (lan == null) {
+            Toast.makeText(this, "The TV isn't on a home Wi-Fi or Ethernet network, so the phone can't reach it", Toast.LENGTH_LONG).show();
+            return;
+        }
+        TextView status = new TextView(this);
+        android.app.AlertDialog[] dialog = new android.app.AlertDialog[1];
+        PhonePage page;
+        try {
+            page = PhonePage.forMessage(lan, Screensaver.message(this), new PhonePage.Listener() {
+                @Override public void checking() { }
+
+                @Override public List<String> accept(Map<String, String> fields) {
+                    String m = (fields.get("line1") + "\n" + fields.get("line2")).trim();
+                    if (m.isEmpty()) prefs.edit().remove("board_message").apply();
+                    else prefs.edit().putString("board_message", m).apply();
+                    String said = m.isEmpty() ? "Message removed." : "Done: it shows on the screensaver now.";
+                    runOnUiThread(() -> {
+                        if (dialog[0] != null) dialog[0].dismiss();
+                        Toast.makeText(HomeActivity.this, said, Toast.LENGTH_SHORT).show();
+                        if (zone == Z_MENU) {   // the row shows the new message, still in focus
+                            int at = menuIdx;
+                            openTalkiesSettings(settingsAt);
+                            focusMenu(Math.min(at, menuItems.size() - 1));
+                        }
+                    });
+                    return java.util.Collections.singletonList(said);
+                }
+
+                @Override public void closed(boolean expired) {
+                    if (expired) runOnUiThread(() -> status.setText("This code has expired. Close it and open Screensaver message again."));
+                }
+            });
+        } catch (java.io.IOException e) {
+            Toast.makeText(this, "Couldn't open the page for your phone", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        LinearLayout box = new LinearLayout(this);
+        box.setOrientation(LinearLayout.VERTICAL);
+        box.setGravity(Gravity.CENTER_HORIZONTAL);
+        box.setPadding(px(24), px(8), px(24), 0);
+        box.addView(qrCode(page.url), new LinearLayout.LayoutParams(px(180), px(180)));
+        TextView where = new TextView(this);
+        where.setText(page.url);
+        where.setTextSize(12);
+        where.setPadding(0, px(8), 0, 0);
+        box.addView(where);
+        status.setText("Waiting for your phone… The page works once, for 5 minutes.");
+        status.setPadding(0, px(6), 0, 0);
+        box.addView(status);
+        dialog[0] = new android.app.AlertDialog.Builder(this, android.R.style.Theme_DeviceDefault_Dialog_Alert)
+                .setTitle("Screensaver message")
+                .setMessage("Scan this with your phone's camera (on the same Wi-Fi as the TV), then type up to two short lines.")
+                .setView(box)
+                .setNegativeButton("Close", null)
+                .setOnDismissListener(d -> page.close())
+                .create();
+        dialog[0].show();
     }
 
     /** Whether the TV's screensaver is Talkies' (Settings → Device Preferences → Screen saver). */
@@ -4072,7 +4153,7 @@ public class HomeActivity extends Activity {
         addRow("Wallpaper", wallpaperLabel(), this::openWallpaperMenu, false);
         final View[] ss = new View[1];
         ss[0] = addRow("Screensaver", screensaverLabel(), () -> {
-            String[] order = {"clock", "wallpaper", "picks"};
+            String[] order = {"clock", "board", "wallpaper", "picks"};
             String next = order[(Arrays.asList(order).indexOf(prefs.getString("screensaver", "clock")) + 1) % order.length];
             prefs.edit().putString("screensaver", next).apply();
             setStatus(ss[0], screensaverLabel());
@@ -4083,6 +4164,14 @@ public class HomeActivity extends Activity {
                 Toast.makeText(this, "To use it, pick Talkies in the TV's Settings → Device Preferences → Screen saver",
                         Toast.LENGTH_LONG).show();
             }
+        }, true);
+        addRow("Screensaver message", messageLabel(), this::openPhoneMessage, false);
+        final View[] qh = new View[1];
+        qh[0] = addRow("Quiet hours", quietLabel(), () -> {
+            String[] order = {"23-7", "22-6", "0-7", "off"};
+            String next = order[(Arrays.asList(order).indexOf(prefs.getString("quiet_hours", "23-7")) + 1) % order.length];
+            prefs.edit().putString("quiet_hours", next).apply();
+            setStatus(qh[0], quietLabel());
         }, true);
         final View[] fx = new View[1];
         fx[0] = addRow("Effects", effectsLabel(), () -> {

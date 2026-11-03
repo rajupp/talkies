@@ -73,7 +73,9 @@ Control Center → **Talkies settings**, or **hold OK on the ⚙ icon** (a press
 | **Look** | |
 | Appearance | Cycles Auto (light by day, dark at night) → Light → Dark. With a wallpaper, Auto picks the look that suits the photo instead, and every look adds just enough veil behind the text to keep it readable |
 | Wallpaper | A picture of your own **from your phone** (a QR code) or **from this TV** (pictures on the TV or a USB drive, or a folder for a new picture each day), Bing's **picture of the day** (checked every few hours while Talkies is in front), or **Remove your picture**. See [Change the wallpaper](#change-the-wallpaper) |
-| Screensaver | **Clock** (default), **Wallpaper** or **Picks**: what Talkies' screensaver shows behind its clock ([Screensaver](#screensaver-and-whats-playing)). *Not in use* until you pick Talkies in the TV's Screen saver settings; *none set* in Wallpaper with no wallpaper; *may be slow* in Picks on a TV with little memory |
+| Screensaver | **Clock** (default), **Board**, **Wallpaper** or **Picks**: what Talkies' screensaver shows ([Screensaver](#screensaver-and-whats-playing)). *Not in use* until you pick Talkies in the TV's Screen saver settings; *none set* in Wallpaper with no wallpaper; *may be slow* in Picks on a TV with little memory |
+| Screensaver message | Two short lines for the screensaver ("Dinner at 8"), typed on your phone: a QR code opens the page, which shows the message as it is. Send both lines empty to remove it |
+| Quiet hours | When the screensaver dims: **11 PM – 7 AM** (default), 10 PM – 6 AM, Midnight – 7 AM, or Off |
 | Effects | **Auto** (default): Lite on a TV with under 1.6 GB of memory, or one that turns out slow (Talkies times its frames the first few times you move with the arrows), Full elsewhere. **Full**: the background glows in the focused app's colour and focus and scrolling glide. **Lite**: no glow, and focus and scrolling move at once, which keeps slow TVs responsive |
 | RAM and storage | Shown (default) or Hidden: the two meters beside the icon buttons, with free RAM and free storage, updated every minute |
 | Apps open from their tile | On by default: an app's window grows out of the tile or card you chose. It's Android's normal opening animation, started from the tile, so it costs nothing extra |
@@ -281,6 +283,9 @@ The weather part combines two sources:
 - **Rain and cloud** come from [Open-Meteo](https://open-meteo.com)'s model for your exact coordinates, because an
   airport 15–20 km away can be dry while it rains at home.
 
+When it's dry now but rain is likely (50% or more) in the next 12 hours, the line adds when: "27° SUNNY · RAIN AROUND
+4 PM". It goes once that hour comes.
+
 Without a recent airport report, the temperature also comes from Open-Meteo. It refreshes at most every
 30 minutes, and only while the home screen is showing.
 
@@ -358,7 +363,7 @@ the score and the minute ("LIVE · Premier League · 67'"), kick-off time ("star
 
 ## Screensaver and what's playing
 
-**Talkies' screensaver:** a dim clock, the date and the weather, moving to a new spot every 20 seconds so nothing
+**Talkies' screensaver:** a dim clock (with the seconds, smaller), the date and the weather, moving to a new spot every 20 seconds so nothing
 burns in (handy on OLED TVs). Pick it in the TV's Settings → Device Preferences → Screen saver → **Talkies**; it isn't
 the TV's screensaver until you do. Behind the clock, by Talkies settings → **Screensaver**:
 
@@ -366,6 +371,18 @@ the TV's screensaver until you do. Behind the clock, by Talkies settings → **S
 - **Wallpaper**: your wallpaper (your picture or Bing's), dimmed, drifting and growing slowly so it never holds still.
 - **Picks**: the Trending picks' pictures, a new one each minute, with the title and app under the clock. It keeps two
   pictures in memory, so on a TV with under 1.6 GB the row says *may be slow*: Clock or Wallpaper is lighter.
+- **Board**: instead of the clock, a split-flap board of 22 letters by 6 rows, like an old station departures board:
+  the time to the second, the date, the weather, then rain coming or the day's high and low. Only the letters that
+  change flip, each running through a few on the way, and every 15 seconds a wave from the top left turns every letter
+  once round. It shifts a little every 20 seconds, on true black. An idea from
+  [Departures](https://github.com/0xdravyn/departures).
+
+**Screensaver message:** Talkies settings → **Screensaver message** shows a QR code; on your phone, type up to two
+lines of 22 letters ("Dinner at 8", "Happy birthday Asha!"). Board shows them in amber at the bottom; the other
+screensavers show them under the clock (Picks uses that line for the title). Send both lines empty to remove it.
+
+**Quiet hours:** from 11 PM to 7 AM the screensaver dims to about a third. Talkies settings → **Quiet hours** picks
+other hours or Off.
 
 It comes on after the TV's idle time, over any app, and any button wakes the TV. If your TV hides that menu, from a
 computer: `adb shell settings put secure screensaver_components com.techpp.glass/.Screensaver`.

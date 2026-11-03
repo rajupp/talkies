@@ -51,7 +51,39 @@ final class Weather {
     /** The last line shown, or null when no location is set (the greeting stays). */
     String cached() {
         if (area() == null || !unit().equals(prefs.getString("unit", "C"))) return null;  // °C/°F changed: refetch
-        return prefs.getString("line", null);
+        return withRain(prefs.getString("line", null));
+    }
+
+    /** "27° Sunny · Rain around 4 PM" when rain is likely in the next hours and it isn't raining now. An idea from Departures (MIT). */
+    private String withRain(String line) {
+        String rain = line == null ? null : rainLater(line);
+        return rain == null ? line : line + " · " + rain;
+    }
+
+    /** The first coming hour where rain is likely (50% or more), as "Rain around 4 PM"; null if none, or it's wet already. */
+    private String rainLater(String line) {
+        for (String wet : new String[]{"Drizzle", "Rain", "Showers", "Thunderstorm", "Snow"}) if (line.endsWith(" " + wet)) return null;
+        long now = System.currentTimeMillis();
+        for (String at : prefs.getString("wet", "").split(",")) {
+            long t;
+            try { t = Long.parseLong(at); } catch (NumberFormatException e) { continue; }
+            if (t <= now) continue;
+            boolean h24 = android.text.format.DateFormat.is24HourFormat(ctx);
+            return "Rain around " + new java.text.SimpleDateFormat(h24 ? "HH:mm" : "h a", Locale.getDefault()).format(new java.util.Date(t));
+        }
+        return null;
+    }
+
+    /** Today's high and low ("31°", "22°") from the last forecast, or null. */
+    String[] highLow() {
+        if (cached() == null) return null;
+        for (String row : prefs.getString("days", "").split("\n")) {
+            String[] f = row.split("\t");
+            if (f.length != 2 || !f[0].equals("Today")) continue;
+            String[] t = f[1].split("  ")[0].split(" / ");
+            return t.length == 2 ? t : null;
+        }
+        return null;
     }
 
     private String unit() { return Region.fahrenheit(Region.here(ctx)) ? "F" : "C"; }
@@ -69,7 +101,7 @@ final class Weather {
         long stamp = new File(ctx.getExternalFilesDir(null), "location.txt").lastModified();
         boolean moved = !area.equals(prefs.getString("area", null)) || stamp != prefs.getLong("file_at", 0)
                 || !unit().equals(prefs.getString("unit", "C"))  // the TV now in a °F country, or back
-                || !prefs.contains("hours_at");  // saved before Talkies kept the forecast this way
+                || !prefs.contains("hours_at") || !prefs.contains("wet");  // saved before Talkies kept the forecast this way
         prefs.edit().putLong("file_at", stamp).apply();
         if (!moved && (now - prefs.getLong("ok_at", 0) < REFRESH_MS || now - prefs.getLong("try_at", 0) < RETRY_MS)) return;
         prefs.edit().putLong("try_at", now).apply();
@@ -80,7 +112,8 @@ final class Weather {
                 String line = observe(where[0], where[1]);
                 prefs.edit().putString("line", line).putString("unit", unit()).putLong("ok_at", System.currentTimeMillis()).apply();
                 Log.i(TAG, "Weather: " + line);
-                main.post(() -> l.onWeather(line));
+                String shown = withRain(line);
+                main.post(() -> l.onWeather(shown));
             } catch (Exception e) {
                 Log.w(TAG, "Weather failed: " + e.getClass().getSimpleName() + " " + e.getMessage());
             } finally {
@@ -145,7 +178,7 @@ final class Weather {
     private String observe(double lat, double lon) throws Exception {
         JSONObject forecast = get(String.format(Locale.US,
                 "https://api.open-meteo.com/v1/forecast?latitude=%.4f&longitude=%.4f&current=temperature_2m,weather_code,is_day"
-                        + "&hourly=temperature_2m,weather_code,is_day&forecast_hours=12"
+                        + "&hourly=temperature_2m,weather_code,is_day,precipitation_probability&forecast_hours=12"
                         + "&daily=sunrise,sunset,weather_code,temperature_2m_max,temperature_2m_min&timezone=auto&forecast_days=6", lat, lon));
         JSONObject here = forecast.getJSONObject("current");
         saveForecast(forecast);
@@ -191,7 +224,7 @@ final class Weather {
 
     /** Keeps the forecast ready-made, so Control Center shows it at once and offline. */
     private void saveForecast(JSONObject forecast) {
-        StringBuilder hours = new StringBuilder(), days = new StringBuilder();
+        StringBuilder hours = new StringBuilder(), days = new StringBuilder(), wet = new StringBuilder();
         try {
             java.text.SimpleDateFormat in = new java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm", Locale.US),
                     day = new java.text.SimpleDateFormat("yyyy-MM-dd", Locale.US);
@@ -199,9 +232,16 @@ final class Weather {
             java.text.DateFormat weekday = new java.text.SimpleDateFormat("EEEE", Locale.getDefault());
             JSONObject h = forecast.getJSONObject("hourly");
             JSONArray t = h.getJSONArray("time"), temp = h.getJSONArray("temperature_2m"), code = h.getJSONArray("weather_code"),
-                    isDay = h.getJSONArray("is_day");
+                    isDay = h.getJSONArray("is_day"), chance = h.optJSONArray("precipitation_probability");
             for (int i = 0; i < t.length(); i++) {
-                hours.append(in.parse(t.getString(i)).getTime()).append('\t')
+                long at = in.parse(t.getString(i)).getTime();
+                int c = code.getInt(i);
+                // Likely rain: a wet hour (drizzle, rain, showers, storms) at 50% or more.
+                if (((c >= 51 && c <= 67) || (c >= 80 && c <= 82) || c >= 95) && (chance == null || chance.optInt(i, 0) >= 50)) {
+                    if (wet.length() > 0) wet.append(',');
+                    wet.append(at);
+                }
+                hours.append(at).append('\t')
                         .append(degrees(temp.getDouble(i))).append(' ').append(wmoCondition(code.getInt(i), isDay.optInt(i, 1) == 1)).append('\n');
             }
             JSONObject d = forecast.getJSONObject("daily");
@@ -215,7 +255,8 @@ final class Weather {
         } catch (Exception e) {
             Log.w(TAG, "No forecast: " + e);
         }
-        prefs.edit().putString("hours", hours.toString()).putString("days", days.toString()).putBoolean("hours_at", true).apply();
+        prefs.edit().putString("hours", hours.toString()).putString("days", days.toString()).putBoolean("hours_at", true)
+                .putString("wet", wet.toString()).apply();
     }
 
     /** "31°", in Fahrenheit where that's the custom. */

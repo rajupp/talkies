@@ -10,9 +10,18 @@ features, a new fix number only fixes. The version shows in Talkies settings →
   is on · Switch to HDMI 2". Talkies settings → **A device turns on** turns it off. An idea from Home Deck.
 - **Edit inputs.** Talkies settings → **Edit inputs** names a port ("Living room box") or hides it (a soundbar's ARC
   port, Live TV without an aerial). An idea from Home Deck, and from AndyVRD in Discussion #22.
-- **Talkies screensaver.** A dim clock, the date and the weather, moving every 20 seconds so nothing burns in. Pick
+- **Talkies screensaver.** A dim clock with seconds, the date and the weather, moving every 20 seconds so nothing burns in. Pick
   it in the TV's Settings → Screen saver. Talkies settings → **Screensaver** puts your wallpaper (dimmed, drifting) or
   the picks (a new one each minute) behind it. An idea from Home Deck.
+- **Board screensaver.** Talkies settings → **Screensaver → Board**: a split-flap board, like a station's departures
+  board, with the time to the second, the date, the weather and the day's high and low. Only the letters that change
+  flip, and every 15 seconds a wave turns them all once round. An idea from Departures.
+- **Screensaver message.** Two short lines typed on your phone ("Dinner at 8"), shown on the screensaver. Talkies
+  settings → **Screensaver message** shows the QR code. An idea from Departures.
+- **Quiet hours.** The screensaver dims at night, 11 PM to 7 AM unless you pick other hours (or Off) in Talkies
+  settings → **Quiet hours**. An idea from Departures.
+- **Rain coming.** The weather line adds "Rain around 4 PM" when rain is likely in the next hours and it's dry now.
+  An idea from Departures.
 - **What's playing on Home.** While music plays, the line under the icons shows the song, the artist and the app.
   An idea from Home Deck.
 

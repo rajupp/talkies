@@ -39,6 +39,8 @@ import java.util.concurrent.atomic.AtomicInteger;
  * Its other job (Talkies settings → Wallpaper → From your phone): a page to pick a photo, which the phone itself crops
  * to the TV's 16:9 and re-encodes as a 1920 × 1080 JPEG (so it arrives small, without the photo's location or other
  * details), then sends as the one POST.
+ *
+ * And a third (Talkies settings → Screensaver message): two short lines for the screensaver.
  */
 final class PhonePage {
     private static final String TAG = "GlassPhonePage";
@@ -73,6 +75,15 @@ final class PhonePage {
     private volatile boolean closed;
 
     PhonePage(InetAddress lan, Listener listener) throws IOException { this(lan, false, listener); }
+
+    /** The message page, with the message as it is now ("" for none); null on the other pages. */
+    private String message;
+
+    static PhonePage forMessage(InetAddress lan, String current, Listener listener) throws IOException {
+        PhonePage p = new PhonePage(lan, false, listener);
+        p.message = current == null ? "" : current;
+        return p;
+    }
 
     /** What the photo is cropped for, on the photo page: "the TV screen", or an app's tile. */
     private String fitFor = "the TV screen";
@@ -233,7 +244,8 @@ final class PhonePage {
             return false;
         }
         if (method.equals("GET") || method.equals("HEAD")) {
-            respond(out, "200 OK", "text/html; charset=utf-8", method.equals("HEAD") ? new byte[0] : wallpaper ? photoForm() : form());
+            respond(out, "200 OK", "text/html; charset=utf-8", method.equals("HEAD") ? new byte[0]
+                    : wallpaper ? photoForm() : message != null ? messageForm() : form());
             return false;
         }
         if (!method.equals("POST")) {
@@ -269,6 +281,13 @@ final class PhonePage {
         }
         String form = new String(body, StandardCharsets.US_ASCII);
         Map<String, String> fields = new LinkedHashMap<>();
+        if (message != null) {   // both lines, empty ones too: sending two empty lines clears the message
+            fields.put("line1", field(form, "line1").trim());
+            fields.put("line2", field(form, "line2").trim());
+            listener.checking();
+            respond(out, "200 OK", "text/html; charset=utf-8", result(listener.accept(fields)));
+            return true;
+        }
         for (String name : new String[]{"tmdb", "location"}) {
             String v = field(form, name).trim();
             if (!v.isEmpty()) fields.put(name, v);
@@ -371,6 +390,22 @@ final class PhonePage {
                 .append("const r=await fetch(location.pathname,{method:'POST',headers:{'Content-Type':'image/jpeg'},body:blob});")
                 .append("document.open();document.write(await r.text());document.close()}catch(e){")
                 .append("m.textContent='Couldn\\'t reach the TV. Is your phone on the same Wi-Fi?';b.disabled=false}};</script>");
+        return bottom(b);
+    }
+
+    /** Two lines of 22, the board's width, filled in with the message as it is. */
+    private byte[] messageForm() {
+        String[] now = (message + "\n").split("\n", -1);
+        StringBuilder b = top();
+        b.append("<p>Up to two short lines for the screensaver: “Dinner at 8”, “Happy birthday Asha”. ")
+                .append("Leave both empty to remove it.</p>")
+                .append("<form method=post action=\"").append(path).append("\">");
+        for (int i = 1; i <= 2; i++) {
+            b.append("<label for=line").append(i).append(">Line ").append(i).append("</label><input id=line").append(i)
+                    .append(" name=line").append(i).append(" maxlength=22 autocomplete=off value=\"").append(esc(now[i - 1].trim())).append("\">");
+        }
+        b.append("<button>Send to the TV</button></form><p class=s>")
+                .append("The Board screensaver shows letters, numbers and . , : ' ! ? - / & + % ( ) # @. This page works once, for 5 minutes.</p>");
         return bottom(b);
     }
 

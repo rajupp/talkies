@@ -36,7 +36,7 @@
   Home as a tile, or have the TV open one (or an app) each time it turns on. Turn a console on while Home is up and
   Talkies offers to switch to it.
 - **What's playing** under the icons while music plays, and a **screensaver** of its own: a dim clock that moves so
-  nothing burns in.
+  nothing burns in, or a split-flap board, with a message from your phone and dimmer at night.
 - **Remote buttons with a new job:** make any spare button open an app, and give it a second job when held.
 - **Your apps' channel rows** below the dock (Netflix, YouTube, JioHotstar…), the ones you pick, in your order.
 - **Light by day, dark at night**, following your sunrise and sunset. **Your own wallpaper**, sent from your phone or
@@ -303,6 +303,8 @@ Ideas (no code; Talkies' own implementation):
   ahead-of-time compiling and a list of TVs: [Aerial](https://github.com/pengchujin/aerial-tv).
 - Offering to switch to a device that turns on, naming and hiding inputs, the screensaver clock, what's playing on
   Home and noticing a slow TV: [Home Deck](https://github.com/glidiandev/home-deck).
+- The split-flap Board screensaver, the screensaver message, quiet hours and "Rain around 4 PM":
+  [Departures](https://github.com/0xdravyn/departures).
 
 The Outfit typeface is © The Outfit Project Authors, licensed under the SIL Open Font License 1.1 (`OUTFIT-OFL.txt`).
 
