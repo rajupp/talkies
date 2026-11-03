@@ -519,6 +519,12 @@ public class HomeActivity extends Activity {
         updateScore();
     }
 
+    /** How deep the menus were when Country opened, so choosing one (from either list) goes back to Talkies settings. */
+    private int countryDepth;
+    /** The first countries offered (Talkies settings → Country): where Talkies is used most; More countries has all. */
+    private static final String[] COUNTRIES = {"IN", "US", "GB", "CA", "AU", "AE", "SG", "SA", "DE", "FR", "ES", "IT",
+            "NL", "TR", "BR", "MX", "JP", "KR", "IE", "NZ", "ZA", "PK", "BD", "LK", "NP"};
+
     /** Talkies settings → Sports: the ids, with the names shown. */
     private static final String[][] SPORTS = {{"cricket", "Cricket"}, {"football", "Football"}, {"nba", "NBA"}, {"nfl", "NFL"}};
     /** "Soccer" in the US and Canada, where football is the NFL; "Football" everywhere else. Set in applySports. */
@@ -2529,6 +2535,49 @@ public class HomeActivity extends Activity {
 
     // ---------------------------------------------------------------- live scores
 
+    /** "Automatic (India)", or the country you chose. */
+    private String countryLabel() {
+        String chosen = Region.chosen(this);
+        return chosen == null ? "Automatic (" + Region.fullName(Region.here(this)) + ")" : Region.fullName(chosen);
+    }
+
+    /**
+     * Talkies settings → Country: the country the picks and scores are for, for a TV whose time zone says otherwise
+     * or anyone who wants another country's picks. Automatic first, then common ones, then every country A to Z.
+     * The weather's °C/°F and which app has the cricket still follow where the TV is.
+     */
+    private void openCountry() {
+        countryDepth = menuParents.size();  // Talkies settings is pushed just after: choosing a country goes back there
+        beginMenu(settingsAt, "Country for picks and scores");
+        String chosen = Region.chosen(this);
+        addRow("Automatic", Region.fullName(Region.here(this)) + (chosen == null ? "  ·  On" : ""), () -> setCountry(null), true);
+        for (String cc : COUNTRIES) addRow(Region.fullName(cc), cc.equals(chosen) ? "On" : null, () -> setCountry(cc), true);
+        addRow("More countries", "A to Z", this::openAllCountries, false);
+        showMenu(360);
+    }
+
+    private void openAllCountries() {
+        beginMenu(settingsAt, "Country for picks and scores");
+        String chosen = Region.chosen(this);
+        List<String> all = new ArrayList<>(Arrays.asList(Locale.getISOCountries()));
+        all.sort((a, b) -> Region.fullName(a).compareToIgnoreCase(Region.fullName(b)));
+        for (String cc : all) addRow(Region.fullName(cc), cc.equals(chosen) ? "On" : null, () -> setCountry(cc), true);
+        showMenu(360);
+    }
+
+    /** Saves the country (null: automatic); the picks, the New in … tab and the score defaults follow at once. */
+    private void setCountry(String cc) {
+        Region.choose(this, cc);
+        applySports();
+        tabs[2].setText("New in " + Region.name(Region.country(this)));
+        Toast.makeText(this, "Country: " + countryLabel(), Toast.LENGTH_SHORT).show();
+        onPicks(null);
+        refreshOnline();
+        // Back to Talkies settings, on the Country row, as Back would from the first list.
+        while (menuParents.size() > countryDepth + 1) menuParents.pop();
+        back();
+    }
+
     /** "Cricket, Football", "All", "Off". */
     private String sportsLabel() {
         if (sportsOn.isEmpty()) return "Off";
@@ -3721,6 +3770,7 @@ public class HomeActivity extends Activity {
             setStatus(anim[0], on ? "On" : "Off");
         }, true);
         addMenuHeading("For You and scores");
+        addRow("Country", countryLabel(), this::openCountry, false);
         final View[] fy = new View[1];
         fy[0] = addRow("For You", forYou ? "Shown" : "Hidden", () -> {
             forYou = !forYou;

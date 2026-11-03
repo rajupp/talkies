@@ -835,14 +835,17 @@ final class Trending {
 
     /**
      * TMDB accepts either a v3 API key (query parameter) or a v4 read access token (Bearer header). A connection
-     * reset is tried once more: some Indian networks drop the odd TMDB connection, and one lost request out of a
-     * hundred would otherwise lose the whole refresh.
+     * reset is tried up to twice more, a moment apart: some Indian networks drop TMDB connections now and then, and
+     * one lost request out of a hundred would otherwise lose the whole refresh.
      */
     private static JSONObject get(String key, String path) throws Exception {
-        try {
-            return getOnce(key, path);
-        } catch (java.net.SocketException e) {
-            return getOnce(key, path);
+        for (int attempt = 0; ; attempt++) {
+            try {
+                return getOnce(key, path);
+            } catch (java.net.SocketException e) {
+                if (attempt == 2) throw e;
+                Thread.sleep(800L * (attempt + 1));
+            }
         }
     }
 

@@ -77,6 +77,7 @@ Control Center → **Talkies settings**, or **hold OK on the ⚙ icon** (a press
 | RAM and storage | Shown (default) or Hidden: the two meters beside the icon buttons, with free RAM and free storage, updated every minute |
 | Apps open from their tile | On by default: an app's window grows out of the tile or card you chose. It's Android's normal opening animation, started from the tile, so it costs nothing extra |
 | **For You and scores** | |
+| Country | **Automatic** (where the TV is, by its time zone), about 25 common countries, or **More countries** (A to Z): the country the picks and scores are for; see [Which country](#trending-and-new-in-) |
 | For You | Shown or Hidden. Hidden removes the tabs and picks (the weather, time and date stay, larger), Up from the dock goes to the icons, and TMDB picks aren't fetched |
 | Picks from | India only: TMDB or StreamRadar, where the picks come from ([In India without a key](#in-india-without-a-key)) |
 | Picks languages | Only while For You is shown: **All** (the default) or the languages you choose for Trending and New in …. See [Languages](#languages) |
@@ -146,8 +147,10 @@ your country, in those languages, so it can be short. It's the title's original 
 still counts as Hindi, and TMDB doesn't tell Brazilian from European Portuguese.
 
 **Which country:** the TV's time zone (where it actually is; many TVs stay on "English (United States)" wherever
-they are), then its language setting. If that's wrong for you, set it: `./set-region.sh GB` (`--remove` to go back).
-It also picks the cricket and °C/°F behaviour below.
+they are), then its language setting. To use another country's picks, or if that's wrong for you: Talkies settings →
+**Country** (or `./set-region.sh GB` from a computer). It changes the picks, the *New in …* tab, Picks from (India
+only), which cricket teams and football leagues come first, and Soccer for Football in the US and Canada. The
+weather's °C or °F and which app has the cricket still follow where the TV is.
 Each tab keeps up to 24 and shows 12 of them, moving on by 4 each hour, so the large card and the row change through
 the day and the same set comes back only after 6 hours. The lists refresh at most every 6 hours (TMDB's popularity
 rankings change about daily, so refreshing more often would mostly fetch the same lists); a refresh takes a few seconds. Under the large card: film or series, genre, language (when not English) and the app.
@@ -263,7 +266,7 @@ Artwork is cached on the TV in `files/channels/`.
 ## Weather
 
 The weather shows at the top left, for example "27° SHOWERS", in °C, or °F where that's the custom (the US and a
-few others; see [Which country](#trending-and-new-in-)), after a small line drawing of the sky: sun, moon, sun or
+few others, going by where the TV is), after a small line drawing of the sky: sun, moon, sun or
 moon behind a cloud, cloud, rain, snow, thunder or fog.
 The weather part combines two sources:
 

@@ -11,21 +11,23 @@ features, a new fix number only fixes. The version shows in Talkies settings →
   them, from StreamRadar India. OK opens the title's page in its app where StreamRadar has a link. A TMDB key takes
   over at once, and Talkies settings → **Picks from** (on TVs in India) switches between TMDB and StreamRadar any
   time. Thanks to Swakshan for pointing it out.
-
 - **NBA and NFL scores**, from the same ESPN scoreboard as football: live games, start times and results, away
   team first ("CHI at SEA").
 - **Sports.** Talkies settings → **Sports** (was Live scores) turns Cricket, Football, NBA and NFL on or off one by
   one, in any country. Cricket and football to start, plus the NBA and NFL in the US and Canada; your Live scores
   choice carries over. **Football leagues** shows only while Football is on. In the US and Canada, football is
   called Soccer.
+- **Country.** Talkies settings → **Country** picks the country the picks and scores are for: Automatic (by the
+  TV's time zone), common countries first, or any country A to Z. The *New in …* tab, Trending and the cricket and
+  football defaults follow at once; the weather's °C/°F stays with where the TV is. Suggested on X.
 
 ### Changed
 - **Talkies settings in groups.** Its rows are now under five headings, most used first: Look, For You and scores,
   Apps and inputs, Remote and power, and Talkies (keys, updates, About).
 
 ### Fixed
-- **Picks on flaky networks.** A TMDB request whose connection is reset is tried once more, instead of the whole
-  refresh failing until the next try half an hour later.
+- **Picks on flaky networks.** A TMDB request whose connection is reset is tried up to twice more, instead of the
+  whole refresh failing until the next try half an hour later.
 
 ## 1.2.6 — 2 November 2026
 

@@ -344,7 +344,7 @@ final class Cricket {
      * and for JioHotstar its search, with both teams typed in (see SleepService.searchHotstar).
      */
     private void findStream(Match m) {
-        boolean india = "IN".equals(Region.country(ctx));
+        boolean india = "IN".equals(Region.here(ctx));  // the rights go by where the TV is, not the chosen country
         String[] names1 = {m.t1.toLowerCase(Locale.ROOT).replace("-w", ""), m.full1.toLowerCase(Locale.ROOT)},
                 names2 = {m.t2.toLowerCase(Locale.ROOT).replace("-w", ""), m.full2.toLowerCase(Locale.ROOT)};
         try (Cursor ch = ctx.getContentResolver().query(TvContract.Channels.CONTENT_URI,

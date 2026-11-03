@@ -41,7 +41,8 @@
 - **Updates itself:** a bell tells you when a new version is out, and OK installs it.
 
 **Set for where you live, and yours to change.** Talkies works out your country from the TV's time zone (many TVs
-stay on "English (United States)" wherever they are), and almost everything on the screen can be changed:
+stay on "English (United States)" wherever they are), or any country you pick in Talkies settings → Country, and
+almost everything on the screen can be changed:
 
 | | Set for your country | You can change |
 |---|---|---|

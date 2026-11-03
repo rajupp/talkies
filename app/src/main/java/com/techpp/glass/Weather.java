@@ -54,7 +54,7 @@ final class Weather {
         return prefs.getString("line", null);
     }
 
-    private String unit() { return Region.fahrenheit(Region.country(ctx)) ? "F" : "C"; }
+    private String unit() { return Region.fahrenheit(Region.here(ctx)) ? "F" : "C"; }
 
     /** The network is back: a fetch that failed while it was down may run again now, without waiting out the retry. */
     void networkBack() {
@@ -220,7 +220,7 @@ final class Weather {
 
     /** "31°", in Fahrenheit where that's the custom. */
     private String degrees(double c) {
-        return Math.round(Region.fahrenheit(Region.country(ctx)) ? c * 9 / 5 + 32 : c) + "°";
+        return Math.round(Region.fahrenheit(Region.here(ctx)) ? c * 9 / 5 + 32 : c) + "°";
     }
 
     /** The closest airport report from the last two hours within about 200 km, or null. */
@@ -256,7 +256,7 @@ final class Weather {
 
     /** "27° Showers"; in Fahrenheit where that's the custom (the US and a few others, Region). Both sources give °C. */
     private String line(double temp, String condition, String where) {
-        if (Region.fahrenheit(Region.country(ctx))) temp = temp * 9 / 5 + 32;
+        if (Region.fahrenheit(Region.here(ctx))) temp = temp * 9 / 5 + 32;
         String s = Math.round(temp) + "° " + condition;
         return where == null || where.isEmpty() ? s : s + " · " + where;
     }

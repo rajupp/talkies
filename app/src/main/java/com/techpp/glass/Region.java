@@ -12,10 +12,10 @@ import java.util.Locale;
 import java.util.TimeZone;
 
 /**
- * Where the TV is, for the picks (which titles stream here), cricket (which app has the rights) and the weather's
- * °C or °F. In order: files/region.txt (a two-letter country code you can push, for a TV whose settings say
- * otherwise), the time zone's country (where the TV actually is: many TVs are left on "English (United States)"
- * wherever they are), the language setting's country, and finally the US.
+ * The country the picks and scores are for (country): files/region.txt, set in Talkies settings → Country (or by
+ * set-region.sh), else where the TV is (here): the time zone's country (many TVs are left on "English (United
+ * States)" wherever they are), the language setting's country, and finally the US. The weather's °C or °F and which
+ * app has the cricket follow where the TV is, whatever country you choose.
  */
 final class Region {
     private static final List<String> ENGLISH = Arrays.asList("US", "GB", "AU", "CA", "NZ", "IE");
@@ -26,7 +26,28 @@ final class Region {
     /** Two-letter country code, e.g. "IN". */
     static String country(Context c) {
         String override = override(c);
-        if (override != null) return override;
+        return override != null ? override : here(c);
+    }
+
+    /** The country you chose in Talkies settings → Country, or null: automatic. */
+    static String chosen(Context c) { return override(c); }
+
+    /** Chooses the country for the picks and scores; null goes back to where the TV is. */
+    static void choose(Context c, String cc) {
+        File f = new File(c.getExternalFilesDir(null), "region.txt");
+        if (cc == null) {
+            if (f.isFile() && !f.delete()) android.util.Log.w("GlassRegion", "Couldn't remove " + f);
+            return;
+        }
+        try (java.io.FileOutputStream out = new java.io.FileOutputStream(f)) {
+            out.write(cc.getBytes(StandardCharsets.US_ASCII));
+        } catch (java.io.IOException e) {
+            android.util.Log.w("GlassRegion", "Couldn't save the country: " + e);
+        }
+    }
+
+    /** Where the TV is, whatever country is chosen: the time zone's, the language setting's, else the US. */
+    static String here(Context c) {
         try {
             String tz = android.icu.util.TimeZone.getRegion(TimeZone.getDefault().getID());
             if (tz != null && tz.matches("[A-Z]{2}") && !tz.equals("ZZ")) return tz;
@@ -62,6 +83,12 @@ final class Region {
                 String n = new Locale("", cc).getDisplayCountry(Locale.ENGLISH);
                 return n.isEmpty() || n.length() > 14 ? cc : n;
         }
+    }
+
+    /** "India", "United States": the country's full name, for Talkies settings → Country. */
+    static String fullName(String cc) {
+        String n = new Locale("", cc).getDisplayCountry(Locale.ENGLISH);
+        return n.isEmpty() ? cc : n;
     }
 
     /** Countries whose own titles are mostly in English: the Trending mix is then just "popular here". */

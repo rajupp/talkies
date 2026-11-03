@@ -105,7 +105,7 @@ Google Photos. More in the guide: [Google TV's setup wizard](guide.md#google-tvs
 ./restore.sh                           # the TV's own home screen back, Talkies removed
 ./restore.sh --keep-talkies            # the TV's own home screen back, Talkies kept
 ./switch-home.sh list|talkies|stock    # choose the home screen (see the guide)
-./set-region.sh GB                     # use another country for picks, cricket and °C/°F (--remove: the TV's own)
+./set-region.sh GB                     # use another country for picks and scores, like Talkies settings → Country (--remove: the TV's own)
 ./set-tmdb-key.sh / set-location.sh   # key and weather area (--remove clears one)
 ./backup-settings.sh                   # copy Talkies' settings from the TV to talkies-backup.json here
 ./restore-settings.sh                  # put them back (after reinstalling, or on another TV)
