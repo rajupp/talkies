@@ -16,6 +16,10 @@ features, a new fix number only fixes. The version shows in Talkies settings →
   the same ESPN scoreboard: live games, start times and results, away team first ("CHI at SEA"). On by default in
   the US and Canada.
 
+### Changed
+- **Talkies settings in groups.** Its rows are now under five headings, most used first: Look, For You and scores,
+  Apps and inputs, Remote and power, and Talkies (keys, updates, About).
+
 ### Fixed
 - **Picks on flaky networks.** A TMDB request whose connection is reset is tried once more, instead of the whole
   refresh failing until the next try half an hour later.

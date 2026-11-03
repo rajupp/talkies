@@ -3410,15 +3410,27 @@ public class HomeActivity extends Activity {
         return row;
     }
 
-    /** A section's name in a menu ("New", "Fixed"): not a row, the arrows pass over it. */
+    /**
+     * A section's name in a menu ("NEW", "LOOK"): a thin rule (after the first rows), then a small, spaced-out label in
+     * the quieter text colour, so it reads as a divider, not as one more row. The arrows pass over both.
+     */
     private void addMenuHeading(String text) {
+        if (!menuItems.isEmpty()) {
+            View rule = new View(this);
+            rule.setTag("rule");
+            rule.setBackgroundColor(theme.menuStroke);
+            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, Math.max(1, px(1) / 2));
+            lp.setMargins(px(14), px(10), px(14), 0);
+            menu.addView(rule, lp);
+        }
         TextView h = new TextView(this);
-        h.setText(text);
-        h.setTextSize(14);
-        h.setTextColor(theme.text);
+        h.setText(text.toUpperCase(Locale.ROOT));
+        h.setTextSize(11);
+        h.setLetterSpacing(0.12f);
+        h.setTextColor(theme.text2);
         h.setTypeface(getResources().getFont(R.font.outfit));
-        h.setFontVariationSettings("'wght' 650");
-        h.setPadding(px(14), px(14), px(14), px(2));
+        h.setFontVariationSettings("'wght' 600");
+        h.setPadding(px(14), px(12), px(14), px(4));
         menu.addView(h);
     }
 
@@ -3597,10 +3609,11 @@ public class HomeActivity extends Activity {
     private void openTalkiesSettings(int anchor) {
         settingsAt = anchor;
         beginMenu(anchor, "Talkies settings");
-        // First: what a new TV still needs (only while something does), then the keys and the weather area.
+        // What a new TV still needs (only while something does), then the rows in groups: how Home looks, what
+        // it shows, the apps and inputs, the remote and power, and Talkies itself.
         int missing = setupMissing();
         if (missing > 0) addRow("Finish setup", missing + (missing == 1 ? " step left" : " steps left"), this::openFinishSetup, false);
-        addRow("Keys and location", null, () -> openKeysAndLocation(0), false);
+        addMenuHeading("Look");
         final View[] look = new View[1];
         look[0] = addRow("Appearance", APPEARANCE[prefs.getInt("appearance", 0)], () -> {
             int mode = (prefs.getInt("appearance", 0) + 1) % APPEARANCE.length;
@@ -3610,10 +3623,15 @@ public class HomeActivity extends Activity {
             applyTheme();
             // Restyle the open menu too.
             menuScroll.setBackground(rounded(theme.menuBg, theme.menuStroke, 20));
-            View heading = menu.getChildAt(0);
-            if (heading instanceof TextView && !menuItems.contains(heading)) ((TextView) heading).setTextColor(theme.text2);
+            // The title, the group headings and their rules: what isn't a row.
+            for (int i = 0; i < menu.getChildCount(); i++) {
+                View v = menu.getChildAt(i);
+                if (v instanceof TextView && !menuItems.contains(v)) ((TextView) v).setTextColor(theme.text2);
+                else if ("rule".equals(v.getTag())) v.setBackgroundColor(theme.menuStroke);
+            }
             focusMenu(menuIdx);
         }, true);
+        addRow("Wallpaper", wallpaperLabel(), this::openWallpaperMenu, false);
         final View[] fx = new View[1];
         fx[0] = addRow("Effects", effectsLabel(), () -> {
             String[] order = {"auto", "full", "lite"};
@@ -3624,6 +3642,21 @@ public class HomeActivity extends Activity {
             updateAmbient();
             setStatus(fx[0], effectsLabel());
         }, true);
+        final View[] ms = new View[1];
+        ms[0] = addRow("RAM and storage", meters.getVisibility() == View.VISIBLE ? "Shown" : "Hidden", () -> {
+            boolean show = meters.getVisibility() != View.VISIBLE;
+            prefs.edit().putBoolean("meters", show).apply();
+            meters.setVisibility(show ? View.VISIBLE : View.GONE);
+            if (show) meters.update();
+            setStatus(ms[0], show ? "Shown" : "Hidden");
+        }, true);
+        final View[] anim = new View[1];
+        anim[0] = addRow("Apps open from their tile", prefs.getBoolean("open_animation", true) ? "On" : "Off", () -> {
+            boolean on = !prefs.getBoolean("open_animation", true);
+            prefs.edit().putBoolean("open_animation", on).apply();
+            setStatus(anim[0], on ? "On" : "Off");
+        }, true);
+        addMenuHeading("For You and scores");
         final View[] fy = new View[1];
         fy[0] = addRow("For You", forYou ? "Shown" : "Hidden", () -> {
             forYou = !forYou;
@@ -3653,40 +3686,13 @@ public class HomeActivity extends Activity {
             recentPicks = new ArrayList<>();  // rebuild Continue with the other pictures
             refreshWatchNext();
         }, true);
-        addRow("Dock apps", dockCount + " in the dock", this::openDockApps, false);
-        // Only on a TV: a streaming box has no inputs of its own.
-        if (!ports().isEmpty()) addRow("Inputs on Home", homeInputs().isEmpty() ? null : homeInputs().size() + " on Home",
-                this::openHomeInputs, false);
-        final View[] ds = new View[1];
-        ds[0] = addRow("Dock size", dockSize() + " apps", () -> {
-            int n = dockSize() + 1;
-            if (n > DOCK_SIZES[DOCK_SIZES.length - 1]) n = DOCK_SIZES[0];
-            prefs.edit().putInt("dock_size", n).apply();
-            setStatus(ds[0], n + " apps");
-            reloadApps();
-        }, true);
-        final View[] ao = new View[1];
-        ao[0] = addRow("All apps order", APPS_ORDER[appsOrder()], () -> {
-            int n = (appsOrder() + 1) % APPS_ORDER.length;
-            prefs.edit().putInt("apps_order", n).apply();
-            setStatus(ao[0], APPS_ORDER[n]);
-            reloadApps();
-        }, true);
-        // Only on a TV that has phone apps: elsewhere the setting would change nothing.
-        int phone = phoneOnlyApps();
-        final View[] pa = new View[1];
-        if (phone > 0) pa[0] = addRow("Phone apps", phoneAppsLabel(phone), () -> {
-            prefs.edit().putBoolean("phone_apps", !prefs.getBoolean("phone_apps", true)).apply();
-            setStatus(pa[0], phoneAppsLabel(phone));
-            reloadApps();
-        }, true);
-        final View[] ms = new View[1];
-        ms[0] = addRow("RAM and storage", meters.getVisibility() == View.VISIBLE ? "Shown" : "Hidden", () -> {
-            boolean show = meters.getVisibility() != View.VISIBLE;
-            prefs.edit().putBoolean("meters", show).apply();
-            meters.setVisibility(show ? View.VISIBLE : View.GONE);
-            if (show) meters.update();
-            setStatus(ms[0], show ? "Shown" : "Hidden");
+        // Off by default: looking a video up means sending its title and channel to YouTube.
+        final View[] yt = new View[1];
+        yt[0] = addRow("Sharp YouTube pictures", prefs.getBoolean("youtube_art", false) ? "On" : "Off", () -> {
+            boolean on = !prefs.getBoolean("youtube_art", false);
+            prefs.edit().putBoolean("youtube_art", on).apply();
+            setStatus(yt[0], on ? "On" : "Off");
+            if (on) refreshOnline();
         }, true);
         final View[] sc = new View[1];
         sc[0] = addRow("Live scores", scoresLabel(), () -> {
@@ -3702,23 +3708,49 @@ public class HomeActivity extends Activity {
         if (!scores().equals("off") && !scores().equals("cricket")) addRow("Leagues", football.leagues().size() + " on",
                 () -> openFootballLeagues(0), false);
         addRow("Channels", null, this::openChannelsEditor, false);
+        addMenuHeading("Apps and inputs");
+        addRow("Dock apps", dockCount + " in the dock", this::openDockApps, false);
+        final View[] ds = new View[1];
+        ds[0] = addRow("Dock size", dockSize() + " apps", () -> {
+            int n = dockSize() + 1;
+            if (n > DOCK_SIZES[DOCK_SIZES.length - 1]) n = DOCK_SIZES[0];
+            prefs.edit().putInt("dock_size", n).apply();
+            setStatus(ds[0], n + " apps");
+            reloadApps();
+        }, true);
+        final View[] ao = new View[1];
+        ao[0] = addRow("All apps order", APPS_ORDER[appsOrder()], () -> {
+            int n = (appsOrder() + 1) % APPS_ORDER.length;
+            prefs.edit().putInt("apps_order", n).apply();
+            setStatus(ao[0], APPS_ORDER[n]);
+            reloadApps();
+        }, true);
         int hiddenCount = hiddenApps().size();
         if (hiddenCount > 0) addRow("Hidden apps", String.valueOf(hiddenCount), this::openHiddenApps, false);
-        addRow("Remote keys", remoteKeysLabel(),
-                this::openRemoteKeys, false);
-        final View[] adb = new View[1];
-        adb[0] = addRow("Network debugging", "Checking…", this::openNetworkDebugging, false);
-        checkNetworkDebugging(st -> { if (adb[0].isAttachedToWindow()) setStatus(adb[0], st); });
-        powerOnRow = addRow("At power-on", wakeLabel(), () -> {
-            if (!SleepService.isRunning()) { needsTurnOffSetup(); return; }
-            openPowerOn();
-        }, false);
+        // Only on a TV that has phone apps: elsewhere the setting would change nothing.
+        int phone = phoneOnlyApps();
+        final View[] pa = new View[1];
+        if (phone > 0) pa[0] = addRow("Phone apps", phoneAppsLabel(phone), () -> {
+            prefs.edit().putBoolean("phone_apps", !prefs.getBoolean("phone_apps", true)).apply();
+            setStatus(pa[0], phoneAppsLabel(phone));
+            reloadApps();
+        }, true);
+        // Only on a TV: a streaming box has no inputs of its own.
+        if (!ports().isEmpty()) addRow("Inputs on Home", homeInputs().isEmpty() ? null : homeInputs().size() + " on Home",
+                this::openHomeInputs, false);
         final View[] ports = new View[1];
         ports[0] = addRow("Empty inputs", prefs.getBoolean("inputs_connected_only", false) ? "Under More inputs" : "Shown", () -> {
             boolean only = !prefs.getBoolean("inputs_connected_only", false);
             prefs.edit().putBoolean("inputs_connected_only", only).apply();
             setStatus(ports[0], only ? "Under More inputs" : "Shown");
         }, true);
+        addMenuHeading("Remote and power");
+        addRow("Remote keys", remoteKeysLabel(),
+                this::openRemoteKeys, false);
+        powerOnRow = addRow("At power-on", wakeLabel(), () -> {
+            if (!SleepService.isRunning()) { needsTurnOffSetup(); return; }
+            openPowerOn();
+        }, false);
         // Switch between Talkies and another launcher with Android's Home app chooser.
         // Google TV keeps its own launcher as the home app whatever is picked, so there Talkies has Home through its
         // Accessibility switch: that's what to turn off to use another home screen.
@@ -3741,23 +3773,13 @@ public class HomeActivity extends Activity {
             start(i);
         }, false);
         else addRow("Home app", currentHomeName(), () -> start(new Intent(Settings.ACTION_HOME_SETTINGS)), false);
-        addRow("Wallpaper", wallpaperLabel(), this::openWallpaperMenu, false);
         addRow("Control Center shortcuts", null, this::openShortcuts, false);
-        final View[] anim = new View[1];
-        anim[0] = addRow("Apps open from their tile", prefs.getBoolean("open_animation", true) ? "On" : "Off", () -> {
-            boolean on = !prefs.getBoolean("open_animation", true);
-            prefs.edit().putBoolean("open_animation", on).apply();
-            setStatus(anim[0], on ? "On" : "Off");
-        }, true);
-        // Off by default: looking a video up means sending its title and channel to YouTube.
-        final View[] yt = new View[1];
-        yt[0] = addRow("Sharp YouTube pictures", prefs.getBoolean("youtube_art", false) ? "On" : "Off", () -> {
-            boolean on = !prefs.getBoolean("youtube_art", false);
-            prefs.edit().putBoolean("youtube_art", on).apply();
-            setStatus(yt[0], on ? "On" : "Off");
-            if (on) refreshOnline();
-        }, true);
+        addMenuHeading("Talkies");
+        addRow("Keys and location", null, () -> openKeysAndLocation(0), false);
         addUpdatesRow();
+        final View[] adb = new View[1];
+        adb[0] = addRow("Network debugging", "Checking…", this::openNetworkDebugging, false);
+        checkNetworkDebugging(st -> { if (adb[0].isAttachedToWindow()) setStatus(adb[0], st); });
         addRow("About", null, this::openAbout, false);
         showMenu(350);
     }
@@ -4234,9 +4256,10 @@ public class HomeActivity extends Activity {
         try { version = " " + pm.getPackageInfo(getPackageName(), 0).versionName; } catch (PackageManager.NameNotFoundException ignored) { }
         beginMenu(settingsAt, "Talkies" + version + "  ·  MIT License");
         String[][] credits = {
+                {"Picks in India without a key", "StreamRadar India"},
                 {"Weather", "Open-Meteo.com (CC BY 4.0)"},
                 {"Airport temperatures", "aviationweather.gov (NOAA)"},
-                {"Cricket and football scores", "ESPN (public scoreboard)"},
+                {"Scores", "ESPN (public scoreboard)"},
                 {"Speed test", "Cloudflare"},
                 {"Code from", "tv-vibehack, CleanYourTV, Free My TV, Matinee, Luma, GlassLauncher"},
                 {"Font", "Outfit (SIL OFL)"},
