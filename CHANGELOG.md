@@ -8,7 +8,7 @@ features, a new fix number only fixes. The version shows in Talkies settings →
 ### Fixed
 - **Send from your phone on any home network.** The QR code page now also works when the router hands out
   addresses outside the usual private ranges; there it answers only phones on the TV's own network
-  ([#20](https://github.com/rajupp/talkies/issues/20)).
+  ([#20](https://github.com/rajupp/talkies/issues/20)). Thanks to wpfyorg for tracking down the cause.
 
 ## 1.2.7 — 3 November 2026
 
