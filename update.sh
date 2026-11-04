@@ -28,7 +28,9 @@ AAPT="$(command -v aapt || true)"
 if [ -z "$SIGNER" ] || [ -z "$AAPT" ]; then
   SDK="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-}}"
   if [ -z "$SDK" ]; then
-    for candidate in "$HOME/Library/Android/sdk" "$HOME/Android/Sdk"; do
+    BREW_PREFIX="$(brew --prefix 2>/dev/null || true)"
+    for candidate in "$HOME/Library/Android/sdk" "$HOME/Android/Sdk" "${BREW_PREFIX:+$BREW_PREFIX/share/android-commandlinetools}"; do
+      [ -n "$candidate" ] || continue
       if [ -d "$candidate/build-tools" ]; then SDK="$candidate"; break; fi
     done
   fi
