@@ -6,6 +6,8 @@ features, a new fix number only fixes. The version shows in Talkies settings →
 ## Unreleased
 
 ### New
+- **A welcome card on a new install.** The first time Home shows, if the Home button isn't set up yet, a small card
+  takes you straight to its switch. Later closes it for good; Talkies settings → Finish setup stays.
 - **A device turns on.** With Home on screen, a console or box on HDMI that switches on gets a card: "PlayStation 5
   is on · Switch to HDMI 2". Talkies settings → **A device turns on** turns it off. An idea from Home Deck.
 - **Edit inputs.** Talkies settings → **Edit inputs** names a port ("Living room box") or hides it (a soundbar's ARC
@@ -52,6 +54,8 @@ features, a new fix number only fixes. The version shows in Talkies settings →
   TV that turns out slow gets Lite. An idea from Home Deck.
 
 ### Fixed
+- **Back to Talkies after an update.** On TVs that bring back the last app instead of the built-in launcher, updating
+  from Talkies left you in that app. Talkies now comes back. Reported by Shahnawaz on a TCL TV.
 - **Dock tiles no longer shrink for empty places.** With fewer apps than Dock size, the tiles are sized for the apps
   there are. Reported by AndyVRD.
 - **Remote key menus in the right place.** A button set to Inputs or Recent apps, pressed while scrolled down the page,

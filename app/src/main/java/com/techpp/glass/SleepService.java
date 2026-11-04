@@ -121,8 +121,13 @@ public class SleepService extends AccessibilityService {
         if (SystemClock.elapsedRealtime() < BOOT_WINDOW_MS) powerOn();
         // After Talkies updates itself (or the service comes back for any other reason), Android shows the built-in
         // launcher while this service is unbound, so the window event that would bring Talkies back is missed: if
-        // that launcher is what's in front now, take over once.
+        // that launcher is what's in front now, take over once. Some TVs bring back the last app instead (TCL, and
+        // any TV whose launcher is disabled), so after an update you started in Talkies, take over whatever's there.
         main.postDelayed(() -> {
+            if (SelfUpdate.justUpdated(this)) {
+                openHome();
+                return;
+            }
             AccessibilityNodeInfo root = getRootInActiveWindow();
             if (root != null && root.getPackageName() != null && stockPackages.contains(root.getPackageName().toString())) openHome();
         }, 500);

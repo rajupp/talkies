@@ -54,6 +54,8 @@ final class SelfUpdate {
 
     private SelfUpdate() { }
 
+    private static final long RETURN_WINDOW_MS = 15 * 60_000L;
+
     private static SharedPreferences prefs(Context c) { return c.getSharedPreferences("updates", Context.MODE_PRIVATE); }
 
     /** This app is the APK from the releases (the project's key), so it can install the next one. */
@@ -219,9 +221,23 @@ final class SelfUpdate {
             Intent done = new Intent(c, Receiver.class).setAction(ACTION).putExtra("version", version);
             // Mutable: the installer adds its status.
             int flags = PendingIntent.FLAG_UPDATE_CURRENT | (Build.VERSION.SDK_INT >= 31 ? PendingIntent.FLAG_MUTABLE : 0);
+            prefs(c).edit().putString("installing", version).putLong("installing_at", System.currentTimeMillis()).apply();
             session.commit(PendingIntent.getBroadcast(c, id, done, flags).getIntentSender());
         }
         Log.i(TAG, "Installing " + version);
+    }
+
+    /**
+     * True once, just after the update you started from Talkies went in: you pressed OK at the TV, so Talkies comes back
+     * whatever Android put in front meanwhile. A cancelled install changes no version, so it doesn't count.
+     */
+    static boolean justUpdated(Context c) {
+        SharedPreferences p = prefs(c);
+        String version = p.getString("installing", null);
+        if (version == null) return false;
+        boolean done = version.equals(installed(c)) && System.currentTimeMillis() - p.getLong("installing_at", 0) < RETURN_WINDOW_MS;
+        if (done || version.equals(installed(c))) p.edit().remove("installing").remove("installing_at").apply();
+        return done;
     }
 
     /** Android's installer answers: it needs you to confirm (and, the first time, to allow Talkies to install apps). */

@@ -3636,23 +3636,63 @@ public class HomeActivity extends Activity {
         requestPermissions(SETUP_PERMISSIONS, REQ_SETUP);
     }
 
+    /** The screen with the switch that keeps the Home button on Talkies. */
+    private void openHomeButtonSwitch() {
+        Toast.makeText(this, "Switch on Talkies here: it keeps the Home button on Talkies", Toast.LENGTH_LONG).show();
+        Intent i = new Intent().setClassName("com.android.tv.settings", "com.android.tv.settings.oemlink.AccessibilitySettingsActivity");
+        if (pm.resolveActivity(i, 0) == null) i = new Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS);
+        start(i);
+    }
+
+    private void openRestrictedSettings() {
+        Toast.makeText(this, "Look for Allow restricted settings here. Not there? The README's Questions and fixes "
+                + "has the one command that allows it", Toast.LENGTH_LONG).show();
+        start(new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:" + getPackageName())));
+    }
+
+    /** A new install whose Home button isn't set up yet, and which hasn't had the card. An update never gets it. */
+    private boolean welcomeDue() {
+        if (prefs.getBoolean("welcome_seen", false) || SleepService.isRunning()) return false;
+        try {
+            android.content.pm.PackageInfo pi = pm.getPackageInfo(getPackageName(), 0);
+            return pi.firstInstallTime == pi.lastUpdateTime;
+        } catch (PackageManager.NameNotFoundException e) {
+            return false;
+        }
+    }
+
+    /**
+     * Once, the first time Home shows on a new install: without this one step, pressing Home goes to the TV's own
+     * launcher and Talkies looks broken. It waits for the permissions prompt (refreshOnline runs with the window in
+     * focus). Later is for good; Talkies settings → Finish setup stays.
+     */
+    private void showWelcomeCard() {
+        if (!inFront || zone == Z_MENU || moving || !welcomeDue()) return;
+        prefs.edit().putBoolean("welcome_seen", true).apply();
+        beginMenu(P_SETTINGS, null);
+        menuTitle("Welcome to Talkies");
+        TextView t = new TextView(this);
+        t.setText("One step left, so the Home button stays here.");
+        t.setTextSize(16);
+        t.setTextColor(theme.text);
+        t.setTypeface(getResources().getFont(R.font.outfit));
+        t.setPadding(px(14), px(5), px(14), px(5));
+        menu.addView(t);
+        menu.addView(new View(this), new LinearLayout.LayoutParams(1, px(12)));
+        addRow("Set up Home button", null, this::openHomeButtonSwitch, false);
+        if (Build.VERSION.SDK_INT >= 33) addRow("Switch greyed out?", "App info", this::openRestrictedSettings, false);
+        addRow("Later", null, () -> { }, false);
+        showCentredCard();
+    }
+
     /** Talkies settings → Finish setup: one row per step still to do; OK opens the place it's done. */
     private void openFinishSetup() {
         beginMenu(settingsAt, "Finish setup");
-        if (!SleepService.isRunning()) addRow("Home button", "Accessibility → Talkies", () -> {
-            Toast.makeText(this, "Switch on Talkies here: it keeps the Home button on Talkies", Toast.LENGTH_LONG).show();
-            Intent i = new Intent().setClassName("com.android.tv.settings", "com.android.tv.settings.oemlink.AccessibilitySettingsActivity");
-            if (pm.resolveActivity(i, 0) == null) i = new Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS);
-            start(i);
-        }, false);
+        if (!SleepService.isRunning()) addRow("Home button", "Accessibility → Talkies", this::openHomeButtonSwitch, false);
         // Android 13 and later grey out these switches for an app installed from an APK, until allowed in App info
         // (or with one adb command where the TV's App info doesn't offer it: README → Questions and fixes).
         if (Build.VERSION.SDK_INT >= 33 && (!SleepService.isRunning() || !notificationAccess()))
-            addRow("Switch greyed out?", "App info → Allow restricted settings", () -> {
-                Toast.makeText(this, "Look for Allow restricted settings here. Not there? The README's Questions and fixes "
-                        + "has the one command that allows it", Toast.LENGTH_LONG).show();
-                start(new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:" + getPackageName())));
-            }, false);
+            addRow("Switch greyed out?", "App info → Allow restricted settings", this::openRestrictedSettings, false);
         if (!notificationAccess() && notificationScreen()) addRow("Notification access", "Continue, Now playing, the bell", () -> {
             Toast.makeText(this, "Switch on Talkies here", Toast.LENGTH_LONG).show();
             start(new Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS));
@@ -4172,7 +4212,11 @@ public class HomeActivity extends Activity {
             openWhatsNew();
             menuClosed = () -> focusDock(dockIdx);
         }, false);
-        // Over Home, not opened from an icon: no ring on the tile behind it, and closing it goes back to the dock.
+        showCentredCard();
+    }
+
+    /** The menu as a card in the middle of Home, not opened from an icon: no ring on the tile behind it, and closing it goes back to the dock. */
+    private void showCentredCard() {
         setFocus(null, 1f, 0);
         menuClosed = () -> focusDock(dockIdx);
         menu.setPadding(px(16), px(16), px(16), px(12));
@@ -5586,6 +5630,8 @@ public class HomeActivity extends Activity {
         if (forYou) trending.refreshIfStale(this::onPicks);
         // Just updated: what's new, once (showNewsCard checks again when it's time).
         if (zone != Z_MENU && WhatsNew.due(this, prefs)) root.postDelayed(this::showNewsCard, 1500);
+        // A new install, Home button not set up yet: once, after the service has had time to connect.
+        if (zone != Z_MENU && welcomeDue()) root.postDelayed(this::showWelcomeCard, 2500);
         // Once a day: is there a newer Talkies? Said once per version.
         background.execute(() -> {
             boolean news = SelfUpdate.checkIfStale(this);
