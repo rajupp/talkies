@@ -24,7 +24,8 @@ ACTUAL_DIGEST="$(python3 -c 'import hashlib,sys; h=hashlib.sha256(); f=open(sys.
 [ "$ACTUAL_DIGEST" = "${DIGEST#sha256:}" ] || { echo "!! APK SHA-256 doesn't match GitHub's release metadata" >&2; exit 1; }
 
 SIGNER="$(command -v apksigner || true)"
-if [ -z "$SIGNER" ]; then
+AAPT="$(command -v aapt || true)"
+if [ -z "$SIGNER" ] || [ -z "$AAPT" ]; then
   SDK="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-}}"
   if [ -z "$SDK" ]; then
     for candidate in "$HOME/Library/Android/sdk" "$HOME/Android/Sdk"; do
@@ -33,15 +34,24 @@ if [ -z "$SIGNER" ]; then
   fi
   if [ -n "$SDK" ] && [ -d "$SDK/build-tools" ]; then
     BUILDTOOLS="$(ls -d "$SDK"/build-tools/*/ 2>/dev/null | tail -1 || true)"
-    [ -z "$BUILDTOOLS" ] || SIGNER="${BUILDTOOLS}apksigner"
+    if [ -n "$BUILDTOOLS" ]; then
+      [ -n "$SIGNER" ] || SIGNER="${BUILDTOOLS}apksigner"
+      [ -n "$AAPT" ] || AAPT="${BUILDTOOLS}aapt"
+    fi
   fi
 fi
 [ -x "$SIGNER" ] || { echo "!! apksigner is required (Android SDK Build Tools); set ANDROID_HOME or add it to PATH" >&2; exit 1; }
+[ -x "$AAPT" ] || { echo "!! aapt is required (Android SDK Build Tools); set ANDROID_HOME or add it to PATH" >&2; exit 1; }
 EXPECTED_CERT="$(sed -n 's/.*RELEASE_CERT = "\([0-9a-f]*\)".*/\1/p' "$HERE/app/src/main/java/com/techpp/glass/SelfUpdate.java" | head -1)"
 [[ "$EXPECTED_CERT" =~ ^[0-9a-f]{64}$ ]] || { echo "!! Couldn't read Talkies' pinned release certificate" >&2; exit 1; }
 VERIFY="$("$SIGNER" verify --print-certs "$APK")" || { echo "!! APK signature verification failed" >&2; exit 1; }
 ACTUAL_CERT="$(printf '%s\n' "$VERIFY" | sed -n 's/.*certificate SHA-256 digest: //p' | head -1 | tr '[:upper:]' '[:lower:]')"
 [ "$ACTUAL_CERT" = "$EXPECTED_CERT" ] || { echo "!! APK isn't signed with Talkies' pinned release key" >&2; exit 1; }
+BADGING="$("$AAPT" dump badging "$APK")" || { echo "!! Couldn't read the APK manifest" >&2; exit 1; }
+PACKAGE="$(printf '%s\n' "$BADGING" | sed -n "s/^package: name='\([^']*\)'.*/\1/p" | head -1)"
+VERSION="$(printf '%s\n' "$BADGING" | sed -n "s/^package:.* versionName='\([^']*\)'.*/\1/p" | head -1)"
+[ "$PACKAGE" = "com.techpp.glass" ] || { echo "!! APK package is '$PACKAGE', expected com.techpp.glass" >&2; exit 1; }
+[ "$VERSION" = "${TAG#v}" ] || { echo "!! APK version is '$VERSION', expected ${TAG#v}" >&2; exit 1; }
 
 adb connect "$DEV" >/dev/null || true
 echo "== Installing on $DEV"
