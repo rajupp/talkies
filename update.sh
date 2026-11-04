@@ -1,8 +1,7 @@
 #!/bin/bash
-# Updates Talkies on the TV from its latest GitHub release, over adb. For TVs and boxes that can't install an app
-# themselves: some operator set-top boxes have no package installer, so the bell downloads the update and then no
-# Install screen opens, and Downloader or a USB drive can't finish it either. adb goes straight to Android's package
-# manager, and -r replaces the app with your settings, dock, keys and wallpaper as they are.
+# Updates Talkies on the TV from its latest GitHub release, over adb. This is the fallback when the in-app updater
+# downloads an APK but Android's install-confirmation screen does not appear or cannot be completed. adb installs
+# through Android's package manager, and -r replaces the app while keeping its app data.
 # Usage: ./update.sh [tv-ip:port]   (or TALKIES_TV, or the .tv file, like the other scripts)
 set -euo pipefail
 . "$(dirname "$0")/tv-address.sh"

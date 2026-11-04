@@ -1,7 +1,6 @@
 package com.techpp.glass;
 
 import android.app.PendingIntent;
-import android.content.ActivityNotFoundException;
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
@@ -12,7 +11,6 @@ import android.content.pm.PackageManager;
 import android.content.pm.Signature;
 import android.os.Build;
 import android.util.Log;
-import android.widget.Toast;
 
 import org.json.JSONArray;
 import org.json.JSONObject;
@@ -48,8 +46,6 @@ final class SelfUpdate {
     private static final long MAX_SIZE = 20L << 20;   // the APK is about 200 KB
     private static final long DAY = 24 * 3600_000L;
     static final String ACTION = "com.techpp.glass.UPDATE_STATUS";
-    /** Set once Android's installer turned out to be missing here, so the row says how the update does arrive. */
-    private static final String NO_INSTALLER = "noInstaller";
 
     /** What the row shows; the latest version found is in "latest". */
     interface Listener { void changed(String status); }
@@ -90,9 +86,7 @@ final class SelfUpdate {
     static String summary(Context c) {
         String mine = installed(c), v = available(c);
         if (v == null) return mine + "  ·  " + (prefs(c).contains("checked") ? "Up to date" : "Check now");
-        if (!takesReleases(c)) return v + " is out  ·  build it again";
-        // Where Android has no installer UI, the APK must be installed from a connected computer.
-        return v + " is out  ·  " + (prefs(c).getBoolean(NO_INSTALLER, false) ? "OK retries" : "OK installs");
+        return takesReleases(c) ? v + " is out  ·  OK installs" : v + " is out  ·  build it again";
     }
 
     /** The daily check (no download): true when it found a newer version it hadn't mentioned yet. Background thread. */
@@ -236,31 +230,15 @@ final class SelfUpdate {
             int status = intent.getIntExtra(PackageInstaller.EXTRA_STATUS, PackageInstaller.STATUS_FAILURE);
             if (status == PackageInstaller.STATUS_PENDING_USER_ACTION) {
                 Intent confirm = intent.getParcelableExtra(Intent.EXTRA_INTENT);
-                if (confirm == null) return;
-                confirm.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
                 try {
-                    c.startActivity(confirm);
-                } catch (ActivityNotFoundException e) {
-                    // Nothing on this TV can ask to install it, usual on some operator set-top boxes (Jio's, for
-                    // one). The update would end here without a word, so say what works instead: adb install -r
-                    // runs on a computer and replaces the app without removing its settings and keys.
-                    Log.w(TAG, "No installer to confirm the update", e);
-                    prefs(c).edit().putBoolean(NO_INSTALLER, true).apply();
-                    Toast.makeText(c, onComputerMessage(), Toast.LENGTH_LONG).show();
+                    if (confirm != null) c.startActivity(confirm.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
                 } catch (RuntimeException e) {
                     Log.w(TAG, "Android's installer didn't open: " + e);
                 }
             } else if (status != PackageInstaller.STATUS_SUCCESS) {
                 Log.w(TAG, "Not installed (" + status + "): " + intent.getStringExtra(PackageInstaller.EXTRA_STATUS_MESSAGE));
-            } else {
-                prefs(c).edit().putBoolean(NO_INSTALLER, false).apply();
             }
         }
-    }
-
-    /** WRITE_SECURE_SETTINGS does not give an app ADB shell access; this fallback is for a connected computer. */
-    private static String onComputerMessage() {
-        return "This TV can't finish app installs. Install from a computer; see GitHub README → Updates.";
     }
 
     /** "0.10.0" vs "0.9.1": numbers compared one by one, missing ones as 0. */
