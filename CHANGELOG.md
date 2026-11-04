@@ -22,6 +22,11 @@ features, a new fix number only fixes. The version shows in Talkies settings →
   settings → **Quiet hours**. An idea from Departures.
 - **Rain coming.** The weather line adds "Rain around 4 PM" when rain is likely in the next hours and it's dry now.
   An idea from Departures.
+- **Weather without setup.** Until you set a location, Talkies goes by your internet address: roughly your city, looked
+  up once a week (ipwho.is, then ipapi.co or geojs.io). Talkies settings → Keys and location → **Weather location**
+  shows "Near Bengaluru"; set a place for better weather, or Remove to turn it off. A location you already set stays
+  in charge, and removing one still leaves just the time and date. An idea from tvOS Launcher, Aerial and Plume.
+- **A backup for the weather.** If Open-Meteo doesn't answer, MET Norway's forecast fills in. An idea from tvOS Launcher.
 - **What's playing on Home.** While music plays, the line under the icons shows the song, the artist and the app.
   An idea from Home Deck.
 

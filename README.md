@@ -202,9 +202,11 @@ settings to another TV.
 ## Privacy
 
 - **No account, no ads, no analytics.** Nothing about what you watch leaves the TV (except the opt-in YouTube
-  lookup below), and your weather area goes only to the weather services.
-- **What it connects to, and only while it's on screen:** TMDB for the picks (with your key), Open-Meteo and
-  NOAA's aviationweather.gov for the weather, ESPN's public scoreboard for cricket and
+  lookup below), and your weather area goes only to the weather services. Until you set a weather location, a location
+  service (below) sees your internet address once a week to find your rough city; Remove in Keys and location stops it.
+- **What it connects to, and only while it's on screen:** TMDB for the picks (with your key), Open-Meteo,
+  MET Norway (if Open-Meteo is down) and NOAA's aviationweather.gov for the weather, ipwho.is, ipapi.co or geojs.io for
+  your rough city (only with no location set), ESPN's public scoreboard for cricket and
   football, StreamRadar for the picks in India without a TMDB key, Bing for the wallpaper (if you turn it on), GitHub once a day for updates, and Cloudflare when you run a
   speed test. Sharp YouTube pictures (off by default) looks a video's title up on YouTube.
 - **Your keys, location and wallpaper** stay on the TV. *Send from your phone* (keys, and Wallpaper → From your
@@ -269,7 +271,8 @@ Data (also listed in the app, Talkies settings → About):
   certified, or otherwise approved by TMDB.* You use your own free API key, under TMDB's [terms of use](https://www.themoviedb.org/api-terms-of-use).
 - **Weather:** [Weather data by Open-Meteo.com](https://open-meteo.com/), under
   [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/); airport temperatures from NOAA's
-  [aviationweather.gov](https://aviationweather.gov).
+  [aviationweather.gov](https://aviationweather.gov); the backup forecast from
+  [MET Norway](https://api.met.no), under CC BY 4.0.
 - **Picks in India without a key:** [StreamRadar India](https://streamradar.bricksgenius.com), a free Stremio add-on;
   pointed out by Swakshan.
 - **Cricket and football:** ESPN's public scoreboard (not an official API; Talkies isn't affiliated with ESPN).
@@ -305,6 +308,7 @@ Ideas (no code; Talkies' own implementation):
   Home and noticing a slow TV: [Home Deck](https://github.com/glidiandev/home-deck).
 - The split-flap Board screensaver, the screensaver message, quiet hours and "Rain around 4 PM":
   [Departures](https://github.com/0xdravyn/departures).
+- A backup weather source, and a rough location from the internet address: tvOS Launcher, Aerial and Plume.
 
 The Outfit typeface is © The Outfit Project Authors, licensed under the SIL Open Font License 1.1 (`OUTFIT-OFL.txt`).
 

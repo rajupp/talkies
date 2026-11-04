@@ -3036,11 +3036,14 @@ public class HomeActivity extends Activity {
                 "For the Trending and New picks. Free at themoviedb.org → Settings → API: the API Key or the API Read "
                         + "Access Token." + paste, null, true, tmdb != null, text -> saveKey(Keys.TMDB, "TMDB", text, 1)), true);
         // Coordinates pinpoint a home, so the row (and any screenshot of it) just says so; place names show as typed.
-        String where = area == null ? "Not set" : area.matches("[-+0-9.,\\s]+") ? "Coordinates"
+        String near = weather.autoCity();   // no location set: roughly where the internet address says
+        String where = area == null ? (near == null ? "Not set" : near.isEmpty() ? "Approximate" : "Near " + near) : area.matches("[-+0-9.,\\s]+") ? "Coordinates"
                 : area.length() > 22 ? area.substring(0, 21) + "…" : area;
         addRow("Weather location", where,
                 () -> askText("Weather location", "A town or area, like \"Camden, London\", or latitude,longitude, like "
-                        + "\"51.54,-0.14\".", area, false, area != null, this::saveLocation), true);
+                        + "\"51.54,-0.14\"."
+                        + (near != null ? " For now the weather goes by your internet address, which can be off by a city. Remove turns that off." : ""),
+                        area, false, area != null || near != null, this::saveLocation), true);
         showMenu(420);
         focusMenu(focus);
     }
@@ -3107,6 +3110,7 @@ public class HomeActivity extends Activity {
             Toast.makeText(this, "Couldn't save the location", Toast.LENGTH_SHORT).show();
             return;
         }
+        weather.stopAuto();   // your choice from now on: a place, or no weather
         if (text.isEmpty()) {
             weatherLine = null;
             updateInfo();
@@ -4797,6 +4801,7 @@ public class HomeActivity extends Activity {
         String[][] credits = {
                 {"Picks in India without a key", "StreamRadar India"},
                 {"Weather", "Open-Meteo.com (CC BY 4.0)"},
+                {"Weather backup", "MET Norway (CC BY 4.0)"},
                 {"Airport temperatures", "aviationweather.gov (NOAA)"},
                 {"Scores", "ESPN (public scoreboard)"},
                 {"Speed test", "Cloudflare"},

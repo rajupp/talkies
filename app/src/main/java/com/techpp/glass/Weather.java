@@ -27,13 +27,18 @@ import java.util.concurrent.Executors;
 /**
  * Current weather for the top-left line: the nearest airport's measured temperature (METAR, via the US National
  * Weather Service's aviationweather.gov, free and keyless) with rain and cloud from Open-Meteo for your exact
- * coordinates. When no airport within ~200 km has a report from the last two hours, all of it comes from Open-Meteo. The area comes from files/location.txt
- * (set with set-location.sh): a place name, looked up once with Open-Meteo's geocoding, or "lat,lon".
+ * coordinates. When no airport within ~200 km has a report from the last two hours, all of it comes from Open-Meteo.
+ * If Open-Meteo doesn't answer, MET Norway's forecast stands in. The area comes from files/location.txt (set with
+ * set-location.sh): a place name, looked up once with Open-Meteo's geocoding, or "lat,lon". Until one is set, it's
+ * roughly where the TV's internet address says (a week at a time); removing a location turns that off for good.
  * Refreshed at most every 30 minutes, and only when the home screen asks.
  */
 final class Weather {
     private static final String TAG = "GlassWeather";
     private static final long REFRESH_MS = 30 * 60_000L, RETRY_MS = 10 * 60_000L, MAX_AGE_S = 2 * 3600;
+    private static final long AUTO_FOR_MS = 7 * 24 * 3600_000L;
+    /** Free, no key: tried in turn. Each answers with latitude, longitude and city. */
+    private static final String[] IP_LOOKUPS = {"https://ipwho.is/", "https://ipapi.co/json/", "https://get.geojs.io/v1/ip/geo.json"};
 
     interface Listener { void onWeather(String line); }
 
@@ -93,13 +98,26 @@ final class Weather {
         if (prefs.getLong("try_at", 0) > prefs.getLong("ok_at", 0)) prefs.edit().remove("try_at").apply();
     }
 
+    /** The city the internet address points to, while that's what the weather goes by; else null. */
+    String autoCity() {
+        return typed() == null && !prefs.getBoolean("auto_off", false) ? prefs.getString("auto_city", null) : null;
+    }
+
+    /** No more guessing from the internet address: a location was set or removed. */
+    void stopAuto() {
+        prefs.edit().putBoolean("auto_off", true).remove("auto_area").remove("auto_city").remove("auto_at").apply();
+    }
+
     void refreshIfStale(Listener l) {
+        String typed = typed();
+        if (typed != null && !prefs.getBoolean("auto_off", false)) stopAuto();
         String area = area();
-        if (area == null || running) return;
+        if (running || (area == null && prefs.getBoolean("auto_off", false))) return;
         long now = System.currentTimeMillis();
+        if (area == null && now - prefs.getLong("try_at", 0) < RETRY_MS) return;   // no address looked up yet
         // Running set-location.sh again (even with the same place) rewrites the file: fetch right away.
         long stamp = new File(ctx.getExternalFilesDir(null), "location.txt").lastModified();
-        boolean moved = !area.equals(prefs.getString("area", null)) || stamp != prefs.getLong("file_at", 0)
+        boolean moved = area == null || !area.equals(prefs.getString("area", null)) || stamp != prefs.getLong("file_at", 0)
                 || !unit().equals(prefs.getString("unit", "C"))  // the TV now in a °F country, or back
                 || !prefs.contains("hours_at") || !prefs.contains("wet");  // saved before Talkies kept the forecast this way
         prefs.edit().putLong("file_at", stamp).apply();
@@ -108,7 +126,7 @@ final class Weather {
         running = true;
         worker.execute(() -> {
             try {
-                double[] where = locate(area);
+                double[] where = locate(typed != null ? typed : autoArea());
                 String line = observe(where[0], where[1]);
                 prefs.edit().putString("line", line).putString("unit", unit()).putLong("ok_at", System.currentTimeMillis()).apply();
                 Log.i(TAG, "Weather: " + line);
@@ -123,6 +141,32 @@ final class Weather {
     }
 
     private String area() {
+        String t = typed();
+        return t != null || prefs.getBoolean("auto_off", false) ? t : prefs.getString("auto_area", null);
+    }
+
+    /** "lat,lon" from the internet address: the one saved, looked up again after a week; a failed lookup keeps it. */
+    private String autoArea() throws IOException {
+        String saved = prefs.getString("auto_area", null);
+        if (saved != null && System.currentTimeMillis() - prefs.getLong("auto_at", 0) < AUTO_FOR_MS) return saved;
+        for (String url : IP_LOOKUPS) {
+            try {
+                JSONObject o = get(url);
+                if (!o.optBoolean("success", true)) continue;
+                String found = String.format(Locale.US, "%.2f,%.2f", o.getDouble("latitude"), o.getDouble("longitude"));
+                prefs.edit().putString("auto_area", found).putString("auto_city", o.optString("city", ""))
+                        .putLong("auto_at", System.currentTimeMillis()).apply();
+                return found;
+            } catch (Exception e) {
+                Log.w(TAG, "Location lookup failed: " + e.getClass().getSimpleName());
+            }
+        }
+        if (saved != null) return saved;
+        throw new IOException("No location lookup answered");
+    }
+
+    /** What you set: the place in location.txt, or null. */
+    private String typed() {
         File f = new File(ctx.getExternalFilesDir(null), "location.txt");
         try (InputStream in = new FileInputStream(f)) {
             String s = new String(readAll(in), StandardCharsets.UTF_8).trim();
@@ -176,10 +220,16 @@ final class Weather {
      * 15–20 km away can be dry while it rains here). Without a recent airport report, both come from the model.
      */
     private String observe(double lat, double lon) throws Exception {
-        JSONObject forecast = get(String.format(Locale.US,
-                "https://api.open-meteo.com/v1/forecast?latitude=%.4f&longitude=%.4f&current=temperature_2m,weather_code,is_day"
-                        + "&hourly=temperature_2m,weather_code,is_day,precipitation_probability&forecast_hours=12"
-                        + "&daily=sunrise,sunset,weather_code,temperature_2m_max,temperature_2m_min&timezone=auto&forecast_days=6", lat, lon));
+        JSONObject forecast;
+        try {
+            forecast = get(String.format(Locale.US,
+                    "https://api.open-meteo.com/v1/forecast?latitude=%.4f&longitude=%.4f&current=temperature_2m,weather_code,is_day"
+                            + "&hourly=temperature_2m,weather_code,is_day,precipitation_probability&forecast_hours=12"
+                            + "&daily=sunrise,sunset,weather_code,temperature_2m_max,temperature_2m_min&timezone=auto&forecast_days=6", lat, lon));
+        } catch (Exception e) {
+            Log.w(TAG, "Open-Meteo failed (" + e.getClass().getSimpleName() + "): trying MET Norway");
+            forecast = metForecast(lat, lon);
+        }
         JSONObject here = forecast.getJSONObject("current");
         saveForecast(forecast);
         // Today's sunrise and sunset ("2026-10-21T06:07"), for the launcher's automatic day/night look.
@@ -194,6 +244,82 @@ final class Weather {
         JSONObject station = nearestReport(lat, lon);
         if (station == null) return line(here.getDouble("temperature_2m"), condition, null);
         return line(station.getDouble("temp"), condition, null);  // the station is named in the log, not on screen
+    }
+
+    /**
+     * MET Norway's forecast, rewritten as Open-Meteo's answer so the rest needn't know. It has no chance of rain (a
+     * rainy hour counts as likely) and no sunrise or sunset (the last ones known stay), and today's high and low cover
+     * only the hours left. Its times are UTC; days go by the TV's clock.
+     */
+    private JSONObject metForecast(double lat, double lon) throws Exception {
+        JSONArray series = get(String.format(Locale.US, "https://api.met.no/weatherapi/locationforecast/2.0/compact?lat=%.4f&lon=%.4f", lat, lon))
+                .getJSONObject("properties").getJSONArray("timeseries");
+        java.text.SimpleDateFormat utc = new java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", Locale.US);
+        utc.setTimeZone(java.util.TimeZone.getTimeZone("UTC"));
+        java.text.SimpleDateFormat dayOf = new java.text.SimpleDateFormat("yyyy-MM-dd", Locale.US);
+        java.util.Calendar cal = java.util.Calendar.getInstance();
+        long now = System.currentTimeMillis();
+        JSONObject current = null;
+        JSONArray hTime = new JSONArray(), hTemp = new JSONArray(), hCode = new JSONArray(), hDay = new JSONArray();
+        java.util.Map<String, double[]> days = new java.util.LinkedHashMap<>();   // day → high, low, condition, hours from noon
+        for (int i = 0; i < series.length(); i++) {
+            JSONObject row = series.getJSONObject(i), data = row.getJSONObject("data");
+            long at = utc.parse(row.getString("time")).getTime();
+            if (at < now - 3600_000L) continue;
+            double temp = data.getJSONObject("instant").getJSONObject("details").getDouble("air_temperature");
+            JSONObject hour = data.optJSONObject("next_1_hours"), six = data.optJSONObject("next_6_hours");
+            JSONObject next = hour != null ? hour : six;
+            if (next == null) continue;   // the last rows of the forecast
+            String symbol = next.getJSONObject("summary").getString("symbol_code");
+            int code = metCode(symbol), isDay = symbol.endsWith("_night") ? 0 : 1;
+            if (current == null) current = new JSONObject().put("temperature_2m", temp).put("weather_code", code).put("is_day", isDay);
+            if (hour != null && hTime.length() < 12) {
+                hTime.put(row.getString("time").substring(0, 16));
+                hTemp.put(temp);
+                hCode.put(code);
+                hDay.put(isDay);
+            }
+            cal.setTimeInMillis(at);
+            String day = dayOf.format(cal.getTime());
+            double fromNoon = Math.abs(cal.get(java.util.Calendar.HOUR_OF_DAY) - 12);
+            double[] d = days.get(day);
+            if (d == null) {
+                if (days.size() == 6) break;
+                days.put(day, new double[]{temp, temp, code, fromNoon});
+            } else {
+                d[0] = Math.max(d[0], temp);
+                d[1] = Math.min(d[1], temp);
+                if (fromNoon < d[3]) { d[2] = code; d[3] = fromNoon; }
+            }
+        }
+        if (current == null) throw new IOException("No forecast from MET Norway");
+        JSONArray dTime = new JSONArray(), dMax = new JSONArray(), dMin = new JSONArray(), dCode = new JSONArray();
+        for (java.util.Map.Entry<String, double[]> e : days.entrySet()) {
+            dTime.put(e.getKey());
+            dMax.put(e.getValue()[0]);
+            dMin.put(e.getValue()[1]);
+            dCode.put((int) e.getValue()[2]);
+        }
+        return new JSONObject().put("timezone", "UTC").put("current", current)
+                .put("hourly", new JSONObject().put("time", hTime).put("temperature_2m", hTemp).put("weather_code", hCode).put("is_day", hDay))
+                .put("daily", new JSONObject().put("time", dTime).put("temperature_2m_max", dMax).put("temperature_2m_min", dMin)
+                        .put("weather_code", dCode).put("sunrise", new JSONArray()).put("sunset", new JSONArray()));
+    }
+
+    /** MET Norway's symbol ("lightrainshowers_day") as the WMO code that says the same. */
+    private static int metCode(String symbol) {
+        String s = symbol.split("_")[0];
+        if (s.equals("clearsky")) return 0;
+        if (s.equals("fair")) return 1;
+        if (s.equals("partlycloudy")) return 2;
+        if (s.equals("cloudy")) return 3;
+        if (s.equals("fog")) return 45;
+        if (s.contains("thunder")) return 95;
+        if (s.contains("snow")) return 71;
+        if (s.contains("sleet")) return 66;
+        if (s.contains("showers")) return 80;
+        if (s.contains("rain")) return 61;
+        return 3;
     }
 
     /**
@@ -381,7 +507,7 @@ final class Weather {
         HttpURLConnection c = (HttpURLConnection) new URL(url).openConnection();
         c.setConnectTimeout(15_000);
         c.setReadTimeout(20_000);
-        c.setRequestProperty("User-Agent", "Talkies/1.0 (Android TV launcher)");
+        c.setRequestProperty("User-Agent", "Talkies/1.0 (+https://github.com/rajupp/talkies)");
         try {
             if (c.getResponseCode() != 200) throw new IOException("HTTP " + c.getResponseCode() + " from " + new URL(url).getHost());
             try (InputStream in = c.getInputStream()) { return new String(readAll(in), StandardCharsets.UTF_8); }

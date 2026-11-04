@@ -286,8 +286,14 @@ The weather part combines two sources:
 When it's dry now but rain is likely (50% or more) in the next 12 hours, the line adds when: "27° SUNNY · RAIN AROUND
 4 PM". It goes once that hour comes.
 
-Without a recent airport report, the temperature also comes from Open-Meteo. It refreshes at most every
-30 minutes, and only while the home screen is showing.
+Without a recent airport report, the temperature also comes from Open-Meteo. If Open-Meteo doesn't answer,
+[MET Norway](https://api.met.no)'s forecast fills in for the conditions, the rain note and the forecast (with no
+chance of rain to go by, a rainy hour counts as likely). It refreshes at most every 30 minutes, and only while the
+home screen is showing.
+
+**With no location set,** Talkies goes by your internet address: it asks ipwho.is (or ipapi.co, or geojs.io) once a
+week, and Keys and location → **Weather location** says "Near Bengaluru". It can be off by a city, or further on a
+VPN. Setting a place replaces it for good; **Remove** there turns it off and leaves just the time and date.
 
 Set your area once, on the TV in Talkies settings → **Keys and location** (or **Send from your phone**), or from a
 computer:
