@@ -54,6 +54,8 @@ features, a new fix number only fixes. The version shows in Talkies settings →
   TV that turns out slow gets Lite. An idea from Home Deck.
 
 ### Fixed
+- **Updates that can't install now say so.** On a box with no install screen, the update downloaded and then nothing
+  happened. Talkies now says so and points to the computer fallback. Found by wpfyorg on a Jio set-top box.
 - **Back to Talkies after an update.** On TVs that bring back the last app instead of the built-in launcher, updating
   from Talkies left you in that app. Talkies now comes back. Reported by Shahnawaz on a TCL TV.
 - **Dock tiles no longer shrink for empty places.** With fewer apps than Dock size, the tiles are sized for the apps

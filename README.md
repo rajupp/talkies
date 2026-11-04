@@ -191,6 +191,8 @@ at any time. Your settings stay as they are.
   Talkies, so open the bell or Updates again and press OK once more.
 - **Keeps sending you back to that switch although it's on?** Some TVs leave an old "deny" behind; from a computer,
   `adb shell appops set com.techpp.glass REQUEST_INSTALL_PACKAGES allow` clears it.
+- **"This TV can't show Android's install screen"**: some boxes have none. From a computer,
+  `adb install -r talkies.apk` installs the same APK and keeps your settings ([With a computer](#with-a-computer)).
 - Only APKs from this project's releases, signed with its key, are installed. Talkies checks the download's size and
   checksum against GitHub's, its version and its signature first.
 

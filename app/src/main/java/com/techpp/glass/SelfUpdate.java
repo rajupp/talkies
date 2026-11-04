@@ -11,6 +11,7 @@ import android.content.pm.PackageManager;
 import android.content.pm.Signature;
 import android.os.Build;
 import android.util.Log;
+import android.widget.Toast;
 
 import org.json.JSONArray;
 import org.json.JSONObject;
@@ -51,6 +52,8 @@ final class SelfUpdate {
     interface Listener { void changed(String status); }
 
     private static Boolean releaseKey;
+    /** The row or bell that started the install: Android's answer comes later, to Receiver. */
+    private static volatile Listener waiting;
 
     private SelfUpdate() { }
 
@@ -88,7 +91,8 @@ final class SelfUpdate {
     static String summary(Context c) {
         String mine = installed(c), v = available(c);
         if (v == null) return mine + "  ·  " + (prefs(c).contains("checked") ? "Up to date" : "Check now");
-        return takesReleases(c) ? v + " is out  ·  OK installs" : v + " is out  ·  build it again";
+        if (!takesReleases(c)) return v + " is out  ·  build it again";
+        return v.equals(prefs(c).getString("no_installer", null)) ? v + " is out  ·  needs a computer" : v + " is out  ·  OK installs";
     }
 
     /** The daily check (no download): true when it found a newer version it hadn't mentioned yet. Background thread. */
@@ -108,6 +112,7 @@ final class SelfUpdate {
 
     /** OK on the row: check now, and if there's a newer release (and this app takes them), download and install it. */
     static void checkAndInstall(Context c, Listener l) {
+        waiting = l;
         new Thread(() -> {
             try {
                 l.changed("Checking…");
@@ -247,13 +252,25 @@ final class SelfUpdate {
             if (status == PackageInstaller.STATUS_PENDING_USER_ACTION) {
                 Intent confirm = intent.getParcelableExtra(Intent.EXTRA_INTENT);
                 try {
-                    if (confirm != null) c.startActivity(confirm.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
+                    if (confirm == null) throw new IllegalStateException("no install screen");
+                    c.startActivity(confirm.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
                 } catch (RuntimeException e) {
                     Log.w(TAG, "Android's installer didn't open: " + e);
+                    // Some boxes have no install screen. It stays worth another try: OK on the row or the bell.
+                    prefs(c).edit().putString("no_installer", intent.getStringExtra("version")).apply();
+                    tell(c, "This TV can't show Android's install screen. Install it from a computer: README → Updates", summary(c));
                 }
             } else if (status != PackageInstaller.STATUS_SUCCESS) {
                 Log.w(TAG, "Not installed (" + status + "): " + intent.getStringExtra(PackageInstaller.EXTRA_STATUS_MESSAGE));
+                // Cancelling is your own answer. Anything else would otherwise leave the row on "Installing…".
+                if (status != PackageInstaller.STATUS_FAILURE_ABORTED) tell(c, "Android couldn't install the update", "Couldn't update");
+                else if (waiting != null) waiting.changed(summary(c));
             }
+        }
+
+        private static void tell(Context c, String message, String status) {
+            Toast.makeText(c, message, Toast.LENGTH_LONG).show();
+            if (waiting != null) waiting.changed(status);
         }
     }
 
