@@ -405,7 +405,7 @@ final class PhonePage {
                     .append(" name=line").append(i).append(" maxlength=22 autocomplete=off value=\"").append(esc(now[i - 1].trim())).append("\">");
         }
         b.append("<button>Send to the TV</button></form><p class=s>")
-                .append("The Board screensaver shows letters, numbers and . , : ' ! ? - / & + % ( ) # @. This page works once, for 5 minutes.</p>");
+                .append("The Board screensaver shows letters, numbers, emoji and . , : ' ! ? - / & + % ( ) # @. This page works once, for 5 minutes.</p>");
         return bottom(b);
     }
 

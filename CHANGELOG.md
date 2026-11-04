@@ -6,6 +6,8 @@ features, a new fix number only fixes. The version shows in Talkies settings →
 ## Unreleased
 
 ### New
+- **Emoji on the Board.** Hearts and other emoji in your Screensaver message now get a tile of their own, instead of a
+  blank.
 - **A live score over TV.** Hold OK on a match → **Pin over TV**: a small card stays in a corner, updating while you
   watch anything (not on Talkies' Home or the screensaver), and leaves about five minutes after the match ends. Control Center unpins it. An idea from Gulam.
 

@@ -5,9 +5,14 @@ import android.graphics.Canvas;
 import android.graphics.Paint;
 import android.graphics.RectF;
 import android.graphics.Typeface;
+import android.icu.lang.UCharacter;
+import android.icu.lang.UProperty;
 import android.os.SystemClock;
 import android.view.View;
 
+import java.text.BreakIterator;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Locale;
 
 /**
@@ -17,26 +22,28 @@ import java.util.Locale;
  */
 final class FlapBoard extends View {
     static final int COLS = 22, ROWS = 6;
-    /** What a tile can show; anything else is a blank. */
+    /** The letters on a tile's drum. An emoji the TV can draw also gets a tile, stopping there after a few letters; anything else is a blank. */
     private static final String FLAPS = " ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789.,:'!?-/&+%()#@°";
     private static final long FLIP_MS = 70, COL_DELAY_MS = 22, ROW_DELAY_MS = 45;
     /** Letters a tile shows on its way to the new one, at most: enough to look mechanical, few enough to settle fast. */
     private static final int MAX_STEPS = 6;
 
-    private final char[][] shown = new char[ROWS][COLS];
+    /** Each tile's letter or emoji (an emoji can be several chars, so these are strings). */
+    private final String[][] shown = new String[ROWS][COLS];
     /** For each tile, the letters still to show, the last being where it stops; null when still. */
-    private final char[][][] queue = new char[ROWS][COLS][];
+    private final String[][][] queue = new String[ROWS][COLS][];
     private final int[][] step = new int[ROWS][COLS];
     private final long[][] startAt = new long[ROWS][COLS];
     private final int[] rowColor = new int[ROWS];
     private final Paint tile = new Paint(Paint.ANTI_ALIAS_FLAG), flap = new Paint(Paint.ANTI_ALIAS_FLAG),
-            text = new Paint(Paint.ANTI_ALIAS_FLAG), hinge = new Paint();
+            text = new Paint(Paint.ANTI_ALIAS_FLAG), emoji = new Paint(Paint.ANTI_ALIAS_FLAG), hinge = new Paint();
+    private final BreakIterator clusters = BreakIterator.getCharacterInstance(Locale.ROOT);
     private final RectF cell = new RectF();
     private float tileW, tileH, gap, left, top;
 
     FlapBoard(Context c, Typeface font) {
         super(c);
-        for (char[] r : shown) java.util.Arrays.fill(r, ' ');
+        for (String[] r : shown) java.util.Arrays.fill(r, " ");
         java.util.Arrays.fill(rowColor, 0xFFEDEDED);
         tile.setColor(0xFF1B1B1D);
         flap.setColor(0xFF232326);
@@ -44,19 +51,20 @@ final class FlapBoard extends View {
         text.setTypeface(font);
         text.setFontVariationSettings("'wght' 560");
         text.setTextAlign(Paint.Align.CENTER);
+        emoji.setTextAlign(Paint.Align.CENTER);
     }
 
     /** Up to six lines, each centred on its row, in its colour; the tiles that differ start flipping. */
     void show(String[] lines, int[] colors) {
         long now = SystemClock.uptimeMillis();
         for (int r = 0; r < ROWS; r++) {
-            String line = r < lines.length && lines[r] != null ? fit(lines[r]) : "";
-            int pad = (COLS - line.length()) / 2;
+            List<String> line = fit(r < lines.length ? lines[r] : null);
+            int pad = (COLS - line.size()) / 2;
             if (r < colors.length) rowColor[r] = colors[r];
             for (int c = 0; c < COLS; c++) {
-                char want = c >= pad && c - pad < line.length() ? line.charAt(c - pad) : ' ';
-                char from = queue[r][c] != null ? queue[r][c][queue[r][c].length - 1] : shown[r][c];
-                if (want == from) continue;
+                String want = c >= pad && c - pad < line.size() ? line.get(c - pad) : " ";
+                String from = queue[r][c] != null ? queue[r][c][queue[r][c].length - 1] : shown[r][c];
+                if (want.equals(from)) continue;
                 queue[r][c] = path(shown[r][c], want);
                 step[r][c] = 0;
                 startAt[r][c] = now + c * COL_DELAY_MS + r * ROW_DELAY_MS;
@@ -70,7 +78,7 @@ final class FlapBoard extends View {
         long now = SystemClock.uptimeMillis();
         for (int r = 0; r < ROWS; r++) {
             for (int c = 0; c < COLS; c++) {
-                if (shown[r][c] == ' ' || queue[r][c] != null) continue;
+                if (shown[r][c].equals(" ") || queue[r][c] != null) continue;
                 queue[r][c] = path(shown[r][c], shown[r][c]);
                 step[r][c] = 0;
                 startAt[r][c] = now + c * COL_DELAY_MS + r * ROW_DELAY_MS;
@@ -79,22 +87,45 @@ final class FlapBoard extends View {
         invalidate();
     }
 
-    /** Capitals, letters the board has, and no more than a row holds. */
-    private static String fit(String s) {
-        StringBuilder b = new StringBuilder();
-        for (char ch : s.toUpperCase(Locale.ROOT).toCharArray()) b.append(FLAPS.indexOf(ch) >= 0 ? ch : ' ');
-        String t = b.toString().trim();
-        return t.length() > COLS ? t.substring(0, COLS).trim() : t;
+    /** A row's tiles: capitals, what the board has or the TV can draw, and no more than a row holds. */
+    private List<String> fit(String s) {
+        List<String> tiles = new ArrayList<>();
+        if (s == null) return tiles;
+        String up = s.toUpperCase(Locale.ROOT);
+        clusters.setText(up);   // whole emoji, including skin tones, flags and joined ones
+        for (int from = clusters.first(), to = clusters.next(); to != BreakIterator.DONE; from = to, to = clusters.next()) {
+            String one = up.substring(from, to);
+            tiles.add(FLAPS.contains(one) || isEmoji(one) ? one : " ");
+        }
+        trim(tiles);
+        if (tiles.size() > COLS) {
+            tiles.subList(COLS, tiles.size()).clear();
+            trim(tiles);
+        }
+        return tiles;
     }
 
-    /** The letters from one to the next, forward round the drum as a real one turns, thinned to MAX_STEPS; a whole turn when they're the same. */
-    private static char[] path(char from, char to) {
-        int a = FLAPS.indexOf(from), b = FLAPS.indexOf(to), n = FLAPS.length();
-        int dist = ((b - a) % n + n) % n;
+    private static void trim(List<String> tiles) {
+        while (!tiles.isEmpty() && tiles.get(0).equals(" ")) tiles.remove(0);
+        while (!tiles.isEmpty() && tiles.get(tiles.size() - 1).equals(" ")) tiles.remove(tiles.size() - 1);
+    }
+
+    private boolean isEmoji(String s) {
+        return UCharacter.hasBinaryProperty(s.codePointAt(0), UProperty.EMOJI) && emoji.hasGlyph(s);
+    }
+
+    /**
+     * The tiles from one to the next, forward round the drum as a real one turns, thinned to MAX_STEPS; a whole turn when
+     * they're the same. Emoji aren't on the drum: leaving one starts from the blank, and reaching one ends a short run on it.
+     */
+    private static String[] path(String from, String to) {
+        int a = Math.max(0, FLAPS.indexOf(from)), b = FLAPS.indexOf(to), n = FLAPS.length();
+        int dist = b < 0 ? MAX_STEPS : ((b - a) % n + n) % n;
         if (dist == 0) dist = n;
         int steps = Math.min(dist, MAX_STEPS);
-        char[] p = new char[steps];
-        for (int i = 1; i <= steps; i++) p[i - 1] = FLAPS.charAt((a + Math.round((float) dist * i / steps)) % n);
+        String[] p = new String[steps];
+        for (int i = 1; i <= steps; i++) p[i - 1] = String.valueOf(FLAPS.charAt((a + Math.round((float) dist * i / steps)) % n));
+        if (b < 0) p[steps - 1] = to;
         return p;
     }
 
@@ -107,6 +138,7 @@ final class FlapBoard extends View {
         left = (w - tileW * COLS) / 2;
         top = (h - tileH * ROWS) / 2;
         text.setTextSize(tileH * 0.66f);
+        emoji.setTextSize(tileW * 0.72f);   // emoji are wider than letters: this keeps them inside the tile
     }
 
     @Override
@@ -116,7 +148,7 @@ final class FlapBoard extends View {
         for (int r = 0; r < ROWS; r++) {
             for (int c = 0; c < COLS; c++) {
                 cell.set(left + c * tileW + gap / 2, top + r * tileH + gap / 2, left + (c + 1) * tileW - gap / 2, top + (r + 1) * tileH - gap / 2);
-                char[] q = queue[r][c];
+                String[] q = queue[r][c];
                 if (q == null || now < startAt[r][c]) {
                     drawTile(canvas, shown[r][c], rowColor[r], 1f, 0);
                     moving |= q != null;
@@ -131,7 +163,7 @@ final class FlapBoard extends View {
                 }
                 if (q == null) { drawTile(canvas, shown[r][c], rowColor[r], 1f, 0); continue; }
                 moving = true;
-                char next = q[step[r][c]], old = shown[r][c];
+                String next = q[step[r][c]], old = shown[r][c];
                 drawTile(canvas, next, rowColor[r], 1f, -1);   // the new letter's top, uncovered
                 drawTile(canvas, old, rowColor[r], 1f, 1);     // the old letter's bottom, still showing
                 // The flap: the old top falling to the hinge, then the new bottom falling from it.
@@ -143,7 +175,7 @@ final class FlapBoard extends View {
     }
 
     /** One tile, or its top (half -1) or bottom (half 1) half, squashed toward the hinge by scaleY. */
-    private void drawTile(Canvas canvas, char ch, int color, float scaleY, int half) {
+    private void drawTile(Canvas canvas, String ch, int color, float scaleY, int half) {
         float mid = cell.centerY();
         canvas.save();
         if (half < 0) canvas.clipRect(cell.left, cell.top, cell.right, mid);
@@ -151,10 +183,11 @@ final class FlapBoard extends View {
         if (scaleY < 1f) canvas.scale(1f, Math.max(0.001f, scaleY), cell.centerX(), mid);
         float round = tileW * 0.08f;
         canvas.drawRoundRect(cell, round, round, scaleY < 1f ? flap : tile);
-        if (ch != ' ') {
-            text.setColor(color);
-            Paint.FontMetrics fm = text.getFontMetrics();
-            canvas.drawText(String.valueOf(ch), cell.centerX(), mid - (fm.ascent + fm.descent) / 2, text);
+        if (!ch.equals(" ")) {
+            Paint p = FLAPS.contains(ch) ? text : emoji;
+            p.setColor(color);   // a colour emoji keeps its own colours; a plain symbol takes the row's
+            Paint.FontMetrics fm = p.getFontMetrics();
+            canvas.drawText(ch, cell.centerX(), mid - (fm.ascent + fm.descent) / 2, p);
         }
         canvas.restore();
         canvas.drawRect(cell.left, mid - gap / 6, cell.right, mid + gap / 6, hinge);

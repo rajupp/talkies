@@ -395,8 +395,8 @@ the TV's screensaver until you do. Behind the clock, by Talkies settings → **S
   [Departures](https://github.com/0xdravyn/departures).
 
 **Screensaver message:** Talkies settings → **Screensaver message** shows a QR code; on your phone, type up to two
-lines of 22 letters ("Dinner at 8", "Happy birthday Asha!"). Board shows them in amber at the bottom; the other
-screensavers show them under the clock (Picks uses that line for the title). Send both lines empty to remove it.
+lines of 22 letters ("Dinner at 8", "Happy birthday Asha!"), emoji included. Board shows them in amber at the bottom, each emoji
+on its own tile; the other screensavers show them under the clock (Picks uses that line for the title). Send both lines empty to remove it.
 
 **Quiet hours:** from 11 PM to 7 AM the screensaver dims to about a third. Talkies settings → **Quiet hours** picks
 other hours or Off.
