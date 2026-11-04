@@ -30,8 +30,15 @@ final class YouTubeArt {
 
     private YouTubeArt() { }
 
-    /** The 1280 px thumbnail, or null when no result matches exactly; IOException when YouTube couldn't be reached. */
-    static Bitmap find(String title, String channel) throws IOException {
+    /** A video that matched exactly: its id, and its 1280 px thumbnail when it has one. */
+    static final class Found {
+        final String id;
+        final Bitmap picture;
+        Found(String id, Bitmap picture) { this.id = id; this.picture = picture; }
+    }
+
+    /** The video, or null when no result matches exactly; IOException when YouTube couldn't be reached. */
+    static Found find(String title, String channel) throws IOException {
         try {
             String q = URLEncoder.encode(title + (channel.isEmpty() ? "" : " " + channel), "UTF-8");
             String page = new String(get("https://www.youtube.com/results?search_query=" + q, 3_000_000), "UTF-8");
@@ -53,13 +60,13 @@ final class YouTubeArt {
                         Bitmap b = BitmapFactory.decodeByteArray(img, 0, img.length);
                         if (b != null && b.getWidth() >= 1000) {
                             Log.i(TAG, "Sharp thumbnail for \"" + title + "\": " + name + " " + b.getWidth() + "x" + b.getHeight());
-                            return b;
+                            return new Found(id, b);
                         }
                     } catch (IOException ignored) {
                         // Not every video has every size.
                     }
                 }
-                return null;
+                return new Found(id, null);
             }
             Log.i(TAG, "No exact YouTube match for \"" + title + "\"");
         } catch (org.json.JSONException e) {

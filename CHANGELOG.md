@@ -3,6 +3,19 @@
 Versions are numbered *major.minor.fix*. While Talkies is in beta they start with 0: a new minor number brings new
 features, a new fix number only fixes. The version shows in Talkies settings → About.
 
+## Unreleased
+
+### Changed
+- **More for Remote keys.** A button can now open Talkies settings or Sound output, on a press or when held. Asked for
+  by Abdullah AlQudaihi.
+- **TV's screensaver.** A new row in Talkies settings makes Talkies the TV's screensaver if it has the
+  `WRITE_SECURE_SETTINGS` grant, and shows how otherwise, for TVs whose settings don't list it. Reported on a Sony Bravia.
+
+### Fixed
+- **Continue shows what you just watched.** Today's titles now come before cards months old, YouTube can show up to
+  four from the last two days, and each app keeps its own share of the saved list. A YouTube card opens that video,
+  and a JioHotstar title opened from its card keeps the show's name and picture.
+
 ## 1.2.8 — 4 November 2026
 
 ### New

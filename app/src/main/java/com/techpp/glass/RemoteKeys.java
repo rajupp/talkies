@@ -17,7 +17,7 @@ import java.util.TreeMap;
  * Remote keys (Control Center → Remote keys): a button on the remote given another job, e.g. the Netflix button
  * opening JioHotstar. SleepService, Talkies' accessibility service, sees the press before the TV does and does
  * the job instead; buttons with no job pass through untouched. Kept in the "remote_keys" preferences as
- * key code → action: "app:<package>", "inputs", "recents", "control", "tv_settings", "wifi", "home" or "none" ("k<code>"), and the job for holding the button
+ * key code → action: "app:<package>", "inputs", "recents", "control", "talkies_settings", "tv_settings", "wifi", "sound", "home" or "none" ("k<code>"), and the job for holding the button
  * ("h<code>"), which only a button with a press job can have: a press with no job has to reach the TV untouched,
  * and Talkies can't tell a press from a hold until the button is let go. An idea from Plume and CleanYourTV.
  *
@@ -27,7 +27,7 @@ import java.util.TreeMap;
  */
 final class RemoteKeys {
     static final String INPUTS = "inputs", HOME = "home", NONE = "none", APP = "app:", RECENTS = "recents", CONTROL = "control",
-            SETTINGS = "tv_settings", WIFI = "wifi";
+            SETTINGS = "tv_settings", WIFI = "wifi", TALKIES_SETTINGS = "talkies_settings", SOUND = "sound";
     static final String EXTRA_OPEN = "com.techpp.glass.OPEN";
 
     private RemoteKeys() { }
@@ -105,7 +105,9 @@ final class RemoteKeys {
         if (action.equals(INPUTS)) return "Inputs";
         if (action.equals(RECENTS)) return "Recent apps";
         if (action.equals(CONTROL)) return "Control Center";
+        if (action.equals(TALKIES_SETTINGS)) return "Talkies settings";
         if (action.equals(SETTINGS)) return "TV settings";
+        if (action.equals(SOUND)) return "Sound output";
         if (action.equals(WIFI)) return "Wi-Fi";
         if (action.equals(HOME)) return "Talkies";
         if (action.equals(NONE)) return "Nothing";
@@ -120,7 +122,9 @@ final class RemoteKeys {
                 s.openHome();
             } else if (action.equals(SETTINGS) || action.equals(WIFI)) {
                 s.startActivity(settings(s, action).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
-            } else if (action.equals(INPUTS) || action.equals(RECENTS) || action.equals(CONTROL)) {
+            } else if (action.equals(SOUND)) {
+                s.startActivity(sound(s).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
+            } else if (action.equals(INPUTS) || action.equals(RECENTS) || action.equals(CONTROL) || action.equals(TALKIES_SETTINGS)) {
                 s.startActivity(new Intent(Intent.ACTION_MAIN).setClass(s, HomeActivity.class).putExtra(EXTRA_OPEN, action)
                         .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED));
             } else if (action.startsWith(APP)) {
@@ -147,6 +151,30 @@ final class RemoteKeys {
         Intent i = new Intent(android.provider.Settings.ACTION_SETTINGS);
         if (pm.resolveActivity(i, 0) != null) return i;
         return new Intent(Intent.ACTION_MAIN).setClassName("com.android.tv.settings", "com.android.tv.settings.MainSettings");
+    }
+
+    /** The screen you chose in Control Center shortcuts, else the TV's own. An app can only open it: Android keeps the switch itself. */
+    private static Intent sound(Context c) {
+        String chosen = c.getSharedPreferences("home", Context.MODE_PRIVATE).getString("shortcut_sound", null);
+        android.content.ComponentName cn = chosen == null ? null : android.content.ComponentName.unflattenFromString(chosen);
+        Intent i = cn == null ? null : new Intent().setComponent(cn);
+        return i != null && c.getPackageManager().resolveActivity(i, 0) != null ? i : soundSettings(c);
+    }
+
+    /**
+     * Where the speakers are chosen differs by maker: Sony keeps it under Display & sound → Audio output, and its plain
+     * Sound page has only System sounds. Elsewhere the Sound page (sound mode, outputs).
+     */
+    static Intent soundSettings(Context c) {
+        PackageManager pm = c.getPackageManager();
+        Intent i = new Intent();
+        if ("sony".equalsIgnoreCase(android.os.Build.MANUFACTURER)) {
+            i.setClassName("com.android.tv.settings", "com.android.tv.settings.device.displaysound.DisplaySoundActivity");
+            if (pm.resolveActivity(i, 0) == null) i = new Intent();
+        }
+        if (i.getComponent() == null) i.setClassName("com.android.tv.settings", "com.android.tv.settings.device.sound.SoundActivity");
+        if (pm.resolveActivity(i, 0) == null) i = new Intent(android.provider.Settings.ACTION_SOUND_SETTINGS);
+        return i;
     }
 
     static List<Integer> codes(Context c) { return new ArrayList<>(all(c).keySet()); }

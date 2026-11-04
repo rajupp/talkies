@@ -75,6 +75,7 @@ Control Center → **Talkies settings**, or **hold OK on the ⚙ icon** (a press
 | Wallpaper | A picture of your own **from your phone** (a QR code) or **from this TV** (pictures on the TV or a USB drive, or a folder for a new picture each day), Bing's **picture of the day** (checked every few hours while Talkies is in front), or **Remove your picture**. See [Change the wallpaper](#change-the-wallpaper) |
 | Background | With no wallpaper, what's behind Home. **App colour** (default): a soft gradient in the focused app's colour. **Blurred art**: the focused pick or Continue card's own picture, blurred; apps in the dock keep their colour. *Not in use* with a wallpaper or Lite effects |
 | Screensaver | **Clock** (default), **Board**, **Wallpaper** or **Picks**: what Talkies' screensaver shows ([Screensaver](#screensaver-and-whats-playing)). *Not in use* until you pick Talkies in the TV's Screen saver settings; *none set* in Wallpaper with no wallpaper; *may be slow* in Picks on a TV with little memory |
+| TV's screensaver | **Talkies** or **Not Talkies**: which screensaver the TV uses. OK switches it with the `WRITE_SECURE_SETTINGS` grant; without it, shows how to choose it |
 | Screensaver message | Two short lines for the screensaver ("Dinner at 8"), typed on your phone: a QR code opens the page, which shows the message as it is. Send both lines empty to remove it |
 | Quiet hours | When the screensaver dims: **11 PM – 7 AM** (default), 10 PM – 6 AM, Midnight – 7 AM, or Off |
 | Focus | How the selected tile or card shows. **Lift** (default): it grows and lifts on a soft shadow. **Ring**: a white outline as well, easier to see on a busy wallpaper |
@@ -104,7 +105,7 @@ Control Center → **Talkies settings**, or **hold OK on the ⚙ icon** (a press
 | A device turns on | **Offer to switch** (default) or **Nothing**. With Home on screen, a console or box on HDMI that switches on gets a small card: "PlayStation 5 is on · Switch to HDMI 2". It goes away after 15 seconds. Many devices switch the TV to themselves anyway (HDMI-CEC); this is for the ones that don't |
 | Empty inputs | **Shown** (default), or **Under More inputs**: Inputs lists only ports with something plugged in, and a More inputs row brings back the rest |
 | **Remote and power** | |
-| Remote keys | Give a remote button another job: open an app, Inputs, Recent apps, Control Center, TV settings, Wi-Fi, Talkies, or nothing. **Add a key**, press the button, choose. Once it has a job, **When held** gives it a second one for holding it (over half a second). Navigation, OK, Back, Home, volume and power can't be changed. A button Android has no name for shows as *Button 0x…* (its code from the remote). If a button still just does its own job while Talkies waits for it (the app buttons on some TVs), the TV's software handles it before Android sees it, and no app can change it. **Remote keys: On or Off** at the top, On by default: Home goes straight to Talkies. On some TVs, while it's on, holding Volume changes it only one step per press, in every app: Android stops repeating a held button once an app watches the remote, and the TV acts on Volume before any app sees it, so no app can repeat it either. Off, holding Volume works, and Home reaches Talkies with Google TV's home showing for a moment first |
+| Remote keys | Give a remote button another job: open an app, Inputs, Recent apps, Control Center, Talkies settings, TV settings, Wi-Fi, Sound output, Talkies, or nothing. **Add a key**, press the button, choose. Once it has a job, **When held** gives it a second one for holding it (over half a second). Navigation, OK, Back, Home, volume and power can't be changed. A button Android has no name for shows as *Button 0x…* (its code from the remote). If a button still just does its own job while Talkies waits for it (the app buttons on some TVs), the TV's software handles it before Android sees it, and no app can change it. **Remote keys: On or Off** at the top, On by default: Home goes straight to Talkies. On some TVs, while it's on, holding Volume changes it only one step per press, in every app: Android stops repeating a held button once an app watches the remote, and the TV acts on Volume before any app sees it, so no app can repeat it either. Off, holding Volume works, and Home reaches Talkies with Google TV's home showing for a moment first |
 | At power-on | What comes up when the TV turns on. **Talkies, after a restart** (default; after standby the TV shows its last input or app), **Talkies, every time**, one of the TV's inputs (*HDMI 1 · Set-top box*), or **Open an app**: that input or app comes up after a restart and every time the TV wakes. Pressing a button as it wakes keeps what's on screen. Needs the Accessibility switch |
 | Home app | Shows the current home screen and opens Android's *Default home app* chooser (on Google TV the choice doesn't stick; see [Use another home screen](#use-another-home-screen)) |
 | Control Center shortcuts | Which screen Network, Bluetooth, Sound output and Storage open in Control Center: the TV's default, or any screen its settings apps offer (likely matches first, **Show every screen** for the rest). Useful where the TV keeps the useful page elsewhere |
@@ -213,8 +214,11 @@ adb -s "$TALKIES_TV" logcat -d -s GlassTrending
 
 ## Continue
 
-The first tab shows at least ten recent titles: first the newest from each app you've watched (so one app can't take
-over the front of the row), then the next newest. YouTube gets at most two cards. Cards from Watch Next show how far in you are when the app shares it (Prime Video and Xstream Play do).
+The first tab shows up to sixteen recent titles: first the newest from each app you've used in the last two weeks (so
+one app can't take over the front of the row), then the next newest. YouTube gets up to four cards for the last two days,
+two otherwise; **OK** on one opens that video, or searches for it when Talkies hasn't matched it exactly (Sharp YouTube
+pictures finds the match). JioHotstar reports only "S1 E2 Allen" while it plays, so a title you opened from its Continue
+card keeps the show's name, picture and link; one you started inside the app is a plain card that opens the app. Cards from Watch Next show how far in you are when the app shares it (Prime Video and Xstream Play do).
 It combines two sources:
 
 - **Android TV's Watch Next list.** Netflix, Prime Video, JioHotstar, Apple TV and Xstream Play publish what you're
@@ -396,8 +400,10 @@ screensavers show them under the clock (Picks uses that line for the title). Sen
 **Quiet hours:** from 11 PM to 7 AM the screensaver dims to about a third. Talkies settings → **Quiet hours** picks
 other hours or Off.
 
-It comes on after the TV's idle time, over any app, and any button wakes the TV. If your TV hides that menu, from a
-computer: `adb shell settings put secure screensaver_components com.techpp.glass/.Screensaver`.
+It comes on after the TV's idle time, over any app, and any button wakes the TV. Talkies settings → **TV's screensaver**
+makes Talkies the TV's screensaver if you've given Talkies the `WRITE_SECURE_SETTINGS` grant, and OK again puts back the
+one it replaced. Without the grant, choose it in the TV's settings. If they don't list it (Sony's Ambient mode, for one),
+from a computer: `adb shell settings put secure screensaver_components com.techpp.glass/.Screensaver`.
 
 **What's playing:** while music (or anything else) plays in the background, the line under the icons shows it
 instead of the score: "♪ Song · Artist · Spotify". The scores stay in their rows, and the line goes back to them

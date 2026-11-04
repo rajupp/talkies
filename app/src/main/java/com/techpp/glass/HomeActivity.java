@@ -87,7 +87,8 @@ public class HomeActivity extends Activity {
     private static final int Z_TOP = 0, Z_TABS = 1, Z_PICKS = 2, Z_DOCK = 3, Z_GRID = 4, Z_MENU = 5, Z_CHAN = 6, Z_ALL = 7;
     private static final int P_CONTROL = 0, P_INPUTS = 1, P_WIFI = 2, P_SETTINGS = 3, P_BELL = 4;
     private static final String[] TAB_IDS = {RecentStore.TAB, Trending.TRENDING, Trending.INDIA};
-    private static final int TAB_TRENDING = 1, MIN_CONTINUE = 10, MAX_CONTINUE = 16, MAX_YOUTUBE = 2;
+    private static final int TAB_TRENDING = 1, MAX_CONTINUE = 16, MAX_YOUTUBE = 2, MAX_YOUTUBE_RECENT = 4;
+    private static final long DAY_MS = 24 * 3600_000L;
     /** How many apps the dock holds (Talkies settings → Dock size); the tiles shrink or grow to fit. */
     private static final int[] DOCK_SIZES = {4, 5, 6, 7, 8, 9, 10};
     // Geometry (dp, on a 960 × 540 dp screen).
@@ -324,6 +325,7 @@ public class HomeActivity extends Activity {
             if (RemoteKeys.INPUTS.equals(open)) openInputs();
             else if (RemoteKeys.RECENTS.equals(open)) openRecents();
             else if (RemoteKeys.CONTROL.equals(open)) openControlCenter();
+            else if (RemoteKeys.TALKIES_SETTINGS.equals(open)) openSettingsMenu();
         });
     }
 
@@ -796,6 +798,46 @@ public class HomeActivity extends Activity {
     private boolean screensaverChosen() {
         String c = Settings.Secure.getString(getContentResolver(), "screensaver_components");
         return c != null && c.startsWith(getPackageName() + "/");
+    }
+
+    /**
+     * Makes Talkies the TV's screensaver, or puts back the one it replaced. Needs the WRITE_SECURE_SETTINGS grant (false
+     * without it): some TVs, like Sony's with Ambient mode, don't list other apps' screensavers in their settings.
+     */
+    private boolean setScreensaver(boolean talkies) {
+        if (checkSelfPermission(android.Manifest.permission.WRITE_SECURE_SETTINGS) != PackageManager.PERMISSION_GRANTED) return false;
+        String key = "screensaver_components";
+        try {
+            if (talkies) {
+                prefs.edit().putString("screensaver_before", Settings.Secure.getString(getContentResolver(), key)).apply();
+                Settings.Secure.putString(getContentResolver(), key, getPackageName() + "/.Screensaver");
+            } else {
+                Settings.Secure.putString(getContentResolver(), key, prefs.getString("screensaver_before", null));
+            }
+            return true;
+        } catch (SecurityException e) {
+            return false;
+        }
+    }
+
+    /** Without the grant: where it's chosen on the TV, and the one command for a TV that doesn't list Talkies there. */
+    private void openScreensaverHelp() {
+        beginMenu(settingsAt, "TV's screensaver");
+        String[] lines = {"Choose Talkies in the TV's screen saver settings. If they don't list it, run this once from a computer:",
+                "adb shell settings put secure screensaver_components " + getPackageName() + "/.Screensaver"};
+        for (String line : lines) {
+            TextView t = new TextView(this);
+            t.setText(line);
+            t.setTextSize(15);
+            t.setTextColor(theme.text);
+            t.setTypeface(getResources().getFont(R.font.outfit));
+            t.setPadding(px(14), px(5), px(14), px(5));
+            menu.addView(t);
+        }
+        Intent settings = new Intent(Settings.ACTION_DREAM_SETTINGS);
+        if (pm.resolveActivity(settings, 0) != null) addRow("Open the TV's settings", null, () -> start(settings), false);
+        else addRow("OK", null, () -> { }, false);
+        showMenu(640);
     }
 
     /** Under 1.6 GB of memory (or Android calls it low-RAM): where Effects' Auto picks Lite. */
@@ -1435,8 +1477,8 @@ public class HomeActivity extends Activity {
 
     /**
      * Continue: what apps put on Android's Watch Next list (Netflix, Prime Video…, opening the right episode) plus what
-     * other apps reported playing, newest first. First the newest title from each app (so one app can't take over the
-     * front of the row), then the rest in order, until there are at least ten cards (up to sixteen).
+     * other apps reported playing, newest first. First the newest title from each app used lately (so one app can't take
+     * over the front of the row), then the rest in order, up to sixteen cards.
      */
     private List<Trending.Pick> continuePicks(List<Trending.Pick> sessions, List<Trending.Pick> watchNext) {
         // Titles you removed (hold OK → Remove from Continue) stay out until the app reports a new episode.
@@ -1449,24 +1491,32 @@ public class HomeActivity extends Activity {
         // something more recently than its newest entry: JioHotstar, for one, doesn't always update Watch Next.
         Map<String, Long> newest = new java.util.HashMap<>();
         for (Trending.Pick p : watchNext) newest.merge(p.pkg, p.at, Math::max);
-        List<Trending.Pick> all = new ArrayList<>(watchNext);
+        List<Trending.Pick> all = new ArrayList<>();
+        Set<String> played = new HashSet<>();
         for (Trending.Pick p : sessions) {
             if (appsOff.contains(p.pkg)) continue;
             Long wn = newest.get(p.pkg);
-            if (wn == null || p.at > wn) all.add(p);
+            if (wn != null && p.at <= wn) continue;
+            all.add(p);
+            played.add(p.pkg + "\n" + p.title);
         }
+        // The same title from Watch Next is older than what we just saw play: the app hasn't updated it.
+        for (Trending.Pick p : watchNext) if (!played.contains(p.pkg + "\n" + p.title)) all.add(p);
         Collections.sort(all, (a, b) -> Long.compare(b.at, a.at));
-        // YouTube fills up fastest (every video you play), so it gets at most two cards.
+        // YouTube fills up fastest (every video you play), so it gets a few cards for the last two days, two otherwise.
+        long now = System.currentTimeMillis();
         List<Trending.Pick> capped = new ArrayList<>();
         int youtube = 0;
         for (Trending.Pick p : all) {
-            if ("com.google.android.youtube.tv".equals(p.pkg) && ++youtube > MAX_YOUTUBE) continue;
+            if ("com.google.android.youtube.tv".equals(p.pkg)
+                    && ++youtube > (now - p.at < 2 * DAY_MS ? MAX_YOUTUBE_RECENT : MAX_YOUTUBE)) continue;
             capped.add(p);
         }
         List<Trending.Pick> out = new ArrayList<>(), rest = new ArrayList<>();
         Set<String> seen = new HashSet<>();
-        for (Trending.Pick p : capped) (seen.add(p.pkg) ? out : rest).add(p);
-        for (Trending.Pick p : rest) if (out.size() < MIN_CONTINUE) out.add(p);
+        // An app last used months ago doesn't go ahead of what you watched today.
+        for (Trending.Pick p : capped) (now - p.at < 14 * DAY_MS && seen.add(p.pkg) ? out : rest).add(p);
+        out.addAll(rest);
         return out.size() > MAX_CONTINUE ? new ArrayList<>(out.subList(0, MAX_CONTINUE)) : out;
     }
 
@@ -2224,6 +2274,7 @@ public class HomeActivity extends Activity {
 
     /** Opens a pick or channel card: through the app's own link to that title when it gave one, else the app. */
     private void openPick(Trending.Pick p) {
+        if ("watchnext".equals(p.kind)) RecentStore.noteOpened(this, p);
         if (p.intentUri != null) {
             try {
                 startActivity(Intent.parseUri(p.intentUri, Intent.URI_INTENT_SCHEME).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK), fromTile());
@@ -3417,8 +3468,10 @@ public class HomeActivity extends Activity {
         addRow("Inputs", null, () -> setKey(code, RemoteKeys.INPUTS), false);
         addRow("Recent apps", null, () -> setKey(code, RemoteKeys.RECENTS), false);
         addRow("Control Center", null, () -> setKey(code, RemoteKeys.CONTROL), false);
+        addRow("Talkies settings", null, () -> setKey(code, RemoteKeys.TALKIES_SETTINGS), false);
         addRow("TV settings", null, () -> setKey(code, RemoteKeys.SETTINGS), false);
         addRow("Wi-Fi", null, () -> setKey(code, RemoteKeys.WIFI), false);
+        addRow("Sound output", null, () -> setKey(code, RemoteKeys.SOUND), false);
         addRow("Talkies", null, () -> setKey(code, RemoteKeys.HOME), false);
         addRow("Do nothing", null, () -> setKey(code, RemoteKeys.NONE), false);
         if (RemoteKeys.action(this, code) != null) {
@@ -3437,8 +3490,10 @@ public class HomeActivity extends Activity {
         addRow("Inputs", null, () -> setHold(code, RemoteKeys.INPUTS), false);
         addRow("Recent apps", null, () -> setHold(code, RemoteKeys.RECENTS), false);
         addRow("Control Center", null, () -> setHold(code, RemoteKeys.CONTROL), false);
+        addRow("Talkies settings", null, () -> setHold(code, RemoteKeys.TALKIES_SETTINGS), false);
         addRow("TV settings", null, () -> setHold(code, RemoteKeys.SETTINGS), false);
         addRow("Wi-Fi", null, () -> setHold(code, RemoteKeys.WIFI), false);
+        addRow("Sound output", null, () -> setHold(code, RemoteKeys.SOUND), false);
         addRow("Talkies", null, () -> setHold(code, RemoteKeys.HOME), false);
         if (hold != null) addRow("Same as a press", null, () -> setHold(code, null), false);
         showMenu(420);
@@ -3762,10 +3817,15 @@ public class HomeActivity extends Activity {
         holdFired = true;
         if (zone == Z_DOCK || zone == Z_GRID) openAppMenu();
         else if (zone == Z_TOP && iconIdx == P_SETTINGS) {
-            openTalkiesSettings(P_SETTINGS);
-            menuOpener = () -> openTalkiesSettings(P_SETTINGS);
+            openSettingsMenu();
         }
         else if (continueCard() != null) openContinueMenu();
+    }
+
+    /** Talkies settings, by holding OK on the gear or from a remote button. */
+    private void openSettingsMenu() {
+        openTalkiesSettings(P_SETTINGS);
+        menuOpener = () -> openTalkiesSettings(P_SETTINGS);
     }
 
     /** Move, Uninstall (apps you installed only), App info. */
@@ -4301,17 +4361,7 @@ public class HomeActivity extends Activity {
         bluetoothStatus(st -> { if (bt[0].isAttachedToWindow()) setStatus(bt[0], st); });
         // Android tells apps a soundbar is connected (HDMI ARC/eARC), not whether it's playing: say only what's known.
         addRow("Sound output", soundbarConnected() ? "Soundbar connected" : "TV speakers", () -> {
-            if (openShortcut("sound")) return;
-            // Where the speakers are chosen differs by maker: Sony keeps it under Display & sound → Audio output, and
-            // its plain Sound page has only System sounds. Elsewhere the Sound page (sound mode, outputs).
-            Intent i = new Intent();
-            if ("sony".equalsIgnoreCase(Build.MANUFACTURER)) {
-                i.setClassName("com.android.tv.settings", "com.android.tv.settings.device.displaysound.DisplaySoundActivity");
-                if (pm.resolveActivity(i, 0) == null) i = new Intent();
-            }
-            if (i.getComponent() == null) i.setClassName("com.android.tv.settings", "com.android.tv.settings.device.sound.SoundActivity");
-            if (pm.resolveActivity(i, 0) == null) i = new Intent(Settings.ACTION_SOUND_SETTINGS);
-            start(i);
+            if (!openShortcut("sound")) start(RemoteKeys.soundSettings(this));
         }, false);
         Intent dream = screensaverIntent();
         if (dream != null) addRow("Screensaver", null, () -> start(dream), false);
@@ -4368,9 +4418,17 @@ public class HomeActivity extends Activity {
                 Toast.makeText(this, "Picks can make the screensaver slow on a TV with this little memory. Clock or Wallpaper is lighter",
                         Toast.LENGTH_LONG).show();
             } else if (!screensaverChosen()) {
-                Toast.makeText(this, "To use it, pick Talkies in the TV's Settings → Device Preferences → Screen saver",
-                        Toast.LENGTH_LONG).show();
+                Toast.makeText(this, "To use it, select TV's screensaver, just below", Toast.LENGTH_LONG).show();
             }
+        }, true);
+        final View[] sc = new View[1];
+        sc[0] = addRow("TV's screensaver", screensaverChosen() ? "Talkies" : "Not Talkies", () -> {
+            if (!setScreensaver(!screensaverChosen())) {
+                openScreensaverHelp();
+                return;
+            }
+            setStatus(sc[0], screensaverChosen() ? "Talkies" : "Not Talkies");
+            setStatus(ss[0], screensaverLabel());
         }, true);
         addRow("Screensaver message", messageLabel(), this::openPhoneMessage, false);
         final View[] qh = new View[1];
@@ -5694,5 +5752,6 @@ public class HomeActivity extends Activity {
         if (RemoteKeys.INPUTS.equals(open)) root.post(this::openInputs);
         else if (RemoteKeys.RECENTS.equals(open)) root.post(this::openRecents);
         else if (RemoteKeys.CONTROL.equals(open)) root.post(this::openControlCenter);
+        else if (RemoteKeys.TALKIES_SETTINGS.equals(open)) root.post(this::openSettingsMenu);
     }
 }
