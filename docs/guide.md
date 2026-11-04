@@ -73,6 +73,7 @@ Control Center → **Talkies settings**, or **hold OK on the ⚙ icon** (a press
 | **Look** | |
 | Appearance | Cycles Auto (light by day, dark at night) → Light → Dark. With a wallpaper, Auto picks the look that suits the photo instead, and every look adds just enough veil behind the text to keep it readable |
 | Wallpaper | A picture of your own **from your phone** (a QR code) or **from this TV** (pictures on the TV or a USB drive, or a folder for a new picture each day), Bing's **picture of the day** (checked every few hours while Talkies is in front), or **Remove your picture**. See [Change the wallpaper](#change-the-wallpaper) |
+| Background | With no wallpaper, what's behind Home. **App colour** (default): a soft gradient in the focused app's colour. **Blurred art**: the focused pick or Continue card's own picture, blurred; apps in the dock keep their colour. *Not in use* with a wallpaper or Lite effects |
 | Screensaver | **Clock** (default), **Board**, **Wallpaper** or **Picks**: what Talkies' screensaver shows ([Screensaver](#screensaver-and-whats-playing)). *Not in use* until you pick Talkies in the TV's Screen saver settings; *none set* in Wallpaper with no wallpaper; *may be slow* in Picks on a TV with little memory |
 | Screensaver message | Two short lines for the screensaver ("Dinner at 8"), typed on your phone: a QR code opens the page, which shows the message as it is. Send both lines empty to remove it |
 | Quiet hours | When the screensaver dims: **11 PM – 7 AM** (default), 10 PM – 6 AM, Midnight – 7 AM, or Off |
@@ -89,6 +90,7 @@ Control Center → **Talkies settings**, or **hold OK on the ⚙ icon** (a press
 | Sharp YouTube pictures | Off by default. On: YouTube cards in Continue get YouTube's 1280-pixel thumbnails, looked up by title and channel |
 | Sports | Cricket, Football, NBA and NFL, each On or Off: what the score line and the score rows show. Cricket and football to start, plus the NBA and NFL in the US and Canada |
 | Football leagues | Only while Football is on: the leagues the Football row follows; see [Football](#football) |
+| Continue apps | Each app with something to continue: Shown or Hidden, for the Continue tab and the Watch Next row |
 | Channels | Choose which app channels show below the dock, and their order |
 | **Apps and inputs** | |
 | Dock apps | Every app, the dock's first (numbered): OK puts one in the dock or takes it out, the same as **Add to dock** and **Remove from dock** when you hold OK on an app. To change the order, hold OK on an app in the dock and choose **Move** |

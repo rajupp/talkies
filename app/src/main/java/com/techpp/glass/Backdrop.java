@@ -54,7 +54,10 @@ public class Backdrop extends View {
     /** Lite effects: the theme's gradient alone, changed without a crossfade. */
     void setLite(boolean on) {
         lite = on;
-        if (on) glow = 0;
+        if (on) {
+            glow = 0;
+            if (!wallpaper) image = null;
+        }
         compose(false);
     }
 

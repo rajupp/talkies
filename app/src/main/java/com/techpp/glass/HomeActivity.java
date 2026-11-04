@@ -345,14 +345,14 @@ public class HomeActivity extends Activity {
                 t.band = 0x94FFFFFF; t.bandStroke = 0xF2FFFFFF;
                 t.scrimTop = 0x8CF5F6F8; t.scrimMid = 0x33EBEEF2; t.scrimBottom = 0xA6E2E5EA;
                 t.menuBg = 0xFFFFFFFF; t.menuStroke = 0x14000000; t.menuFocusBg = 0xFF1D1D1F; t.menuFocusText = 0xFFFFFFFF;
-                t.tileBg = 0xFFD9DCE1; t.ambientAlpha = 0.22f;
+                t.tileBg = 0xFFD9DCE1; t.ambientAlpha = 0.5f;
             } else {
                 t.bgTop = 0xFF121419; t.bgBottom = 0xFF08090C; t.text = 0xFFF5F5F7; t.text2 = 0xFFA1A1A6;
                 t.iconBg = 0x1AFFFFFF; t.iconStroke = 0x1FFFFFFF; t.iconFocusBg = 0xFFF5F5F7; t.iconFocusFg = 0xFF111113;
                 t.band = 0x12FFFFFF; t.bandStroke = 0x1FFFFFFF;
                 t.scrimTop = 0x5908090C; t.scrimMid = 0x2608090C; t.scrimBottom = 0xB308090C;
                 t.menuBg = 0xFF1C1C1F; t.menuStroke = 0x2EFFFFFF; t.menuFocusBg = 0xFFF5F5F7; t.menuFocusText = 0xFF111113;
-                t.tileBg = 0xFF232326; t.ambientAlpha = 0.30f;
+                t.tileBg = 0xFF232326; t.ambientAlpha = 0.65f;
             }
             return t;
         }
@@ -786,6 +786,12 @@ public class HomeActivity extends Activity {
         dialog[0].show();
     }
 
+    /** "App colour" or "Blurred art"; "· not in use" where a wallpaper or Lite effects take its place. */
+    private String backgroundLabel() {
+        String l = prefs.getBoolean("blurred_art", false) ? "Blurred art" : "App colour";
+        return hasWallpaper || lite ? l + "  ·  not in use" : l;
+    }
+
     /** Whether the TV's screensaver is Talkies' (Settings → Device Preferences → Screen saver). */
     private boolean screensaverChosen() {
         String c = Settings.Secure.getString(getContentResolver(), "screensaver_components");
@@ -1020,12 +1026,13 @@ public class HomeActivity extends Activity {
         // The dock's apps and, when any are left over, the round All apps button share the band's width: seven
         // apps are 106 dp wide, five 146, ten 73. Four are 198, too tall for the band, which grows upward to hold them.
         boolean more = apps.size() > dockCount;
-        int n = dockSize();
+        int n = Math.max(1, dockCount);   // the apps it has: with fewer than Dock size, they needn't shrink for empty places
         float inner = getResources().getDisplayMetrics().widthPixels / dp - 40 - 36;
-        float w = Math.min(n == 4 ? DOCK_4_W : DOCK_MAX_W, (inner - (more ? n * DOCK_GAP + ALL_BUTTON : (n - 1) * DOCK_GAP)) / n);
+        boolean four = dockSize() == 4;
+        float w = Math.min(four ? DOCK_4_W : DOCK_MAX_W, (inner - (more ? n * DOCK_GAP + ALL_BUTTON : (n - 1) * DOCK_GAP)) / n);
         ViewGroup.MarginLayoutParams band = (ViewGroup.MarginLayoutParams) dockBand.getLayoutParams();
-        band.height = px(n == 4 ? 132 : 104);
-        band.topMargin = px(n == 4 ? 386 : 414);
+        band.height = px(four ? 132 : 104);
+        band.topMargin = px(four ? 386 : 414);
         dockBand.setLayoutParams(band);
         float h = w * 9 / 16;
         for (int i = 0; i < dockCount; i++) {
@@ -1434,8 +1441,9 @@ public class HomeActivity extends Activity {
     private List<Trending.Pick> continuePicks(List<Trending.Pick> sessions, List<Trending.Pick> watchNext) {
         // Titles you removed (hold OK → Remove from Continue) stay out until the app reports a new episode.
         Set<String> hidden = prefs.getStringSet("hidden_continue", java.util.Collections.emptySet());
+        Set<String> appsOff = prefs.getStringSet("continue_apps_off", java.util.Collections.emptySet());  // Continue apps
         List<Trending.Pick> wnShown = new ArrayList<>();
-        for (Trending.Pick p : watchNext) if (!hidden.contains(continueKey(p))) wnShown.add(p);
+        for (Trending.Pick p : watchNext) if (!hidden.contains(continueKey(p)) && !appsOff.contains(p.pkg)) wnShown.add(p);
         watchNext = wnShown;
         // An app's Watch Next entries (they open the right episode) win over what we saw it play, unless it played
         // something more recently than its newest entry: JioHotstar, for one, doesn't always update Watch Next.
@@ -1443,6 +1451,7 @@ public class HomeActivity extends Activity {
         for (Trending.Pick p : watchNext) newest.merge(p.pkg, p.at, Math::max);
         List<Trending.Pick> all = new ArrayList<>(watchNext);
         for (Trending.Pick p : sessions) {
+            if (appsOff.contains(p.pkg)) continue;
             Long wn = newest.get(p.pkg);
             if (wn == null || p.at > wn) all.add(p);
         }
@@ -1702,17 +1711,73 @@ public class HomeActivity extends Activity {
      * picks from apps that aren't installed. Your own wallpaper replaces it.
      */
     private void updateAmbient() {
-        if (hasWallpaper) return;
+        if (hasWallpaper) { shownAmbient = null; return; }
+        root.removeCallbacks(ambientArt);
+        ambientGen++;
         AppEntry a = null;
+        Trending.Pick pick = null;
         if (zone == Z_DOCK && dockIdx < apps.size()) a = apps.get(dockIdx);
         else if (zone == Z_GRID && dockCount + gridIdx < apps.size()) a = apps.get(dockCount + gridIdx);
-        else if ((zone == Z_PICKS || zone == Z_TABS) && !rowPicks.isEmpty())
-            a = appFor(rowPicks.get(Math.min(picksRow.anchor(), rowPicks.size() - 1)).pkg);
+        else if ((zone == Z_PICKS || zone == Z_TABS) && !rowPicks.isEmpty()) {
+            pick = rowPicks.get(Math.min(picksRow.anchor(), rowPicks.size() - 1));
+            a = appFor(pick.pkg);
+        }
         else if (zone == Z_CHAN && chanIdx < chanRows.size()) {
             List<Trending.Pick> items = chanRows.get(chanIdx).items;
-            if (!items.isEmpty()) a = appFor(items.get(Math.min(chanCol[chanIdx], items.size() - 1)).pkg);
+            if (!items.isEmpty()) {
+                pick = items.get(Math.min(chanCol[chanIdx], items.size() - 1));
+                a = appFor(pick.pkg);
+            }
         }
+        // Talkies settings → Background → Blurred art: a pick's own picture, blurred, once you settle on it. Otherwise,
+        // and for an app or a card with no picture, its app's colour.
+        if (!lite && prefs.getBoolean("blurred_art", false) && pick != null && pick.image != null && pick.image.isFile()) {
+            ambientFile = pick.image;
+            root.postDelayed(ambientArt, AMBIENT_WAIT_MS);
+            return;
+        }
+        shownAmbient = null;
         if (a != null) backdrop.setGlow(a.glowColor(pm));
+    }
+
+    private static final long AMBIENT_WAIT_MS = 220;
+    /** Bumped whenever focus moves, so a picture decoded for a card you've left is dropped. */
+    private int ambientGen;
+    private File ambientFile, shownAmbient;
+    private final Runnable ambientArt = () -> {
+        final File f = ambientFile;
+        if (f == null || f.equals(shownAmbient)) return;
+        final int gen = ambientGen;
+        background.execute(() -> {
+            Bitmap small = tinyPicture(f);
+            runOnUiThread(() -> {
+                if (gen != ambientGen || small == null || isDestroyed()) return;
+                shownAmbient = f;
+                backdrop.setAmbient(small, theme.ambientAlpha);
+            });
+        });
+    };
+
+    /** The picture about 48 px wide: stretched across the screen, that's the blur, for next to no memory or drawing. */
+    private static Bitmap tinyPicture(File f) {
+        try {
+            BitmapFactory.Options o = new BitmapFactory.Options();
+            o.inJustDecodeBounds = true;
+            BitmapFactory.decodeFile(f.getPath(), o);
+            if (o.outWidth <= 0 || o.outHeight <= 0) return null;
+            o.inSampleSize = 1;
+            while (o.outWidth / (o.inSampleSize * 2) >= 96) o.inSampleSize *= 2;
+            o.inJustDecodeBounds = false;
+            o.inPreferredConfig = Bitmap.Config.RGB_565;
+            Bitmap b = BitmapFactory.decodeFile(f.getPath(), o);
+            if (b == null) return null;
+            Bitmap small = Bitmap.createScaledBitmap(b, 48, Math.max(1, 48 * b.getHeight() / b.getWidth()), true);
+            if (small != b) b.recycle();
+            return small;
+        } catch (RuntimeException | OutOfMemoryError e) {
+            Log.w(TAG, "No background from a picture: " + e);
+            return null;
+        }
     }
 
     private AppEntry appFor(String pkg) {
@@ -3873,6 +3938,46 @@ public class HomeActivity extends Activity {
         });
     }
 
+    private String continueAppsLabel() {
+        int off = prefs.getStringSet("continue_apps_off", java.util.Collections.emptySet()).size();
+        return off == 0 ? "All" : off + " hidden";
+    }
+
+    /**
+     * Talkies settings → Continue apps: on or off for each app that has something to continue, and any turned off
+     * (which no longer appear in the row, so they couldn't be found otherwise). Off hides its cards in the Continue
+     * tab and the Watch Next row. Asked for by AndyVRD (Discussion #22).
+     */
+    private void openContinueApps() {
+        beginMenu(settingsAt, "Continue apps");
+        Set<String> pkgs = new HashSet<>(prefs.getStringSet("continue_apps_off", java.util.Collections.emptySet()));
+        for (Trending.Pick p : RecentStore.load(this)) if (p.pkg != null) pkgs.add(p.pkg);
+        for (Trending.Pick p : watchNextPicks) if (p.pkg != null) pkgs.add(p.pkg);
+        List<String[]> rows = new ArrayList<>();
+        for (String p : pkgs) rows.add(new String[]{p, Channels.label(pm, p)});
+        rows.sort((x, y) -> x[1].compareToIgnoreCase(y[1]));
+        if (rows.isEmpty()) addRow("Nothing to continue yet", null, () -> { }, true);
+        for (String[] r : rows) {
+            final View[] row = new View[1];
+            boolean off = prefs.getStringSet("continue_apps_off", java.util.Collections.emptySet()).contains(r[0]);
+            row[0] = addRow(r[1], off ? "Hidden" : "Shown", () -> {
+                Set<String> now = new HashSet<>(prefs.getStringSet("continue_apps_off", java.util.Collections.emptySet()));
+                boolean hide = now.add(r[0]);
+                if (!hide) now.remove(r[0]);
+                prefs.edit().putStringSet("continue_apps_off", now).apply();
+                setStatus(row[0], hide ? "Hidden" : "Shown");
+            }, true);
+        }
+        menuClosed = () -> {
+            recentPicks = continuePicks(RecentStore.load(this), watchNextPicks);
+            refreshChannels();
+            buildPicksRow(0);
+            focusTop(settingsAt);
+        };
+        showMenu(360);
+        focusMenu(0);
+    }
+
     /** "pkg / title / episode line": a new episode of the same show is a new key, so it comes back. */
     private static String continueKey(Trending.Pick p) { return p.pkg + "\n" + p.title + "\n" + p.meta; }
 
@@ -4201,6 +4306,14 @@ public class HomeActivity extends Activity {
             focusMenu(menuIdx);
         }, true);
         addRow("Wallpaper", wallpaperLabel(), this::openWallpaperMenu, false);
+        final View[] bg = new View[1];
+        bg[0] = addRow("Background", backgroundLabel(), () -> {
+            boolean on = !prefs.getBoolean("blurred_art", false);
+            prefs.edit().putBoolean("blurred_art", on).apply();
+            setStatus(bg[0], backgroundLabel());
+            shownAmbient = null;
+            if (!on && !hasWallpaper) backdrop.setGlow(0);   // the art goes now; the next focus brings its app's colour
+        }, true);
         final View[] ss = new View[1];
         ss[0] = addRow("Screensaver", screensaverLabel(), () -> {
             String[] order = {"clock", "board", "wallpaper", "picks"};
@@ -4296,6 +4409,7 @@ public class HomeActivity extends Activity {
         addRow("Sports", sportsLabel(), this::openSports, false);
         if (sportsOn.contains("football")) addRow(soccer + " leagues", football.footballLeagues().size() + " on",
                 () -> openFootballLeagues(0), false);
+        addRow("Continue apps", continueAppsLabel(), this::openContinueApps, false);
         addRow("Channels", null, this::openChannelsEditor, false);
         addMenuHeading("Apps and inputs");
         addRow("Dock apps", dockCount + " in the dock", this::openDockApps, false);

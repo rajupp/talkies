@@ -31,6 +31,11 @@ features, a new fix number only fixes. The version shows in Talkies settings →
   An idea from Home Deck.
 
 ### Changed
+- **Blurred art as the background.** Talkies settings → **Background** → **Blurred art** shows the focused pick or
+  Continue card's own picture, blurred, behind Home. App colour stays the default, and apps in the dock keep their
+  colour either way. Asked for by AndyVRD in Discussion #22, who pointed to Free My TV.
+- **Continue apps.** Talkies settings → **Continue apps** turns each app on or off for the Continue tab and the Watch
+  Next row. Asked for by AndyVRD.
 - **Bigger apps.** Dock size now goes down to 4 apps, with larger tiles, and Talkies settings → **All apps size** shows
   6, 5 or 4 across. Asked for by Abdullah AlQudaihi.
 - **More for Remote keys.** A button can now open Control Center, TV settings or Wi-Fi, on a press or when held. Asked
@@ -47,6 +52,8 @@ features, a new fix number only fixes. The version shows in Talkies settings →
   TV that turns out slow gets Lite. An idea from Home Deck.
 
 ### Fixed
+- **Dock tiles no longer shrink for empty places.** With fewer apps than Dock size, the tiles are sized for the apps
+  there are. Reported by AndyVRD.
 - **Remote key menus in the right place.** A button set to Inputs or Recent apps, pressed while scrolled down the page,
   put the menu off the top of the screen.
 - **Send from your phone on any home network.** The QR code page now also works when the router hands out
