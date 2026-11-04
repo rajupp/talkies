@@ -413,6 +413,10 @@ when the music stops. The remote's Play/Pause works as anywhere; Control Center 
 
 **Hold OK** (about half a second) on:
 
+- **A match** in a score row: **Pin over TV** keeps a small live score card in a corner while you watch anything, and hides on
+  Talkies' Home. It can't take remote buttons from the app underneath, and it leaves about five minutes after the match ends. **Corner**
+  moves it; **Unpin from TV**, or Control Center → **Unpin score**, takes it away. It needs Talkies' Accessibility switch.
+
 - **An app** in the dock or All apps:
   - **Add to dock** (from All apps): it takes the dock's last spot, and the app that was there moves to the front of
     All apps. **Remove from dock** does the opposite: the first app in All apps takes its spot.

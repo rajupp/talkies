@@ -118,6 +118,25 @@ final class Football {
         return id;
     }
 
+    /**
+     * Your choice, or until you make one: cricket and football everywhere, and the NBA and NFL too in the US and
+     * Canada. The old Live scores setting ("both", "cricket", "football", "off") carries over.
+     */
+    static Set<String> sportsOn(Context c) {
+        Set<String> on = new java.util.HashSet<>();
+        SharedPreferences home = c.getSharedPreferences("home", Context.MODE_PRIVATE);
+        String cc = Region.country(c), saved = home.getString("sports", null);
+        if (saved != null) {
+            for (String id : saved.split(",")) if (!id.isEmpty()) on.add(id);
+        } else {
+            String old = home.getString("scores", "both");
+            if (old.equals("both") || old.equals("cricket")) on.add("cricket");
+            if (old.equals("both") || old.equals("football")) on.add("football");
+            if (!home.contains("scores") && (cc.equals("US") || cc.equals("CA"))) { on.add("nba"); on.add("nfl"); }
+        }
+        return on;
+    }
+
     void setSports(boolean soccer, boolean nfl, boolean nba) {
         this.soccer = soccer;
         this.nfl = nfl;

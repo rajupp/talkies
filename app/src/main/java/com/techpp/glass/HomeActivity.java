@@ -278,6 +278,8 @@ public class HomeActivity extends Activity {
         getWindow().setBackgroundDrawable(null);   // the backdrop covers the screen: don't paint it black first
         page = findViewById(R.id.page);
         dockBand = findViewById(R.id.dock_band);
+        // Rows rebuilt or a new size: what's cut off may have changed without the page moving.
+        findViewById(R.id.page).addOnLayoutChangeListener((v, l, t, r, b, ol, ot, or, ob) -> fadeCutOff());
         dock = findViewById(R.id.dock);
         grid = findViewById(R.id.grid);
         menu = findViewById(R.id.menu);
@@ -542,22 +544,13 @@ public class HomeActivity extends Activity {
     private final Set<String> sportsOn = new java.util.LinkedHashSet<>();
 
     /**
-     * Your choice, or until you make one: cricket and football everywhere, and the NBA and NFL too in the US and
-     * Canada. The old Live scores setting ("both", "cricket", "football", "off") carries over. Tells Football.
+     * The sports that are on (Football.sportsOn), and what football is called here. Tells Football.
      */
     private void applySports() {
         sportsOn.clear();
         String cc = Region.country(this);
         soccer = cc.equals("US") || cc.equals("CA") ? "Soccer" : "Football";
-        String saved = prefs.getString("sports", null);
-        if (saved != null) {
-            for (String id : saved.split(",")) if (!id.isEmpty()) sportsOn.add(id);
-        } else {
-            String old = prefs.getString("scores", "both");
-            if (old.equals("both") || old.equals("cricket")) sportsOn.add("cricket");
-            if (old.equals("both") || old.equals("football")) sportsOn.add("football");
-            if (!prefs.contains("scores") && (cc.equals("US") || cc.equals("CA"))) { sportsOn.add("nba"); sportsOn.add("nfl"); }
-        }
+        sportsOn.addAll(Football.sportsOn(this));
         football.setSports(sportsOn.contains("football"), sportsOn.contains("nfl"), sportsOn.contains("nba"));
     }
 
@@ -1963,7 +1956,31 @@ public class HomeActivity extends Activity {
     private void scrollPage(float y) {
         if (Math.abs(y - pageSpring.target) < 1) return;
         pageSpring.target = y;
+        fadeCutOff();
         startMotion();
+    }
+
+    /**
+     * Fades what the screen would cut off: the row above peeking in at the top, the next one at the bottom. Rows that fit
+     * stay, and so does the row you're on, whatever fits. An idea from dossantosee (discussion #17).
+     */
+    private void fadeCutOff() {
+        if (root.getHeight() == 0) return;
+        float top = pageSpring.target, bottom = top + root.getHeight();
+        View on = zone == Z_DOCK || zone == Z_ALL ? dockBand : zone == Z_PICKS || zone == Z_TABS ? picksRow
+                : zone == Z_CHAN ? channelsBox.getChildAt(chanIdx) : zone == Z_GRID ? grid.getChildAt(gridIdx / gridCols) : null;
+        // At the top of the page everything up there stays, even on a TV where the dock only just fits.
+        for (View v : new View[]{forYouHead, picksRow, dockBand}) fade(v, top <= 0 || v == on, top, bottom);
+        fade(allAppsLabel, false, top, bottom);
+        for (int i = 0; i < channelsBox.getChildCount(); i++) fade(channelsBox.getChildAt(i), channelsBox.getChildAt(i) == on, top, bottom);
+        for (int i = 0; i < grid.getChildCount(); i++) fade(grid.getChildAt(i), grid.getChildAt(i) == on, top, bottom);
+    }
+
+    private void fade(View v, boolean keep, float top, float bottom) {
+        float y = 0;
+        for (View p = v; p != null && p != page; p = p.getParent() instanceof View ? (View) p.getParent() : null) y += p.getTop();
+        boolean whole = y >= top - 1 && y + v.getHeight() <= bottom + 1;
+        v.animate().alpha(keep || whole ? 1f : 0f).setDuration(180).start();
     }
 
     private void focusTop(int i) {
@@ -2087,7 +2104,7 @@ public class HomeActivity extends Activity {
             if (!ours) return true;
         }
         boolean onApp = zone == Z_DOCK || zone == Z_GRID || (zone == Z_MENU && menuMode == MENU_CHANNELS)
-                || continueCard() != null || (zone == Z_TOP && iconIdx == P_SETTINGS);
+                || continueCard() != null || matchCard() != null || (zone == Z_TOP && iconIdx == P_SETTINGS);
         // Holding OK on an app opens its menu, on a Continue card the card's menu, and in the Channels editor
         // picks the row up (a timer, or the remote's long-press signal, whichever comes first).
         if (select && e.getAction() == KeyEvent.ACTION_DOWN) {
@@ -3820,6 +3837,7 @@ public class HomeActivity extends Activity {
             openSettingsMenu();
         }
         else if (continueCard() != null) openContinueMenu();
+        else if (matchCard() != null) openMatchMenu();
     }
 
     /** Talkies settings, by holding OK on the gear or from a remote button. */
@@ -4000,6 +4018,40 @@ public class HomeActivity extends Activity {
             if (!items.isEmpty()) return items.get(Math.min(chanCol[chanIdx], items.size() - 1));
         }
         return null;
+    }
+
+    /** The match card focus is on, in a score row. */
+    private Cricket.Match matchCard() {
+        if (zone != Z_CHAN || chanIdx >= chanRows.size()) return null;
+        List<Trending.Pick> items = chanRows.get(chanIdx).items;
+        if (items.isEmpty()) return null;
+        Object extra = items.get(Math.min(chanCol[chanIdx], items.size() - 1)).extra;
+        return extra instanceof Cricket.Match ? (Cricket.Match) extra : null;
+    }
+
+    /** Pin a match over whatever is playing (ScoreCard), and which corner it sits in. */
+    private void openMatchMenu() {
+        Cricket.Match m = matchCard();
+        if (m == null) return;
+        final int r = chanIdx, c = Math.min(chanCol[r], chanCards.get(r).size() - 1);
+        beginMenu(P_CONTROL, m.t1 + " " + m.vs + " " + m.t2);
+        menuTile = chanCards.get(r).get(c);
+        menuClosed = () -> focusChan(r, c);
+        if (m.id.equals(ScoreCard.pinnedId(this))) {
+            addRow("Unpin from TV", null, () -> ScoreCard.unpin(this), false);
+        } else if (!m.ended) {
+            addRow("Pin over TV", null, () -> {
+                boolean on = ScoreCard.pin(this, m);
+                Toast.makeText(this, on ? "It shows over your apps while you watch. Control Center unpins it"
+                        : "This needs Talkies' Accessibility switch: Talkies settings → Finish setup", Toast.LENGTH_LONG).show();
+            }, false);
+        }
+        final View[] corner = new View[1];
+        corner[0] = addRow("Corner", ScoreCard.cornerName(this), () -> {
+            ScoreCard.nextCorner(this);
+            setStatus(corner[0], ScoreCard.cornerName(this));
+        }, true);
+        showMenu(320);
     }
 
     /** Remove from Continue, or open the app itself rather than the episode. */
@@ -4331,6 +4383,7 @@ public class HomeActivity extends Activity {
             start(new Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS));
         }, false);
         addRow("Talkies settings", null, () -> openTalkiesSettings(P_CONTROL), false);
+        if (ScoreCard.pinnedId(this) != null) addRow("Unpin score", ScoreCard.pinnedName(this), () -> ScoreCard.unpin(this), false);
         MediaController playing = NowPlaying.current(this);
         if (playing != null) addRow("Now playing", NowPlaying.title(playing), () -> openNowPlaying(playing), false);
         if (weatherLine != null) addRow("Weather", weatherLine, () -> openWeather(false), false);
@@ -5609,6 +5662,7 @@ public class HomeActivity extends Activity {
         super.onResume();
         tabs[2].setText("New in " + Region.name(Region.country(this)));  // the country can change (Region)
         inFront = true;
+        ScoreCard.homeShowing(true);
         watchPlaying();
         root.post(this::snapRing);
         // Give Android time to bind the service after Talkies (re)starts before calling it stopped.
@@ -5667,6 +5721,7 @@ public class HomeActivity extends Activity {
         pressedHere = 0;
         SleepService.learn(null);
         inFront = false;
+        ScoreCard.homeShowing(false);
         watchPlaying();   // stops following the player
     }
 

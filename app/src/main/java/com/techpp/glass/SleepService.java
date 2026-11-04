@@ -117,6 +117,7 @@ public class SleepService extends AccessibilityService {
         running = this;
         findStockHomes();
         ServiceRepair.connected(this, SleepService.class);
+        if (ScoreCard.pinnedId(this) != null) scoreChanged(null);
         // After a restart the Google TV home screen is up before this service binds: take over once.
         if (SystemClock.elapsedRealtime() < BOOT_WINDOW_MS) powerOn();
         // After Talkies updates itself (or the service comes back for any other reason), Android shows the built-in
@@ -223,6 +224,7 @@ public class SleepService extends AccessibilityService {
 
     private LinearLayout warning;
     private TextView warningText;
+    private ScoreCard scoreCard;
     private long warningEnds;
     private final Runnable tick = this::tick;
 
@@ -230,6 +232,22 @@ public class SleepService extends AccessibilityService {
     static void warn(long at) {
         SleepService s = running;
         if (s != null) s.main.post(() -> s.showWarning(at));
+    }
+
+    /** Hold OK on a match → Pin over TV: the pinned match changed. False with this service off. */
+    static boolean scoreChanged(Cricket.Match m) {
+        SleepService s = running;
+        if (s == null) return false;
+        s.main.post(() -> {
+            if (s.scoreCard == null) s.scoreCard = new ScoreCard(s);
+            s.scoreCard.sync(m);
+        });
+        return true;
+    }
+
+    static void scoreVisibility() {
+        SleepService s = running;
+        if (s != null) s.main.post(() -> { if (s.scoreCard != null) s.scoreCard.applyVisibility(); });
     }
 
     static void cancelWarning() {
@@ -429,6 +447,7 @@ public class SleepService extends AccessibilityService {
         // Unbound while still running: you switched it off, so don't put it back (a force stop never gets here).
         ServiceRepair.disconnected(this, SleepService.class);
         hideWarning();
+        if (scoreCard != null) scoreCard.hide();
         if (screenOn != null) {
             try { unregisterReceiver(screenOn); } catch (RuntimeException ignored) { }
             screenOn = null;

@@ -5,7 +5,13 @@ features, a new fix number only fixes. The version shows in Talkies settings →
 
 ## Unreleased
 
+### New
+- **A live score over TV.** Hold OK on a match → **Pin over TV**: a small card stays in a corner, updating while you
+  watch anything (not on Talkies' Home), and leaves about five minutes after the match ends. Control Center unpins it. An idea from Gulam.
+
 ### Changed
+- **Rows the screen cuts off fade away.** Moving down the page, the strips of the rows above and below fade out, and
+  come back once they fit. An idea from dossantosee in Discussion #17.
 - **More for Remote keys.** A button can now open Talkies settings or Sound output, on a press or when held. Asked for
   by Abdullah AlQudaihi.
 - **TV's screensaver.** A new row in Talkies settings makes Talkies the TV's screensaver if it has the
