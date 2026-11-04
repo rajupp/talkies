@@ -118,6 +118,8 @@ public class Screensaver extends DreamService {
         weather = text(outfit, 20, 400, 0x66FFFFFF);
         caption = text(outfit, 18, 400, 0x66FFFFFF);
         caption.setPadding(0, 16, 0, 0);
+        caption.setSingleLine(false);   // your message's two lines stay two lines
+        caption.setMaxLines(2);
         block.addView(clock);
         block.addView(date);
         block.addView(weather);
@@ -177,7 +179,7 @@ public class Screensaver extends DreamService {
         // Your message, where the picks' caption isn't using the line.
         if (!mode.equals("picks")) {
             String m = message(this);
-            caption.setText(m == null ? "" : m.replace('\n', ' '));
+            caption.setText(m == null ? "" : m);
             caption.setVisibility(m == null ? View.GONE : View.VISIBLE);
         }
     }
