@@ -17,7 +17,7 @@ import java.util.TreeMap;
  * Remote keys (Control Center → Remote keys): a button on the remote given another job, e.g. the Netflix button
  * opening JioHotstar. SleepService, Talkies' accessibility service, sees the press before the TV does and does
  * the job instead; buttons with no job pass through untouched. Kept in the "remote_keys" preferences as
- * key code → action: "app:<package>", "inputs", "recents", "control", "talkies_settings", "tv_settings", "wifi", "sound", "home" or "none" ("k<code>"), and the job for holding the button
+ * key code → action: "app:<package>", "inputs", "recents", "control", "talkies_settings", "tv_settings", "wifi", "sound", "previous", "resume", "input:<id>", "play_pause", "mute", "bluetooth", "screensaver", "turn_off", "home" or "none" ("k<code>"), and the job for holding the button
  * ("h<code>"), which only a button with a press job can have: a press with no job has to reach the TV untouched,
  * and Talkies can't tell a press from a hold until the button is let go. An idea from Plume and CleanYourTV.
  *
@@ -27,7 +27,9 @@ import java.util.TreeMap;
  */
 final class RemoteKeys {
     static final String INPUTS = "inputs", HOME = "home", NONE = "none", APP = "app:", RECENTS = "recents", CONTROL = "control",
-            SETTINGS = "tv_settings", WIFI = "wifi", TALKIES_SETTINGS = "talkies_settings", SOUND = "sound";
+            SETTINGS = "tv_settings", WIFI = "wifi", TALKIES_SETTINGS = "talkies_settings", SOUND = "sound",
+            PREVIOUS = "previous", RESUME = "resume", PLAY_PAUSE = "play_pause", MUTE = "mute", BLUETOOTH = "bluetooth",
+            SCREENSAVER = "screensaver", TURN_OFF = "turn_off", INPUT = AppEntry.INPUT;
     static final String EXTRA_OPEN = "com.techpp.glass.OPEN";
 
     private RemoteKeys() { }
@@ -108,6 +110,14 @@ final class RemoteKeys {
         if (action.equals(TALKIES_SETTINGS)) return "Talkies settings";
         if (action.equals(SETTINGS)) return "TV settings";
         if (action.equals(SOUND)) return "Sound output";
+        if (action.equals(PREVIOUS)) return "Previous app";
+        if (action.equals(RESUME)) return "Resume watching";
+        if (action.equals(PLAY_PAUSE)) return "Play / pause";
+        if (action.equals(MUTE)) return "Mute";
+        if (action.equals(BLUETOOTH)) return "Bluetooth";
+        if (action.equals(SCREENSAVER)) return "Screensaver";
+        if (action.equals(TURN_OFF)) return "Turn off";
+        if (action.startsWith(INPUT)) return prefs(c).getString("name:" + action, "An input");
         if (action.equals(WIFI)) return "Wi-Fi";
         if (action.equals(HOME)) return "Talkies";
         if (action.equals(NONE)) return "Nothing";
@@ -124,7 +134,25 @@ final class RemoteKeys {
                 s.startActivity(settings(s, action).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
             } else if (action.equals(SOUND)) {
                 s.startActivity(sound(s).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
-            } else if (action.equals(INPUTS) || action.equals(RECENTS) || action.equals(CONTROL) || action.equals(TALKIES_SETTINGS)) {
+            } else if (action.equals(PREVIOUS)) {
+                previous(s);
+            } else if (action.startsWith(INPUT)) {
+                s.startActivity(new Intent(Intent.ACTION_VIEW).setDataAndType(android.media.tv.TvContract.buildChannelUriForPassthroughInput(
+                        action.substring(INPUT.length())), "vnd.android.cursor.item/channel").addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
+            } else if (action.equals(PLAY_PAUSE)) {
+                android.media.AudioManager am = s.getSystemService(android.media.AudioManager.class);
+                am.dispatchMediaKeyEvent(new KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE));
+                am.dispatchMediaKeyEvent(new KeyEvent(KeyEvent.ACTION_UP, KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE));
+            } else if (action.equals(MUTE)) {
+                s.getSystemService(android.media.AudioManager.class).adjustStreamVolume(android.media.AudioManager.STREAM_MUSIC,
+                        android.media.AudioManager.ADJUST_TOGGLE_MUTE, android.media.AudioManager.FLAG_SHOW_UI);
+            } else if (action.equals(SCREENSAVER)) {
+                Intent dream = screensaver(s);
+                if (dream != null) s.startActivity(dream.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
+            } else if (action.equals(TURN_OFF)) {
+                if (!Sleep.now()) android.widget.Toast.makeText(s, "This TV doesn't let Talkies turn it off", android.widget.Toast.LENGTH_LONG).show();
+            } else if (action.equals(INPUTS) || action.equals(RECENTS) || action.equals(CONTROL) || action.equals(TALKIES_SETTINGS)
+                    || action.equals(RESUME) || action.equals(BLUETOOTH)) {
                 s.startActivity(new Intent(Intent.ACTION_MAIN).setClass(s, HomeActivity.class).putExtra(EXTRA_OPEN, action)
                         .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED));
             } else if (action.startsWith(APP)) {
@@ -152,6 +180,42 @@ final class RemoteKeys {
         if (pm.resolveActivity(i, 0) != null) return i;
         return new Intent(Intent.ACTION_MAIN).setClassName("com.android.tv.settings", "com.android.tv.settings.MainSettings");
     }
+
+    /** The app before this one, from those opened through Talkies, so pressing again flips between the two. */
+    private static void previous(SleepService s) {
+        android.view.accessibility.AccessibilityNodeInfo root = s.getRootInActiveWindow();
+        String now = root == null || root.getPackageName() == null ? null : root.getPackageName().toString();
+        PackageManager pm = s.getPackageManager();
+        List<String> recent = RecentApps.all(s);
+        for (int i = now == null ? 1 : 0; i < recent.size(); i++) {
+            String pkg = recent.get(i);
+            if (pkg.equals(now) || pkg.equals(s.getPackageName())) continue;
+            Intent open = pm.getLeanbackLaunchIntentForPackage(pkg);
+            if (open == null) open = pm.getLaunchIntentForPackage(pkg);
+            if (open == null) continue;
+            s.startActivity(open.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
+            if (now != null && !now.equals(s.getPackageName())) RecentApps.note(s, now);
+            RecentApps.note(s, pkg);
+            return;
+        }
+        android.widget.Toast.makeText(s, "No other app yet", android.widget.Toast.LENGTH_SHORT).show();
+    }
+
+    /** Starts the screensaver the way Google Assistant does, or through Android's own shortcut; null when there's no way. */
+    static Intent screensaver(Context c) {
+        PackageManager pm = c.getPackageManager();
+        // In a task of its own: it's part of the TV's Settings app, and in Settings' own task a settings page left open
+        // in the background would be what waking the TV shows, instead of Talkies.
+        Intent voice = new Intent("com.google.android.pano.action.SLEEP")
+                .addFlags(Intent.FLAG_ACTIVITY_MULTIPLE_TASK | Intent.FLAG_ACTIVITY_NO_ANIMATION);
+        android.content.pm.ResolveInfo r = pm.resolveActivity(voice, 0);
+        if (r != null && r.activityInfo != null && !r.activityInfo.name.contains("EmptyStub")) return voice;
+        Intent dream = new Intent(Intent.ACTION_MAIN).setClassName("com.android.systemui", "com.android.systemui.Somnambulator");
+        return pm.resolveActivity(dream, 0) != null ? dream : null;
+    }
+
+    /** A remote button set to one input: remembers its name for the Remote keys list. */
+    static void nameInput(Context c, String action, String name) { prefs(c).edit().putString("name:" + action, name).apply(); }
 
     /** The screen you chose in Control Center shortcuts, else the TV's own. An app can only open it: Android keeps the switch itself. */
     private static Intent sound(Context c) {

@@ -25,7 +25,7 @@ import java.util.concurrent.Executors;
 /**
  * A live match pinned over whatever is playing: hold OK on a match → Pin over TV. A small card in a corner, drawn by the
  * Accessibility service (SleepService), so it needs no other permission. It can't be focused or touched, so remote
- * buttons always reach the app underneath, and it stays out of the way on Talkies' own Home. An idea from Gulam.
+ * buttons always reach the app underneath, and it stays out of the way on Talkies' own Home and the screensaver. An idea from Gulam.
  */
 final class ScoreCard {
     private static final String TAG = "GlassScoreCard";
@@ -47,6 +47,14 @@ final class ScoreCard {
     private Football football;
     private LinearLayout card;
     private TextView team1, team2, status;
+    private boolean dreaming;
+    /** The screensaver has the screen: nothing of ours on it. */
+    private final android.content.BroadcastReceiver dream = new android.content.BroadcastReceiver() {
+        @Override public void onReceive(Context c, android.content.Intent i) {
+            dreaming = android.content.Intent.ACTION_DREAMING_STARTED.equals(i.getAction());
+            applyVisibility();
+        }
+    };
     private int misses;
     private long endedAt;
 
@@ -59,9 +67,9 @@ final class ScoreCard {
         SleepService.scoreVisibility();
     }
 
-    /** Over an app, not over Home. */
+    /** Over an app, not over Home or the screensaver. */
     void applyVisibility() {
-        if (card != null) card.setVisibility(homeShowing ? View.GONE : View.VISIBLE);
+        if (card != null) card.setVisibility(homeShowing || dreaming ? View.GONE : View.VISIBLE);
     }
 
     static String pinnedId(Context c) { return prefs(c).getString("id", null); }
@@ -114,6 +122,12 @@ final class ScoreCard {
         main.removeCallbacks(tick);
         if (card == null) return;
         try {
+            service.unregisterReceiver(dream);
+        } catch (RuntimeException ignored) {
+            // Wasn't registered.
+        }
+        dreaming = false;
+        try {
             service.getSystemService(WindowManager.class).removeView(card);
         } catch (RuntimeException ignored) {
             // Already gone.
@@ -149,6 +163,9 @@ final class ScoreCard {
                         | WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN, PixelFormat.TRANSLUCENT);
         try {
             service.getSystemService(WindowManager.class).addView(card, lp);
+            android.content.IntentFilter f = new android.content.IntentFilter(android.content.Intent.ACTION_DREAMING_STARTED);
+            f.addAction(android.content.Intent.ACTION_DREAMING_STOPPED);
+            service.registerReceiver(dream, f);
             return true;
         } catch (RuntimeException e) {
             Log.w(TAG, "Couldn't show the score card: " + e);

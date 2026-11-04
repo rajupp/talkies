@@ -323,11 +323,7 @@ public class HomeActivity extends Activity {
         dockIdx = Math.min(prefs.getInt("last_dock_col", 0), Math.max(0, dockCount - 1));
         root.post(() -> {
             focusDock(dockIdx);
-            String open = getIntent().getStringExtra(RemoteKeys.EXTRA_OPEN);
-            if (RemoteKeys.INPUTS.equals(open)) openInputs();
-            else if (RemoteKeys.RECENTS.equals(open)) openRecents();
-            else if (RemoteKeys.CONTROL.equals(open)) openControlCenter();
-            else if (RemoteKeys.TALKIES_SETTINGS.equals(open)) openSettingsMenu();
+            openFromKey(getIntent().getStringExtra(RemoteKeys.EXTRA_OPEN));
         });
     }
 
@@ -1060,7 +1056,7 @@ public class HomeActivity extends Activity {
         dockTiles.clear();
         // The dock's apps and, when any are left over, the round All apps button share the band's width: seven
         // apps are 106 dp wide, five 146, ten 73. Four are 198, too tall for the band, which grows upward to hold them.
-        boolean more = apps.size() > dockCount;
+        boolean more = apps.size() > dockCount && prefs.getBoolean("all_apps_button", true);
         int n = Math.max(1, dockCount);   // the apps it has: with fewer than Dock size, they needn't shrink for empty places
         float inner = getResources().getDisplayMetrics().widthPixels / dp - 40 - 36;
         boolean four = dockSize() == 4;
@@ -2213,16 +2209,7 @@ public class HomeActivity extends Activity {
      * also on devices without SystemUI's shortcut, like the Google TV Streamer), else SystemUI's Somnambulator.
      * Null where neither exists: Control Center leaves the row out. The voice action idea is from tvOS Launcher.
      */
-    private Intent screensaverIntent() {
-        // In a task of its own: it's part of the TV's Settings app, and in Settings' own task a settings page left open
-        // in the background would be what waking the TV shows, instead of Talkies.
-        Intent voice = new Intent("com.google.android.pano.action.SLEEP")
-                .addFlags(Intent.FLAG_ACTIVITY_MULTIPLE_TASK | Intent.FLAG_ACTIVITY_NO_ANIMATION);
-        ResolveInfo r = pm.resolveActivity(voice, 0);
-        if (r != null && r.activityInfo != null && !r.activityInfo.name.contains("EmptyStub")) return voice;
-        Intent dream = new Intent(Intent.ACTION_MAIN).setClassName("com.android.systemui", "com.android.systemui.Somnambulator");
-        return pm.resolveActivity(dream, 0) != null ? dream : null;
-    }
+    private Intent screensaverIntent() { return RemoteKeys.screensaver(this); }
 
     /** Where focus is: changes whenever a move took it somewhere, so a press at an end makes no sound. */
     private String focusSignature() {
@@ -3481,15 +3468,7 @@ public class HomeActivity extends Activity {
     private void openKeyActions(int code) {
         menuClosed = null;
         beginMenu(settingsAt, RemoteKeys.keyName(code) + "  ·  now: " + RemoteKeys.describe(this, RemoteKeys.action(this, code)));
-        addRow("Open an app", null, () -> openKeyApps(code), false);
-        addRow("Inputs", null, () -> setKey(code, RemoteKeys.INPUTS), false);
-        addRow("Recent apps", null, () -> setKey(code, RemoteKeys.RECENTS), false);
-        addRow("Control Center", null, () -> setKey(code, RemoteKeys.CONTROL), false);
-        addRow("Talkies settings", null, () -> setKey(code, RemoteKeys.TALKIES_SETTINGS), false);
-        addRow("TV settings", null, () -> setKey(code, RemoteKeys.SETTINGS), false);
-        addRow("Wi-Fi", null, () -> setKey(code, RemoteKeys.WIFI), false);
-        addRow("Sound output", null, () -> setKey(code, RemoteKeys.SOUND), false);
-        addRow("Talkies", null, () -> setKey(code, RemoteKeys.HOME), false);
+        addKeyJobs(code, false);
         addRow("Do nothing", null, () -> setKey(code, RemoteKeys.NONE), false);
         if (RemoteKeys.action(this, code) != null) {
             String hold = RemoteKeys.holdAction(this, code);
@@ -3503,20 +3482,31 @@ public class HomeActivity extends Activity {
     private void openHoldActions(int code) {
         String hold = RemoteKeys.holdAction(this, code);
         beginMenu(settingsAt, "Hold " + RemoteKeys.keyName(code) + "  ·  now: " + (hold == null ? "same as a press" : RemoteKeys.describe(this, hold)));
-        addRow("Open an app", null, () -> openKeyApps(code, true), false);
-        addRow("Inputs", null, () -> setHold(code, RemoteKeys.INPUTS), false);
-        addRow("Recent apps", null, () -> setHold(code, RemoteKeys.RECENTS), false);
-        addRow("Control Center", null, () -> setHold(code, RemoteKeys.CONTROL), false);
-        addRow("Talkies settings", null, () -> setHold(code, RemoteKeys.TALKIES_SETTINGS), false);
-        addRow("TV settings", null, () -> setHold(code, RemoteKeys.SETTINGS), false);
-        addRow("Wi-Fi", null, () -> setHold(code, RemoteKeys.WIFI), false);
-        addRow("Sound output", null, () -> setHold(code, RemoteKeys.SOUND), false);
-        addRow("Talkies", null, () -> setHold(code, RemoteKeys.HOME), false);
+        addKeyJobs(code, true);
         if (hold != null) addRow("Same as a press", null, () -> setHold(code, null), false);
         showMenu(420);
     }
 
-    private void openKeyApps(int code) { openKeyApps(code, false); }
+    private void addKeyJobs(int code, boolean hold) {
+        addRow("Open an app", null, () -> openKeyApps(code, hold), false);
+        if (!shownPorts().isEmpty()) addRow("Go to an input", null, () -> openKeyInputs(code, hold), false);
+        String[][] jobs = {{"Previous app", RemoteKeys.PREVIOUS}, {"Resume watching", RemoteKeys.RESUME}, {"Inputs", RemoteKeys.INPUTS},
+                {"Recent apps", RemoteKeys.RECENTS}, {"Control Center", RemoteKeys.CONTROL}, {"Talkies settings", RemoteKeys.TALKIES_SETTINGS},
+                {"TV settings", RemoteKeys.SETTINGS}, {"Wi-Fi", RemoteKeys.WIFI}, {"Sound output", RemoteKeys.SOUND},
+                {"Bluetooth", RemoteKeys.BLUETOOTH}, {"Play / pause", RemoteKeys.PLAY_PAUSE}, {"Mute", RemoteKeys.MUTE},
+                {"Screensaver", RemoteKeys.SCREENSAVER}, {"Turn off", RemoteKeys.TURN_OFF}, {"Talkies", RemoteKeys.HOME}};
+        for (String[] j : jobs) addRow(j[0], null, () -> { if (hold) setHold(code, j[1]); else setKey(code, j[1]); }, false);
+    }
+
+    private void openKeyInputs(int code, boolean hold) {
+        beginMenu(settingsAt, "Go to which input?");
+        for (Port p : shownPorts()) addRow(p.row(), null, () -> {
+            String action = RemoteKeys.INPUT + p.id;
+            RemoteKeys.nameInput(this, action, p.tile());
+            if (hold) setHold(code, action); else setKey(code, action);
+        }, false);
+        showMenu(420);
+    }
 
     private void openKeyApps(int code, boolean hold) {
         beginMenu(settingsAt, "Open which app?");
@@ -3838,6 +3828,23 @@ public class HomeActivity extends Activity {
         }
         else if (continueCard() != null) openContinueMenu();
         else if (matchCard() != null) openMatchMenu();
+    }
+
+    /** A remote button's job that happens on Home. */
+    private void openFromKey(String open) {
+        if (RemoteKeys.INPUTS.equals(open)) openInputs();
+        else if (RemoteKeys.RECENTS.equals(open)) openRecents();
+        else if (RemoteKeys.CONTROL.equals(open)) openControlCenter();
+        else if (RemoteKeys.TALKIES_SETTINGS.equals(open)) openSettingsMenu();
+        else if (RemoteKeys.BLUETOOTH.equals(open)) { if (!openShortcut("bluetooth")) openBluetooth(); }
+        else if (RemoteKeys.RESUME.equals(open)) resumeWatching();
+    }
+
+    /** The first Continue card, as if you'd pressed OK on it. */
+    private void resumeWatching() {
+        recentPicks = continuePicks(RecentStore.load(this), watchNextPicks);
+        if (recentPicks.isEmpty()) Toast.makeText(this, "Nothing to continue yet", Toast.LENGTH_SHORT).show();
+        else openPick(recentPicks.get(0));
     }
 
     /** Talkies settings, by holding OK on the gear or from a remote button. */
@@ -4574,6 +4581,13 @@ public class HomeActivity extends Activity {
             if (n > DOCK_SIZES[DOCK_SIZES.length - 1]) n = DOCK_SIZES[0];
             prefs.edit().putInt("dock_size", n).apply();
             setStatus(ds[0], n + " apps");
+            reloadApps();
+        }, true);
+        final View[] ab = new View[1];
+        ab[0] = addRow("All apps button", prefs.getBoolean("all_apps_button", true) ? "Shown" : "Hidden", () -> {
+            boolean on = !prefs.getBoolean("all_apps_button", true);
+            prefs.edit().putBoolean("all_apps_button", on).apply();
+            setStatus(ab[0], on ? "Shown" : "Hidden");
             reloadApps();
         }, true);
         final View[] gs = new View[1];
@@ -5804,9 +5818,6 @@ public class HomeActivity extends Activity {
             pageSpring.snap(pageSpring.target);
             page.setTranslationY(-pageSpring.value);
         }
-        if (RemoteKeys.INPUTS.equals(open)) root.post(this::openInputs);
-        else if (RemoteKeys.RECENTS.equals(open)) root.post(this::openRecents);
-        else if (RemoteKeys.CONTROL.equals(open)) root.post(this::openControlCenter);
-        else if (RemoteKeys.TALKIES_SETTINGS.equals(open)) root.post(this::openSettingsMenu);
+        if (open != null) root.post(() -> openFromKey(open));
     }
 }

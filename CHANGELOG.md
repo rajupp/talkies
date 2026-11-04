@@ -7,13 +7,16 @@ features, a new fix number only fixes. The version shows in Talkies settings →
 
 ### New
 - **A live score over TV.** Hold OK on a match → **Pin over TV**: a small card stays in a corner, updating while you
-  watch anything (not on Talkies' Home), and leaves about five minutes after the match ends. Control Center unpins it. An idea from Gulam.
+  watch anything (not on Talkies' Home or the screensaver), and leaves about five minutes after the match ends. Control Center unpins it. An idea from Gulam.
 
 ### Changed
 - **Rows the screen cuts off fade away.** Moving down the page, the strips of the rows above and below fade out, and
   come back once they fit. An idea from dossantosee in Discussion #17.
-- **More for Remote keys.** A button can now open Talkies settings or Sound output, on a press or when held. Asked for
-  by Abdullah AlQudaihi.
+- **Many more jobs for Remote keys.** A button can now go to Previous app, Resume watching (the first Continue card) or
+  one input you choose, control Play / pause or Mute, or open Talkies settings, Sound output, Bluetooth, the Screensaver
+  or Turn off, on a press or when held. Asked for by Abdullah AlQudaihi.
+- **All apps button.** Talkies settings → **All apps button** hides the round button at the end of the dock, so the apps
+  fill its width. All apps is still below, further down the page. Asked for by athul.
 - **TV's screensaver.** A new row in Talkies settings makes Talkies the TV's screensaver if it has the
   `WRITE_SECURE_SETTINGS` grant, and shows how otherwise, for TVs whose settings don't list it. Reported on a Sony Bravia.
 
