@@ -289,6 +289,7 @@ public class HomeActivity extends Activity {
         picksRow = findViewById(R.id.picks);
         picksHint = findViewById(R.id.picks_hint);
         ring = findViewById(R.id.ring);
+        ring.setAlways(prefs.getBoolean("focus_ring", false));
         tabs = new TextView[]{findViewById(R.id.tab_recent), findViewById(R.id.tab_trending), findViewById(R.id.tab_india)};
         icons = new ImageView[]{findViewById(R.id.icon_cc), findViewById(R.id.icon_inputs), findViewById(R.id.icon_wifi),
                 findViewById(R.id.icon_settings), findViewById(R.id.icon_bell)};
@@ -4176,6 +4177,13 @@ public class HomeActivity extends Activity {
             String next = order[(Arrays.asList(order).indexOf(prefs.getString("quiet_hours", "23-7")) + 1) % order.length];
             prefs.edit().putString("quiet_hours", next).apply();
             setStatus(qh[0], quietLabel());
+        }, true);
+        final View[] fo = new View[1];
+        fo[0] = addRow("Focus", prefs.getBoolean("focus_ring", false) ? "Ring" : "Lift", () -> {
+            boolean on = !prefs.getBoolean("focus_ring", false);
+            prefs.edit().putBoolean("focus_ring", on).apply();
+            ring.setAlways(on);
+            setStatus(fo[0], on ? "Ring" : "Lift");
         }, true);
         final View[] fx = new View[1];
         fx[0] = addRow("Effects", effectsLabel(), () -> {

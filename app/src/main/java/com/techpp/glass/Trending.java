@@ -43,7 +43,7 @@ import java.util.concurrent.Executors;
  *
  * The TMDB key lives in a file on the TV (files/tmdb_key.txt), never in the APK. Picks and their backdrops are
  * cached in files/trending/. The list is refreshed at most every 6 hours, and only when the home screen asks.
- * In India without a key, the picks come from StreamRadar instead (fetchRadar).
+ * In India without a key, the picks come from StreamRadar instead (fetchRadar); with none of its apps here, they're trailers too.
  */
 final class Trending {
     private static final String TAG = "GlassTrending";
@@ -57,7 +57,7 @@ final class Trending {
     static final int SHOWN = 4;
     static final String TRENDING = "trending", INDIA = "india", RADAR = "streamradar";
     /** Bump when picks.json changes shape; the next home screen refreshes right away. */
-    private static final int CACHE_VERSION = 9;
+    private static final int CACHE_VERSION = 10;
     /** YouTube on Android TV, Fire TV, then the phone app, for the trailers when no streaming app is installed. */
     private static final String[] YOUTUBE = {"com.google.android.youtube.tv", "com.amazon.firetv.youtube", "com.google.android.youtube"};
     /** For one refresh: no streaming app matched, so picks are trailers in this YouTube app. */
@@ -421,7 +421,14 @@ final class Trending {
         for (String[] a : StreamRadar.APPS) if (installed(a[2])) apps.add(a);
         prefs.edit().putInt("matched", apps.size()).apply();
         Log.i(TAG, "StreamRadar for " + apps.size() + " installed apps");
-        if (apps.isEmpty()) { save(new ArrayList<>()); return; }
+        // None of the apps here: every app's lists, and each title's trailer found in YouTube.
+        String youtube = null;
+        if (apps.isEmpty()) {
+            for (String y : YOUTUBE) if (youtube == null && installed(y)) youtube = y;
+            if (youtube == null) { save(new ArrayList<>()); return; }
+            apps.addAll(java.util.Arrays.asList(StreamRadar.APPS));
+        }
+        final String trailers = youtube;
         List<java.util.concurrent.Future<JSONArray>> tops = new ArrayList<>();
         for (String[] a : apps) {
             tops.add(net.submit(() -> StreamRadar.top(a[0], "movie")));
@@ -456,7 +463,8 @@ final class Trending {
         fresh.removeIf(m -> m.optString("background").isEmpty() || taken.contains(m.optString("id")));
         if (fresh.size() > MAX_CHECKS) fresh = fresh.subList(0, MAX_CHECKS);
         List<java.util.concurrent.Future<String[]>> found = new ArrayList<>();
-        for (JSONObject m : fresh) found.add(net.submit(() -> StreamRadar.where(m.getString("type"), m.getString("id"), this::installed)));
+        for (JSONObject m : fresh) found.add(net.submit(() -> StreamRadar.where(m.getString("type"), m.getString("id"),
+                pkg -> trailers != null || installed(pkg))));
         List<Pick> india = new ArrayList<>();
         for (int i = 0; i < fresh.size() && india.size() < MAX_PICKS; i++) {
             String[] w = radarGet(found.get(i));
@@ -470,11 +478,15 @@ final class Trending {
         List<java.util.concurrent.Future<String[]>> links = new ArrayList<>();
         for (Pick p : trend) {
             String type = p.kind.equals("tv") ? "series" : "movie", id = p.intentUri;
-            links.add(net.submit(() -> StreamRadar.where(type, id, pkg -> pkg.equals(p.pkg))));
+            links.add(net.submit(() -> trailers != null ? null : StreamRadar.where(type, id, pkg -> pkg.equals(p.pkg))));
         }
         for (int i = 0; i < trend.size(); i++) {
             String[] w = radarGet(links.get(i));
             trend.get(i).intentUri = w == null ? null : link(w[1], trend.get(i).pkg);
+        }
+        if (trailers != null) {
+            for (Pick p : trend) asTrailer(p, trailers);
+            for (Pick p : india) asTrailer(p, trailers);
         }
         Log.i(TAG, "StreamRadar: " + trend.size() + " trending, " + india.size() + " new");
         List<Pick> picks = new ArrayList<>(trend);
@@ -513,6 +525,16 @@ final class Trending {
             p.posterPath = poster.replaceFirst("/t/p/[^/]+/", "/t/p/w342/");
         }
         return p;
+    }
+
+    /** The pick opens a YouTube search for its trailer, saying where the title streams. StreamRadar has no trailer of its own. */
+    private static void asTrailer(Pick p, String youtube) {
+        p.pkg = youtube;
+        p.service = "Trailer · on " + p.service;
+        p.meta = (p.kind.equals("tv") ? "Series" : "Film") + " · " + p.service;
+        p.intentUri = new android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(
+                "https://www.youtube.com/results?search_query=" + android.net.Uri.encode(p.title + " trailer"))).setPackage(youtube)
+                .toUri(android.content.Intent.URI_INTENT_SCHEME);
     }
 
     /** The app's page for the title, opened in that app. */

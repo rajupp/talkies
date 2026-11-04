@@ -31,6 +31,10 @@ features, a new fix number only fixes. The version shows in Talkies settings →
   An idea from Home Deck.
 
 ### Changed
+- **Focus: Lift or Ring.** Talkies settings → **Focus** → **Ring** keeps a white outline on whatever is selected, for
+  busy wallpapers where the lift and shadow are hard to see. Lift is still the default. Asked for by kdkasucl.
+- **StreamRadar picks without its apps.** With none of its six apps installed, Trending and New in India stayed empty and
+  their tabs vanished. They now show every app's lists, and OK searches YouTube for the trailer. Reported by kdkasucl.
 - **TV makers' extras hidden.** Manuals, firmware updaters, store demos and factory tools are left out of All apps
   from the start (Talkies settings → Hidden apps shows one again). The list is Home Deck's.
 - **Effects: Auto notices a slow TV.** Talkies times its frames the first few times you move with the arrows, and a

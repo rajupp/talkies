@@ -76,6 +76,7 @@ Control Center → **Talkies settings**, or **hold OK on the ⚙ icon** (a press
 | Screensaver | **Clock** (default), **Board**, **Wallpaper** or **Picks**: what Talkies' screensaver shows ([Screensaver](#screensaver-and-whats-playing)). *Not in use* until you pick Talkies in the TV's Screen saver settings; *none set* in Wallpaper with no wallpaper; *may be slow* in Picks on a TV with little memory |
 | Screensaver message | Two short lines for the screensaver ("Dinner at 8"), typed on your phone: a QR code opens the page, which shows the message as it is. Send both lines empty to remove it |
 | Quiet hours | When the screensaver dims: **11 PM – 7 AM** (default), 10 PM – 6 AM, Midnight – 7 AM, or Off |
+| Focus | How the selected tile or card shows. **Lift** (default): it grows and lifts on a soft shadow. **Ring**: a white outline as well, easier to see on a busy wallpaper |
 | Effects | **Auto** (default): Lite on a TV with under 1.6 GB of memory, or one that turns out slow (Talkies times its frames the first few times you move with the arrows), Full elsewhere. **Full**: the background glows in the focused app's colour and focus and scrolling glide. **Lite**: no glow, and focus and scrolling move at once, which keeps slow TVs responsive |
 | RAM and storage | Shown (default) or Hidden: the two meters beside the icon buttons, with free RAM and free storage, updated every minute |
 | Apps open from their tile | On by default: an app's window grows out of the tile or card you chose. It's Android's normal opening animation, started from the tile, so it costs nothing extra |
@@ -174,6 +175,8 @@ a free, open list of what's on Indian apps (an idea from Swakshan):
 - **New in India**: what's just come out on those apps, newest first.
 - **OK** opens the title's own page in its app where StreamRadar has a link (JioHotstar, ZEE5 and SonyLIV checked),
   else the app.
+- **None of those apps on this TV?** You still get the lists, all six apps' Top 10s and what's new, marked "Trailer · on
+  Netflix". OK searches YouTube for the title's trailer. Without YouTube either, the tabs stay hidden.
 
 StreamRadar's lists don't give genres or languages, so the line under the card is just film or series and the app,
 and **Picks languages** isn't offered. Add a TMDB key and TMDB's picks take over at once.
