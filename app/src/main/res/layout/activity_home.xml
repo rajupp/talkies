@@ -195,7 +195,7 @@
             android:clipChildren="false"
             android:clipToPadding="false" />
 
-        <!-- Dock: one band, 5 to 10 apps (Talkies settings → Dock size), then the All apps button -->
+        <!-- Dock: one band, 4 to 10 apps (Talkies settings → Dock size), then the All apps button -->
         <FrameLayout
             android:id="@+id/dock_band"
             android:layout_width="match_parent"

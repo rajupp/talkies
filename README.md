@@ -24,7 +24,7 @@
 ## What you get
 
 - **No ads, no sponsored rows, no tracking.** Talkies shows your apps and what you choose, nothing else.
-- **Your apps** in a dock of 5 to 10 (seven to start), the rest a click away with the **All apps** button at its end. Hold OK on
+- **Your apps** in a dock of 4 to 10 (seven to start), the rest a click away with the **All apps** button at its end. Hold OK on
   any app to move, hide or uninstall it.
 - **For You:** what's trending on *your* streaming apps in *your* country, what's new there, and Continue watching.
   Only titles that stream on a subscription you can use; hide it for a big clean clock instead.
@@ -55,7 +55,7 @@ almost everything on the screen can be changed:
 |---|---|---|
 | **Weather** | °C or °F; day and night follow your sunrise and sunset | The area (a town or `lat,lon`), in Talkies settings → Keys and location |
 | **For You** | Trending and *New in your country* only show titles that stream on a subscription where you are, on your apps (no streaming apps: their trailers in YouTube) | Show or hide it |
-| **Dock** | — | Which apps (Talkies settings → **Dock apps**, or hold OK on any app), how many (**Dock size**, 5 to 10) and their order (hold OK → **Move**); All apps in your order, recently opened first, or A to Z (**All apps order**); your own picture on any app (hold OK → **Change image**) |
+| **Dock** | — | Which apps (Talkies settings → **Dock apps**, or hold OK on any app), how many (**Dock size**, 4 to 10) and their order (hold OK → **Move**); All apps in your order, recently opened first, or A to Z (**All apps order**); your own picture on any app (hold OK → **Change image**) |
 | **Cricket** | Your team's matches first, then other internationals and your domestic competitions (IPL, Ranji Trophy… in India) | On or off |
 | **Football** | Your country's leagues by default (Premier League, Champions League and ISL in India; the NFL, NBA and MLS in the US; Süper Lig in Turkey…) | Pick any leagues; turn on the NBA and NFL anywhere |
 | **Channels, keys, look** | — | Which channel rows and their order, what each remote button does (tap and hold), Light, Dark or Auto, wallpaper, Full or Lite effects |

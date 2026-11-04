@@ -31,6 +31,12 @@ features, a new fix number only fixes. The version shows in Talkies settings →
   An idea from Home Deck.
 
 ### Changed
+- **Bigger apps.** Dock size now goes down to 4 apps, with larger tiles, and Talkies settings → **All apps size** shows
+  6, 5 or 4 across. Asked for by Abdullah AlQudaihi.
+- **More for Remote keys.** A button can now open Control Center, TV settings or Wi-Fi, on a press or when held. Asked
+  for by Abdullah AlQudaihi.
+- **Refresh Continue.** Hold OK on a Continue card → **Refresh Continue** reads what the apps have reported again. Asked
+  for by Abdullah AlQudaihi.
 - **Focus: Lift or Ring.** Talkies settings → **Focus** → **Ring** keeps a white outline on whatever is selected, for
   busy wallpapers where the lift and shadow are hard to see. Lift is still the default. Asked for by kdkasucl.
 - **StreamRadar picks without its apps.** With none of its six apps installed, Trending and New in India stayed empty and
@@ -41,6 +47,8 @@ features, a new fix number only fixes. The version shows in Talkies settings →
   TV that turns out slow gets Lite. An idea from Home Deck.
 
 ### Fixed
+- **Remote key menus in the right place.** A button set to Inputs or Recent apps, pressed while scrolled down the page,
+  put the menu off the top of the screen.
 - **Send from your phone on any home network.** The QR code page now also works when the router hands out
   addresses outside the usual private ranges; there it answers only phones on the TV's own network
   ([#20](https://github.com/rajupp/talkies/issues/20)). Thanks to wpfyorg for tracking down the cause.

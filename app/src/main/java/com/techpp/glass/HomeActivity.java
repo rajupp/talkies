@@ -88,11 +88,10 @@ public class HomeActivity extends Activity {
     private static final int P_CONTROL = 0, P_INPUTS = 1, P_WIFI = 2, P_SETTINGS = 3, P_BELL = 4;
     private static final String[] TAB_IDS = {RecentStore.TAB, Trending.TRENDING, Trending.INDIA};
     private static final int TAB_TRENDING = 1, MIN_CONTINUE = 10, MAX_CONTINUE = 16, MAX_YOUTUBE = 2;
-    private static final int GRID_COLS = 6;
     /** How many apps the dock holds (Talkies settings → Dock size); the tiles shrink or grow to fit. */
-    private static final int[] DOCK_SIZES = {5, 6, 7, 8, 9, 10};
+    private static final int[] DOCK_SIZES = {4, 5, 6, 7, 8, 9, 10};
     // Geometry (dp, on a 960 × 540 dp screen).
-    private static final int DOCK_MAX_W = 146, DOCK_GAP = 12, ALL_BUTTON = 44, GRID_TILE_W = 133, GRID_TILE_H = 75, GRID_GAP_X = 16,
+    private static final int DOCK_MAX_W = 146, DOCK_4_W = 198, DOCK_GAP = 12, ALL_BUTTON = 44, GRID_WIDTH = 878, GRID_GAP_X = 16,
             GRID_GAP_Y = 18;
     // Channel rows, below the dock: header, a row of cards, the focused card's title and description.
     private static final int CHAN_TOP = 548, CHAN_ROW_H = 212, CH_W = 200, CH_H = 112, CH_GAP = 18, CRICKET_W = 280;
@@ -109,6 +108,8 @@ public class HomeActivity extends Activity {
     /** Talkies settings' At power-on row, to come back to once you've chosen. */
     private View powerOnRow;
     private FrameLayout page, dockBand;
+    /** All apps across (Talkies settings → All apps size), and the size of its tiles in dp. */
+    private int gridCols = 6, gridTileW = 133, gridTileH = 75;
     private LinearLayout dock, grid, menu, channelsBox;
     private android.widget.ScrollView menuScroll;
     private TextView title, info, credit, allAppsLabel, moveHint;
@@ -297,9 +298,7 @@ public class HomeActivity extends Activity {
         onUpdates();
         picksRow.setOnFrame(this::snapRing);
 
-        // Banners are prepared at the size of the largest focused tile: an All apps tile at 110%, or the dock's
-        // largest (five apps) at 114%.
-        AppEntry.setBannerSize(px(Math.max(GRID_TILE_W * 1.10f, DOCK_MAX_W * 1.14f)), px(Math.max(GRID_TILE_H * 1.10f, DOCK_MAX_W * 9 / 16f * 1.14f)));
+        applyTileSizes();
         AppEntry.customDir = new File(getExternalFilesDir(null), "tiles");
         trending = new Trending(this);
         weather = new Weather(this);
@@ -324,6 +323,7 @@ public class HomeActivity extends Activity {
             String open = getIntent().getStringExtra(RemoteKeys.EXTRA_OPEN);
             if (RemoteKeys.INPUTS.equals(open)) openInputs();
             else if (RemoteKeys.RECENTS.equals(open)) openRecents();
+            else if (RemoteKeys.CONTROL.equals(open)) openControlCenter();
         });
     }
 
@@ -955,11 +955,25 @@ public class HomeActivity extends Activity {
 
     private void reloadApps() {
         endMove(false);
+        applyTileSizes();
         loadApps();
         buildAppViews();
         if (zone == Z_DOCK) focusDock(Math.min(dockIdx, dockCount - 1));
         else if (zone == Z_ALL) { if (allTile != null) focusAllTile(); else focusDock(dockCount - 1); }
         else if (zone == Z_GRID) focusGrid(Math.min(gridIdx, gridTiles.size() - 1));
+    }
+
+    /**
+     * The All apps grid as chosen, and banners prepared at the size of the largest focused tile: an All apps tile at
+     * 110%, or the dock's at 114%. Only a TV set to the bigger sizes pays for bigger banners.
+     */
+    private void applyTileSizes() {
+        gridCols = prefs.getInt("grid_cols", 6);
+        if (gridCols < 4 || gridCols > 6) gridCols = 6;
+        gridTileW = (GRID_WIDTH - (gridCols - 1) * GRID_GAP_X) / gridCols;
+        gridTileH = Math.round(gridTileW * 9 / 16f);
+        int dockW = dockSize() == 4 ? DOCK_4_W : DOCK_MAX_W;
+        AppEntry.setBannerSize(px(Math.max(gridTileW * 1.10f, dockW * 1.14f)), px(Math.max(gridTileH * 1.10f, dockW * 9 / 16f * 1.14f)));
     }
 
     /** One app tile: its banner (or icon) on a rounded card. */
@@ -1004,11 +1018,15 @@ public class HomeActivity extends Activity {
         dock.removeAllViews();
         dockTiles.clear();
         // The dock's apps and, when any are left over, the round All apps button share the band's width: seven
-        // apps are 106 dp wide, five 146, ten 73.
+        // apps are 106 dp wide, five 146, ten 73. Four are 198, too tall for the band, which grows upward to hold them.
         boolean more = apps.size() > dockCount;
         int n = dockSize();
         float inner = getResources().getDisplayMetrics().widthPixels / dp - 40 - 36;
-        float w = Math.min(DOCK_MAX_W, (inner - (more ? n * DOCK_GAP + ALL_BUTTON : (n - 1) * DOCK_GAP)) / n);
+        float w = Math.min(n == 4 ? DOCK_4_W : DOCK_MAX_W, (inner - (more ? n * DOCK_GAP + ALL_BUTTON : (n - 1) * DOCK_GAP)) / n);
+        ViewGroup.MarginLayoutParams band = (ViewGroup.MarginLayoutParams) dockBand.getLayoutParams();
+        band.height = px(n == 4 ? 132 : 104);
+        band.topMargin = px(n == 4 ? 386 : 414);
+        dockBand.setLayoutParams(band);
         float h = w * 9 / 16;
         for (int i = 0; i < dockCount; i++) {
             View t = appTile(apps.get(i), w, h);
@@ -1028,7 +1046,7 @@ public class HomeActivity extends Activity {
         LinearLayout row = null;
         for (int i = dockCount; i < apps.size(); i++) {
             int g = i - dockCount;
-            if (g % GRID_COLS == 0) {
+            if (g % gridCols == 0) {
                 row = new LinearLayout(this);
                 row.setOrientation(LinearLayout.HORIZONTAL);
                 row.setClipChildren(false);
@@ -1036,9 +1054,9 @@ public class HomeActivity extends Activity {
                 if (g > 0) rl.topMargin = px(GRID_GAP_Y);
                 grid.addView(row, rl);
             }
-            View t = appTile(apps.get(i), GRID_TILE_W, GRID_TILE_H);
+            View t = appTile(apps.get(i), gridTileW, gridTileH);
             LinearLayout.LayoutParams lp = (LinearLayout.LayoutParams) t.getLayoutParams();
-            if (g % GRID_COLS > 0) lp.leftMargin = px(GRID_GAP_X);
+            if (g % gridCols > 0) lp.leftMargin = px(GRID_GAP_X);
             row.addView(t, lp);
             gridTiles.add(t);
         }
@@ -1058,9 +1076,9 @@ public class HomeActivity extends Activity {
         int gridTop = gridTopDp();
         ((ViewGroup.MarginLayoutParams) allAppsLabel.getLayoutParams()).topMargin = px(gridTop - 40);
         ((ViewGroup.MarginLayoutParams) grid.getLayoutParams()).topMargin = px(gridTop);
-        int rows = (gridTiles.size() + GRID_COLS - 1) / GRID_COLS;
+        int rows = (gridTiles.size() + gridCols - 1) / gridCols;
         ViewGroup.LayoutParams plp = page.getLayoutParams();
-        plp.height = px(gridTop + rows * (GRID_TILE_H + GRID_GAP_Y) + 120);
+        plp.height = px(gridTop + rows * (gridTileH + GRID_GAP_Y) + 120);
         page.setLayoutParams(plp);
         allAppsLabel.requestLayout();
         grid.requestLayout();
@@ -1889,9 +1907,9 @@ public class HomeActivity extends Activity {
         if (gridTiles.isEmpty()) return;
         zone = Z_GRID;
         gridIdx = Math.max(0, Math.min(i, gridTiles.size() - 1));
-        int row = gridIdx / GRID_COLS;
+        int row = gridIdx / gridCols;
         int gridTop = gridTopDp();
-        float rowTop = gridTop + row * (GRID_TILE_H + GRID_GAP_Y);
+        float rowTop = gridTop + row * (gridTileH + GRID_GAP_Y);
         scrollPage(px(Math.max(gridTop - 96, rowTop - 190)));
         setFocus(gridTiles.get(gridIdx), moving ? 1.18f : 1.10f, 11);
         updateAmbient();
@@ -1927,9 +1945,9 @@ public class HomeActivity extends Activity {
     }
 
     /** Dock column (0–6) → grid column (0–5) and back, by position across the screen. */
-    private int dockToGridCol(int c) { return Math.round(c * (GRID_COLS - 1) / (float) Math.max(1, dockCount - 1)); }
+    private int dockToGridCol(int c) { return Math.round(c * (gridCols - 1) / (float) Math.max(1, dockCount - 1)); }
 
-    private int gridToDockCol(int c) { return Math.round(c * Math.max(0, dockCount - 1) / (float) (GRID_COLS - 1)); }
+    private int gridToDockCol(int c) { return Math.round(c * Math.max(0, dockCount - 1) / (float) (gridCols - 1)); }
 
     // ---------------------------------------------------------------- keys
 
@@ -2033,7 +2051,7 @@ public class HomeActivity extends Activity {
                 if (left) focusDock(dockTiles.size() - 1);
                 else if (up) { if (hasPicks) focusPicks(picksRow.anchor()); else focusTop(iconIdx); }
                 else if (down && !chanRows.isEmpty()) focusChan(0, chanCol[0]);
-                else if (down) focusGrid(GRID_COLS - 1);
+                else if (down) focusGrid(gridCols - 1);
                 break;
             case Z_CHAN: {
                 int n = chanRows.get(chanIdx).items.size(), c = chanCol[chanIdx];
@@ -2046,13 +2064,13 @@ public class HomeActivity extends Activity {
                 break;
             }
             case Z_GRID: {
-                int row = gridIdx / GRID_COLS, col = gridIdx % GRID_COLS;
+                int row = gridIdx / gridCols, col = gridIdx % gridCols;
                 if (left && col > 0) focusGrid(gridIdx - 1);
-                else if (right && col < GRID_COLS - 1 && gridIdx + 1 < gridTiles.size()) focusGrid(gridIdx + 1);
+                else if (right && col < gridCols - 1 && gridIdx + 1 < gridTiles.size()) focusGrid(gridIdx + 1);
                 else if (up && row == 0 && !chanRows.isEmpty()) focusChan(chanRows.size() - 1, chanCol[chanRows.size() - 1]);
                 else if (up && row == 0) focusDock(gridToDockCol(col));
-                else if (up) focusGrid(gridIdx - GRID_COLS);
-                else if (down && (row + 1) * GRID_COLS < gridTiles.size()) focusGrid(Math.min(gridIdx + GRID_COLS, gridTiles.size() - 1));
+                else if (up) focusGrid(gridIdx - gridCols);
+                else if (down && (row + 1) * gridCols < gridTiles.size()) focusGrid(Math.min(gridIdx + gridCols, gridTiles.size() - 1));
                 break;
             }
         }
@@ -2259,13 +2277,13 @@ public class HomeActivity extends Activity {
             else if (k == KeyEvent.KEYCODE_DPAD_RIGHT && ai < dockCount - 1) target = ai + 1;
             else if (k == KeyEvent.KEYCODE_DPAD_DOWN && gridSize > 0) target = dockCount + Math.min(dockToGridCol(ai), gridSize - 1);
         } else {
-            int g = ai - dockCount, row = g / GRID_COLS, col = g % GRID_COLS;
+            int g = ai - dockCount, row = g / gridCols, col = g % gridCols;
             if (k == KeyEvent.KEYCODE_DPAD_LEFT && col > 0) target = ai - 1;
-            else if (k == KeyEvent.KEYCODE_DPAD_RIGHT && col < GRID_COLS - 1 && ai + 1 < apps.size()) target = ai + 1;
+            else if (k == KeyEvent.KEYCODE_DPAD_RIGHT && col < gridCols - 1 && ai + 1 < apps.size()) target = ai + 1;
             else if (k == KeyEvent.KEYCODE_DPAD_UP && row == 0) target = Math.min(gridToDockCol(col), dockCount - 1);
-            else if (k == KeyEvent.KEYCODE_DPAD_UP) { target = ai - GRID_COLS; swap = false; }
-            else if (k == KeyEvent.KEYCODE_DPAD_DOWN && (row + 1) * GRID_COLS < gridSize) {
-                target = Math.min(ai + GRID_COLS, apps.size() - 1);
+            else if (k == KeyEvent.KEYCODE_DPAD_UP) { target = ai - gridCols; swap = false; }
+            else if (k == KeyEvent.KEYCODE_DPAD_DOWN && (row + 1) * gridCols < gridSize) {
+                target = Math.min(ai + gridCols, apps.size() - 1);
                 swap = false;
             }
         }
@@ -3333,6 +3351,9 @@ public class HomeActivity extends Activity {
         addRow("Open an app", null, () -> openKeyApps(code), false);
         addRow("Inputs", null, () -> setKey(code, RemoteKeys.INPUTS), false);
         addRow("Recent apps", null, () -> setKey(code, RemoteKeys.RECENTS), false);
+        addRow("Control Center", null, () -> setKey(code, RemoteKeys.CONTROL), false);
+        addRow("TV settings", null, () -> setKey(code, RemoteKeys.SETTINGS), false);
+        addRow("Wi-Fi", null, () -> setKey(code, RemoteKeys.WIFI), false);
         addRow("Talkies", null, () -> setKey(code, RemoteKeys.HOME), false);
         addRow("Do nothing", null, () -> setKey(code, RemoteKeys.NONE), false);
         if (RemoteKeys.action(this, code) != null) {
@@ -3350,6 +3371,9 @@ public class HomeActivity extends Activity {
         addRow("Open an app", null, () -> openKeyApps(code, true), false);
         addRow("Inputs", null, () -> setHold(code, RemoteKeys.INPUTS), false);
         addRow("Recent apps", null, () -> setHold(code, RemoteKeys.RECENTS), false);
+        addRow("Control Center", null, () -> setHold(code, RemoteKeys.CONTROL), false);
+        addRow("TV settings", null, () -> setHold(code, RemoteKeys.SETTINGS), false);
+        addRow("Wi-Fi", null, () -> setHold(code, RemoteKeys.WIFI), false);
         addRow("Talkies", null, () -> setHold(code, RemoteKeys.HOME), false);
         if (hold != null) addRow("Same as a press", null, () -> setHold(code, null), false);
         showMenu(420);
@@ -3822,10 +3846,31 @@ public class HomeActivity extends Activity {
         beginMenu(P_CONTROL, p.title);
         menuTile = z == Z_PICKS ? picksRow.anchorCard() : chanCards.get(r).get(c);
         menuClosed = () -> { if (z == Z_PICKS) focusPicks(anchor); else focusChan(r, c); };
+        addRow("Refresh Continue", null, this::refreshContinue, false);
         addRow("Remove from Continue", null, () -> removeFromContinue(p), false);
         Intent app = p.pkg == null ? null : pm.getLeanbackLaunchIntentForPackage(p.pkg);
         if (app != null) addRow("Open " + Channels.label(pm, p.pkg), null, () -> start(app), false);
         showMenu(320);
+    }
+
+    /** Reads what the apps have reported again, now: only as new as an app has told Android. */
+    private void refreshContinue() {
+        background.execute(() -> {
+            List<Trending.Pick> list = WatchNext.load(this);
+            runOnUiThread(() -> {
+                watchNextPicks = list;
+                refreshChannels();
+                recentPicks = continuePicks(RecentStore.load(this), watchNextPicks);
+                if (zone == Z_PICKS && tabIdx == 0) {
+                    int a = Math.max(0, Math.min(picksRow.anchor(), recentPicks.size() - 1));
+                    buildPicksRow(a);
+                    if (!rowPicks.isEmpty()) focusPicks(Math.min(a, rowPicks.size() - 1)); else focusDock(dockIdx);
+                } else if (tabIdx == 0) {
+                    buildPicksRow(0);
+                }
+                Toast.makeText(this, "Continue refreshed", Toast.LENGTH_SHORT).show();
+            });
+        });
     }
 
     /** "pkg / title / episode line": a new episode of the same show is a new key, so it comes back. */
@@ -4260,6 +4305,13 @@ public class HomeActivity extends Activity {
             if (n > DOCK_SIZES[DOCK_SIZES.length - 1]) n = DOCK_SIZES[0];
             prefs.edit().putInt("dock_size", n).apply();
             setStatus(ds[0], n + " apps");
+            reloadApps();
+        }, true);
+        final View[] gs = new View[1];
+        gs[0] = addRow("All apps size", gridCols + " across", () -> {
+            int n = gridCols == 4 ? 6 : gridCols - 1;
+            prefs.edit().putInt("grid_cols", n).apply();
+            setStatus(gs[0], n + " across");
             reloadApps();
         }, true);
         final View[] ao = new View[1];
@@ -5475,7 +5527,12 @@ public class HomeActivity extends Activity {
         focusDock(dockIdx);
         // A remote button set to "Inputs" (Control Center → Remote keys).
         String open = intent.getStringExtra(RemoteKeys.EXTRA_OPEN);
+        if (open != null) {   // the menu places itself by the top icons: not while the page is still gliding back up to them
+            pageSpring.snap(pageSpring.target);
+            page.setTranslationY(-pageSpring.value);
+        }
         if (RemoteKeys.INPUTS.equals(open)) root.post(this::openInputs);
         else if (RemoteKeys.RECENTS.equals(open)) root.post(this::openRecents);
+        else if (RemoteKeys.CONTROL.equals(open)) root.post(this::openControlCenter);
     }
 }

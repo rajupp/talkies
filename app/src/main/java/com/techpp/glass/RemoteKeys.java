@@ -17,7 +17,7 @@ import java.util.TreeMap;
  * Remote keys (Control Center → Remote keys): a button on the remote given another job, e.g. the Netflix button
  * opening JioHotstar. SleepService, Talkies' accessibility service, sees the press before the TV does and does
  * the job instead; buttons with no job pass through untouched. Kept in the "remote_keys" preferences as
- * key code → action: "app:<package>", "inputs", "home" or "none" ("k<code>"), and the job for holding the button
+ * key code → action: "app:<package>", "inputs", "recents", "control", "tv_settings", "wifi", "home" or "none" ("k<code>"), and the job for holding the button
  * ("h<code>"), which only a button with a press job can have: a press with no job has to reach the TV untouched,
  * and Talkies can't tell a press from a hold until the button is let go. An idea from Plume and CleanYourTV.
  *
@@ -26,7 +26,8 @@ import java.util.TreeMap;
  * can't clash with a key code. See {@link #id}.
  */
 final class RemoteKeys {
-    static final String INPUTS = "inputs", HOME = "home", NONE = "none", APP = "app:", RECENTS = "recents";
+    static final String INPUTS = "inputs", HOME = "home", NONE = "none", APP = "app:", RECENTS = "recents", CONTROL = "control",
+            SETTINGS = "tv_settings", WIFI = "wifi";
     static final String EXTRA_OPEN = "com.techpp.glass.OPEN";
 
     private RemoteKeys() { }
@@ -103,6 +104,9 @@ final class RemoteKeys {
         if (action == null) return "Normal";
         if (action.equals(INPUTS)) return "Inputs";
         if (action.equals(RECENTS)) return "Recent apps";
+        if (action.equals(CONTROL)) return "Control Center";
+        if (action.equals(SETTINGS)) return "TV settings";
+        if (action.equals(WIFI)) return "Wi-Fi";
         if (action.equals(HOME)) return "Talkies";
         if (action.equals(NONE)) return "Nothing";
         if (action.startsWith(APP)) return "Open " + Channels.label(c.getPackageManager(), action.substring(APP.length()));
@@ -114,7 +118,9 @@ final class RemoteKeys {
         try {
             if (action.equals(HOME)) {
                 s.openHome();
-            } else if (action.equals(INPUTS) || action.equals(RECENTS)) {
+            } else if (action.equals(SETTINGS) || action.equals(WIFI)) {
+                s.startActivity(settings(s, action).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
+            } else if (action.equals(INPUTS) || action.equals(RECENTS) || action.equals(CONTROL)) {
                 s.startActivity(new Intent(Intent.ACTION_MAIN).setClass(s, HomeActivity.class).putExtra(EXTRA_OPEN, action)
                         .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED));
             } else if (action.startsWith(APP)) {
@@ -131,6 +137,16 @@ final class RemoteKeys {
         } catch (RuntimeException e) {
             Log.w("GlassKeys", "Couldn't run " + action + ": " + e);
         }
+    }
+
+    /** The screen itself, else the TV's settings app, for TVs that hide the standard screens. */
+    private static Intent settings(Context c, String action) {
+        PackageManager pm = c.getPackageManager();
+        Intent wifi = new Intent(android.provider.Settings.ACTION_WIFI_SETTINGS);
+        if (action.equals(WIFI) && pm.resolveActivity(wifi, 0) != null) return wifi;
+        Intent i = new Intent(android.provider.Settings.ACTION_SETTINGS);
+        if (pm.resolveActivity(i, 0) != null) return i;
+        return new Intent(Intent.ACTION_MAIN).setClassName("com.android.tv.settings", "com.android.tv.settings.MainSettings");
     }
 
     static List<Integer> codes(Context c) { return new ArrayList<>(all(c).keySet()); }
