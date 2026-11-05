@@ -1843,7 +1843,7 @@ public class HomeActivity extends Activity {
 
     /** The section opens on Trending; if it had to fall back (no picks yet), switch back once they exist. */
     private void backToTrending() {
-        if (tabIdx != TAB_TRENDING && !trendPicks.isEmpty() && zone != Z_PICKS && zone != Z_TABS) {
+        if (!trendPicks.isEmpty() && (tabIdx != TAB_TRENDING || rowPicks.isEmpty()) && zone != Z_PICKS && zone != Z_TABS) {
             tabIdx = TAB_TRENDING;
             buildPicksRow(0);
         } else styleTop();
@@ -5642,6 +5642,8 @@ public class HomeActivity extends Activity {
             trendPicks = trending.cached(Trending.TRENDING);
             indiaPicks = trending.cached(Trending.INDIA);
             backToTrending();
+            savedPicksTries = 0;
+            if (trendPicks.isEmpty() && indiaPicks.isEmpty() && forYou) root.postDelayed(rereadSavedPicks, SAVED_PICKS_WAIT_S[0] * 1000L);
         }
         // Something new may have been watched while we were away.
         List<Trending.Pick> before = recentPicks;
@@ -5660,6 +5662,20 @@ public class HomeActivity extends Activity {
         }
     };
     private final Runnable rereadWatchNext = this::refreshWatchNext;
+
+    /** Storage can take a while after the TV starts, and a refresh needs internet: keep looking for the saved picks. */
+    private static final int[] SAVED_PICKS_WAIT_S = {2, 4, 8, 15, 30};
+    private int savedPicksTries;
+    private final Runnable rereadSavedPicks = () -> {
+        trendPicks = trending.cached(Trending.TRENDING);
+        indiaPicks = trending.cached(Trending.INDIA);
+        if (!trendPicks.isEmpty() || !indiaPicks.isEmpty()) {
+            Log.i(TAG, "Saved picks readable after " + (savedPicksTries + 1) + " tries");
+            backToTrending();
+        } else if (++savedPicksTries < SAVED_PICKS_WAIT_S.length) {
+            root.postDelayed(this.rereadSavedPicks, SAVED_PICKS_WAIT_S[savedPicksTries] * 1000L);
+        }
+    };
 
     /** At most this often for apps' rows: they change far more often than Watch Next, in bursts, card by card. */
     private static final long ROWS_MIN_GAP_MS = 60_000, ROWS_SETTLE_MS = 5_000;
@@ -5697,6 +5713,7 @@ public class HomeActivity extends Activity {
         getContentResolver().unregisterContentObserver(rowsChanged);
         root.removeCallbacks(rereadWatchNext);
         root.removeCallbacks(rereadRows);
+        root.removeCallbacks(rereadSavedPicks);
         rowsReadWaiting = false;
         unregisterReceiver(timeReceiver);
         unregisterReceiver(packageReceiver);

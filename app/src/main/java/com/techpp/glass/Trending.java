@@ -105,7 +105,7 @@ final class Trending {
     interface Listener { void onPicks(List<Pick> all); }
 
     private final Context ctx;
-    private final File dir;
+    private volatile File dir;
     private final SharedPreferences prefs;
     private final ExecutorService worker = Executors.newSingleThreadExecutor();
     /** For one refresh: several TMDB requests and image downloads at a time (set in fetch, shut down after). */
@@ -177,7 +177,14 @@ final class Trending {
         prefs.edit().putString("seen_languages", String.join(",", order)).apply();
     }
 
-    private File keyFile() { return new File(dir.getParentFile(), "tmdb_key.txt"); }
+    private File keyFile() {
+        // Right after the TV starts, its storage can be missing: find the real folder once it's there.
+        if (!dir.isAbsolute()) {
+            File base = ctx.getExternalFilesDir(null);
+            if (base != null) dir = new File(base, "trending");
+        }
+        return new File(dir.getParentFile(), "tmdb_key.txt");
+    }
 
     /**
      * Where picks come from: the TMDB key, StreamRadar (RADAR), or null: none. Outside India, the key. In India,
@@ -408,7 +415,7 @@ final class Trending {
 
         List<Pick> picks = new ArrayList<>(trend);
         picks.addAll(india);
-        save(downloadImages(picks));
+        saveWithImages(picks);
     }
 
     /**
@@ -491,7 +498,9 @@ final class Trending {
         Log.i(TAG, "StreamRadar: " + trend.size() + " trending, " + india.size() + " new");
         List<Pick> picks = new ArrayList<>(trend);
         picks.addAll(india);
-        save(downloadImages(picks));
+        // Its failed lists count as empty, so no picks at all means it couldn't be reached: keep what's saved.
+        if (picks.isEmpty()) throw new IOException("StreamRadar gave no picks");
+        saveWithImages(picks);
     }
 
     /** Films and series taken in turn. */
@@ -808,6 +817,13 @@ final class Trending {
     private static JSONArray tag(JSONArray a, String kind) throws Exception {
         for (int i = 0; i < a.length(); i++) a.getJSONObject(i).put("_kind", kind);
         return a;
+    }
+
+    /** Replaces the saved picks, unless no picture could be fetched: then the network failed, and they stay. */
+    private void saveWithImages(List<Pick> picks) throws Exception {
+        List<Pick> ready = downloadImages(picks);
+        if (ready.isEmpty() && !picks.isEmpty()) throw new IOException("No pictures could be fetched");
+        save(ready);
     }
 
     private void save(List<Pick> picks) throws Exception {

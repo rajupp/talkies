@@ -12,6 +12,12 @@ features, a new fix number only fixes. The version shows in Talkies settings →
 - **Cricket is on to start only where it's widely followed.** Elsewhere, Talkies settings → Sports turns it on. If you
   already chose your sports, nothing changes. An idea from codermert.
 
+### Fixed
+- **For You keeps its cards offline.** With StreamRadar, a refresh with no internet could wipe the saved picks and leave
+  the row blank for hours, even once back online. Now they stay, and Talkies tries again.
+- **For You after a restart.** If the TV's storage is slow to start, Talkies keeps looking for the saved picks and shows
+  them, without waiting for the internet.
+
 ## 1.2.9 — 5 November 2026
 
 ### New
