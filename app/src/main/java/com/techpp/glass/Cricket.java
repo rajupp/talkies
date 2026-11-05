@@ -309,7 +309,7 @@ final class Cricket {
             // Live, or starting or finished today (a Test that began days ago is still on).
             if (!m.live && !m.paused && (at == null || !today.equals(new SimpleDateFormat("yyyy-MM-dd", Locale.US).format(at)))) continue;
             m.start = m.live || m.paused || m.ended || at == null ? null
-                    : new SimpleDateFormat("h:mm a", Locale.US).format(at).toLowerCase(Locale.ROOT);
+                    : new SimpleDateFormat("HH:mm", Locale.US).format(at).toLowerCase(Locale.ROOT);
             m.t1 = o.optString("t1");
             m.t2 = o.optString("t2");
             m.s1 = o.optString("s1");

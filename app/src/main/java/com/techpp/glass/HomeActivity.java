@@ -86,7 +86,8 @@ public class HomeActivity extends Activity {
     // Where focus is.
     private static final int Z_TOP = 0, Z_TABS = 1, Z_PICKS = 2, Z_DOCK = 3, Z_GRID = 4, Z_MENU = 5, Z_CHAN = 6, Z_ALL = 7;
     private static final int P_CONTROL = 0, P_INPUTS = 1, P_WIFI = 2, P_SETTINGS = 3, P_BELL = 4;
-    private static final String[] TAB_IDS = {RecentStore.TAB, Trending.TRENDING, Trending.INDIA};
+    private static final String[] TAB_IDS = {RecentStore.TAB, Trending.TRENDING, Trending.INDIA, Discover.POPULAR, Discover.UPCOMING, Discover.ARTISTS};
+    private static final int TAB_INDIA = 2, TAB_POPULAR = 3, TAB_UPCOMING = 4, TAB_ARTISTS = 5;
     private static final int TAB_TRENDING = 1, MAX_CONTINUE = 16, MAX_YOUTUBE = 2, MAX_YOUTUBE_RECENT = 4;
     private static final long DAY_MS = 24 * 3600_000L;
     /** How many apps the dock holds (Talkies settings → Dock size); the tiles shrink or grow to fit. */
@@ -150,6 +151,8 @@ public class HomeActivity extends Activity {
 
     // Picks for the three tabs, and what the row shows now.
     private Trending trending;
+    private Discover discover;
+    private List<Trending.Pick> popularPicks = new ArrayList<>(), upcomingPicks = new ArrayList<>(), artistPicks = new ArrayList<>();
     private Weather weather;
     private Cricket cricket;
     private Football football;
@@ -207,7 +210,14 @@ public class HomeActivity extends Activity {
     private Boolean wasOnline;
     private View forYouHead, bigClock;
     private TextView picksHint;
-    private TextView bigTime, bigAmPm, bigDate, bigWeather;
+    private TextView bigTime, bigAmPm, bigDate, bigWeather, pickCounter, dockLabel;
+    private ForecastWidget forecastWidget;
+    private long lastInput;
+    /** First run with no cache yet: until then (a little while) the picks row shows shimmering placeholders. */
+    private long skeletonUntil;
+    private boolean skeletonShown, revealNext;
+    /** How long each pick stays large before the row slides on by itself. */
+    private static final long SLIDE_MS = 7000;
     private View bigRule;
     private boolean inFront;
 
@@ -292,18 +302,41 @@ public class HomeActivity extends Activity {
         moveHint = findViewById(R.id.move_hint);
         picksRow = findViewById(R.id.picks);
         picksHint = findViewById(R.id.picks_hint);
+        pickCounter = findViewById(R.id.pick_counter);
         ring = findViewById(R.id.ring);
         ring.setAlways(prefs.getBoolean("focus_ring", false));
-        tabs = new TextView[]{findViewById(R.id.tab_recent), findViewById(R.id.tab_trending), findViewById(R.id.tab_india)};
+        tabs = new TextView[]{findViewById(R.id.tab_recent), findViewById(R.id.tab_trending), findViewById(R.id.tab_india),
+                findViewById(R.id.tab_best), findViewById(R.id.tab_upcoming), findViewById(R.id.tab_artists)};
         icons = new ImageView[]{findViewById(R.id.icon_cc), findViewById(R.id.icon_inputs), findViewById(R.id.icon_wifi),
                 findViewById(R.id.icon_settings), findViewById(R.id.icon_bell)};
         Updates.setListener(this::onUpdates);
         onUpdates();
         picksRow.setOnFrame(this::snapRing);
+        picksRow.setOverlayFactory(this::overlayFor);
+        // Widgets: a forecast pill under the header, and the focused dock app's name under its tile.
+        forecastWidget = new ForecastWidget(this);
+        FrameLayout.LayoutParams fl = new FrameLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, px(38),
+                Gravity.END | Gravity.TOP);
+        fl.topMargin = px(92);
+        fl.setMarginEnd(px(40));
+        ((FrameLayout) findViewById(R.id.page)).addView(forecastWidget, fl);
+        dockLabel = new TextView(this);
+        dockLabel.setTypeface(Faces.outfit(this, 600));
+        dockLabel.setTextSize(12);
+        dockLabel.setLetterSpacing(0.06f);
+        dockLabel.setSingleLine(true);
+        dockLabel.setAlpha(0f);
+        FrameLayout.LayoutParams dl = new FrameLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT,
+                Gravity.BOTTOM | Gravity.START);
+        dl.bottomMargin = px(9);
+        dockBand.addView(dockLabel, dl);
+        ((LinearLayout) dock).setPadding(0, 0, 0, px(20));
 
         applyTileSizes();
         AppEntry.customDir = new File(getExternalFilesDir(null), "tiles");
         trending = new Trending(this);
+        discover = new Discover(this);
+        skeletonUntil = android.os.SystemClock.uptimeMillis() + 22_000;
         weather = new Weather(this);
         bing = new Bing(this, background);
         cricket = new Cricket(this);
@@ -320,14 +353,112 @@ public class HomeActivity extends Activity {
         buildPicksRow(0);
         applyTheme();
         applyForYou();
+        // Still nothing after the placeholders' time: say why instead of shimmering on.
+        root.postDelayed(() -> { if (skeletonShown && rowPicks.isEmpty()) buildPicksRow(0); }, 22_500);
         dockIdx = Math.min(prefs.getInt("last_dock_col", 0), Math.max(0, dockCount - 1));
         root.post(() -> {
             focusDock(dockIdx);
             openFromKey(getIntent().getStringExtra(RemoteKeys.EXTRA_OPEN));
         });
+        if (introWanted(state)) showIntro();
     }
 
     private int px(float v) { return Math.round(v * dp); }
+
+    // ---------------------------------------------------------------- opening animation
+
+    private View introView;
+
+    /** A cold start from the launcher, not Home finding Talkies running, and not a remote-key or backup launch. */
+    private boolean introWanted(Bundle saved) {
+        Intent in = getIntent();
+        return saved == null && prefs.getBoolean("intro", true) && in != null
+                && in.getStringExtra(RemoteKeys.EXTRA_OPEN) == null
+                && !in.getBooleanExtra("talkies_backup", false) && !in.getBooleanExtra("talkies_restore", false);
+    }
+
+    /**
+     * The name drawn in over a dark screen with a light passing over it and a curve drawing itself underneath, then
+     * the home screen showing through (about 2.3 s). It sits still while it plays: the home screen is already built
+     * under it, and every step is a fade, a slide or one short stroke, which a slow TV can keep up with.
+     */
+    private void showIntro() {
+        final FrameLayout o = new FrameLayout(this);
+        o.setBackgroundColor(0xFF08090C);
+        o.setClickable(true);
+        o.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS);
+        LinearLayout col = new LinearLayout(this);
+        col.setOrientation(LinearLayout.VERTICAL);
+        col.setGravity(Gravity.CENTER_HORIZONTAL);
+
+        final FrameLayout word = new FrameLayout(this);
+        word.setPadding(px(24), px(4), px(24), px(4));
+        TextView name = new TextView(this);
+        name.setText("Talkies");
+        name.setTextSize(68);
+        name.setTextColor(0xFFF5F5F7);
+        name.setTypeface(Faces.outfit(this, 800));
+        name.setLetterSpacing(-0.02f);
+        name.setIncludeFontPadding(false);
+        word.addView(name, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+        final View sweep = new View(this);
+        sweep.setBackground(new GradientDrawable(GradientDrawable.Orientation.LEFT_RIGHT, new int[]{0x00FFFFFF, 0x66FFFFFF, 0x00FFFFFF}));
+        // A fixed height: MATCH_PARENT inside a wrapping parent would measure as tall as the whole screen.
+        word.addView(sweep, new FrameLayout.LayoutParams(px(130), px(82), Gravity.CENTER_VERTICAL));
+        col.addView(word, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+
+        final OpeningArc arc = new OpeningArc(this);
+        LinearLayout.LayoutParams al = new LinearLayout.LayoutParams(px(250), px(26));
+        al.topMargin = px(2);
+        col.addView(arc, al);
+
+        final TextView by = new TextView(this);
+        by.setText("by " + DEV_NAME);
+        by.setTextSize(14);
+        by.setLetterSpacing(0.14f);
+        by.setTextColor(0xFFA1A1A6);
+        by.setTypeface(Faces.outfit(this, 500));
+        LinearLayout.LayoutParams bl = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        bl.topMargin = px(14);
+        col.addView(by, bl);
+        o.addView(col, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT, Gravity.CENTER));
+        ((ViewGroup) root).addView(o, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+        introView = o;
+
+        word.setAlpha(0f);
+        word.setScaleX(0.9f);
+        word.setScaleY(0.9f);
+        by.setAlpha(0f);
+        by.setTranslationY(px(6));
+        sweep.setAlpha(0f);
+        final android.view.animation.Interpolator out = new android.view.animation.DecelerateInterpolator(1.6f);
+        word.animate().alpha(1f).scaleX(1f).scaleY(1f).setStartDelay(150).setDuration(620).setInterpolator(out).withLayer().start();
+        android.animation.ValueAnimator draw = android.animation.ValueAnimator.ofFloat(0f, 1f);
+        draw.setStartDelay(560);
+        draw.setDuration(780);
+        draw.setInterpolator(new android.view.animation.AccelerateDecelerateInterpolator());
+        draw.addUpdateListener(a -> arc.setProgress((Float) a.getAnimatedValue()));
+        draw.start();
+        word.post(() -> {
+            sweep.setTranslationX(-px(150));
+            sweep.setAlpha(1f);
+            sweep.animate().translationX(word.getWidth() + px(20)).setStartDelay(880).setDuration(760)
+                    .setInterpolator(new android.view.animation.AccelerateDecelerateInterpolator()).withLayer().start();
+        });
+        by.animate().alpha(1f).translationY(0f).setStartDelay(820).setDuration(480).setInterpolator(out).withLayer().start();
+        o.animate().alpha(0f).scaleX(1.05f).scaleY(1.05f).setStartDelay(1900).setDuration(460)
+                .setInterpolator(new android.view.animation.AccelerateInterpolator(1.2f)).withLayer()
+                .withEndAction(() -> { ((ViewGroup) root).removeView(o); if (introView == o) introView = null; }).start();
+    }
+
+    /** Fades the opening animation out now (a button was pressed). */
+    private void endIntro(boolean quick) {
+        final View o = introView;
+        if (o == null) return;
+        o.animate().cancel();
+        o.animate().alpha(0f).setDuration(quick ? 160 : 450).setStartDelay(0)
+                .withEndAction(() -> { ((ViewGroup) root).removeView(o); if (introView == o) introView = null; }).start();
+    }
 
     // ---------------------------------------------------------------- theme
 
@@ -373,23 +504,25 @@ public class HomeActivity extends Activity {
         allAppsLabel.setTextColor(theme.text);
         picksHint.setTextColor(theme.text2);
         credit.setTextColor((theme.text2 & 0x00FFFFFF) | 0x99000000);
-        GradientDrawable band = new GradientDrawable();
-        band.setCornerRadius(px(30));
-        band.setColor(theme.band);
+        // A glass shelf: lighter along the top edge, fading down, with a fine rim.
+        GradientDrawable band = new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM,
+                day ? new int[]{0xC8FFFFFF, 0x80FFFFFF} : new int[]{0x2EFFFFFF, 0x0DFFFFFF});
+        band.setCornerRadius(px(32));
         band.setStroke(px(1), theme.bandStroke);
         dockBand.setBackground(band);
         moveHint.setTextColor(theme.text);
         moveHint.setBackground(rounded(theme.menuBg, theme.menuStroke, 14));
         ring.setDay(day);
         for (int i = 0; i < picksRow.getChildCount(); i++) stylePickText(picksRow.getChildAt(i));
+        updateCounter();
         styleChannels();
         // Card backgrounds and match cards are drawn in the theme's colours: redraw the rows.
         if (cricket != null && zone != Z_CHAN && !chanRows.isEmpty()) {
             chanSignature = "";
             showChannels(appChannels);
         }
-        for (View t : dockTiles) t.setBackground(rounded(theme.tileBg, 0, 11));
-        for (View t : gridTiles) t.setBackground(rounded(theme.tileBg, 0, 11));
+        for (View t : dockTiles) t.setBackground(rounded(theme.tileBg, 0, 14));
+        for (View t : gridTiles) t.setBackground(rounded(theme.tileBg, 0, 14));
         styleTop();
         updateInfo();
     }
@@ -456,10 +589,95 @@ public class HomeActivity extends Activity {
             boolean selected = i == tabIdx, f = zone == Z_TABS && selected;
             tabs[i].setVisibility(picksFor(i).isEmpty() ? View.GONE : View.VISIBLE);
             tabs[i].setTextColor(f ? theme.iconFocusFg : selected ? theme.text : theme.text2);
-            tabs[i].setFontVariationSettings(selected ? "'wght' 600" : "'wght' 400");
-            tabs[i].setBackground(f ? rounded(theme.iconFocusBg, 0, 15) : null);
+            tabs[i].setTypeface(Faces.outfit(this, selected ? 600 : 400));
+            tabs[i].setBackground(f ? rounded(theme.iconFocusBg, 0, 15) : selected ? tabUnderline() : null);
         }
         credit.setVisibility(!forYou || tabIdx == 0 || rowPicks.isEmpty() ? View.GONE : View.VISIBLE);
+        updateDockLabel();
+        if (zone != lastZone) {
+            lastZone = zone;
+            // Leaving or entering the picks: the slide timer starts over, with a full interval on the clock.
+            root.removeCallbacks(this.autoSlide);
+            root.postDelayed(this.autoSlide, SLIDE_MS);
+            restartBar();
+        }
+    }
+
+    private int lastZone = -1;
+
+    /** A short line under the tab you are on, in the launcher's text colour. */
+    private Drawable tabUnderline() {
+        GradientDrawable line = new GradientDrawable();
+        line.setColor(theme.text);
+        line.setCornerRadius(px(2));
+        android.graphics.drawable.LayerDrawable l = new android.graphics.drawable.LayerDrawable(new Drawable[]{line});
+        l.setLayerInset(0, px(12), px(27), px(12), 0);
+        return l;
+    }
+
+    /** The large pick moves on by itself while you rest on the dock or the tabs; any key press holds it a moment. */
+    private final Runnable autoSlide = () -> {
+        root.postDelayed(this.autoSlide, SLIDE_MS);
+        if (!slidingNow() || android.os.SystemClock.uptimeMillis() - lastInput < 2500) return;
+        int next = (picksRow.anchor() + 1) % rowPicks.size();
+        picksRow.setAnchor(next, true);
+        updatePickImages(next);
+        updateAmbient();
+        updateCounter();
+        restartBar();
+    };
+
+    private boolean slidingNow() {
+        return inFront && forYou && tabIdx != 0 && rowPicks.size() > 1 && !moving
+                && (zone == Z_TOP || zone == Z_TABS || zone == Z_DOCK || zone == Z_ALL);
+    }
+
+    /** The thin line along the large card's foot fills over SLIDE_MS, so you can see when the next pick comes. */
+    private void restartBar() {
+        for (int i = 0; i < picksRow.getChildCount(); i++) {
+            View bar = picksRow.getChildAt(i).findViewWithTag("autobar");
+            if (bar == null) continue;
+            bar.animate().cancel();
+            bar.setScaleX(0f);
+            if (i == picksRow.anchor() && slidingNow()) {
+                bar.animate().scaleX(1f).setDuration(SLIDE_MS).setInterpolator(new android.view.animation.LinearInterpolator()).start();
+            }
+        }
+    }
+
+    /** "03 / 12" at the end of the tabs: where you are in the row. */
+    private void updateCounter() {
+        int n = rowPicks.size();
+        if (!forYou || n < 2) {
+            pickCounter.setVisibility(View.GONE);
+            return;
+        }
+        String cur = String.format(Locale.US, "%02d", picksRow.anchor() + 1);
+        SpannableStringBuilder b = new SpannableStringBuilder(cur + String.format(Locale.US, " / %02d", n));
+        b.setSpan(new ForegroundColorSpan(theme.text), 0, cur.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+        b.setSpan(new StyleSpan(Typeface.BOLD), 0, cur.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+        b.setSpan(new ForegroundColorSpan(theme.text2), cur.length(), b.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+        pickCounter.setTypeface(Faces.outfit(this, 600));
+        pickCounter.setText(b);
+        pickCounter.setVisibility(View.VISIBLE);
+    }
+
+    /** The name of the focused dock app, under its tile. */
+    private void updateDockLabel() {
+        if (dockLabel == null) return;
+        boolean show = zone == Z_DOCK && !moving && dockIdx < dockTiles.size() && dockIdx < apps.size();
+        if (!show) {
+            dockLabel.animate().alpha(0f).setDuration(120).start();
+            return;
+        }
+        dockLabel.setText(apps.get(dockIdx).label);
+        dockLabel.setTextColor(theme.text);
+        dockLabel.measure(0, 0);
+        View t = dockTiles.get(dockIdx);
+        float x = t.getLeft() + t.getWidth() / 2f - dockLabel.getMeasuredWidth() / 2f;
+        float max = Math.max(px(12), dockBand.getWidth() - dockLabel.getMeasuredWidth() - px(12));
+        dockLabel.setTranslationX(Math.max(px(12), Math.min(x, max)));
+        dockLabel.animate().alpha(1f).setDuration(160).start();
     }
 
     /**
@@ -502,7 +720,7 @@ public class HomeActivity extends Activity {
     /** "1:05 PM · Wed 21 Oct · 27° Showers", the time a little stronger. */
     private void updateInfo() {
         Calendar now = Calendar.getInstance();
-        String time = DateFormat.format(DateFormat.is24HourFormat(this) ? "HH:mm" : "h:mm a", now).toString();
+        String time = DateFormat.format("HH:mm", now).toString();
         SpannableStringBuilder b = new SpannableStringBuilder(time);
         b.setSpan(new ForegroundColorSpan(theme.text), 0, time.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
         b.setSpan(new StyleSpan(Typeface.BOLD), 0, time.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
@@ -510,15 +728,19 @@ public class HomeActivity extends Activity {
         if (weatherLine != null) b.append("  ·  ").append(weatherLine);
         info.setTextColor(theme.text2);
         info.setText(b);
-        boolean h24 = DateFormat.is24HourFormat(this);
-        bigTime.setText(DateFormat.format(h24 ? "HH:mm" : "h:mm", now));
-        bigAmPm.setText(h24 ? "" : DateFormat.format("a", now));
-        bigAmPm.setVisibility(h24 ? View.GONE : View.VISIBLE);
+        bigTime.setText(DateFormat.format("HH:mm", now));   // 24-hour, always: 19:03, not 7:03 PM
+        bigAmPm.setText("");
+        bigAmPm.setVisibility(View.GONE);
         bigDate.setText(DateFormat.format("EEEE  d MMMM", now));
-        bigWeather.setText(weatherLine == null ? "" : weatherLine);
+        String city = cityName();
+        bigWeather.setText(weatherLine == null ? "" : (city == null ? "" : city + "  \u00b7  ") + weatherLine);
         weatherIcon();
         if (meters.getVisibility() == View.VISIBLE) meters.update();
         bigWeather.setVisibility(weatherLine == null ? View.GONE : View.VISIBLE);
+        List<String[]> days = weather.forecast(true);
+        String today = days.isEmpty() ? null : days.get(0)[1].split("  ")[0];
+        if (forYou) forecastWidget.update(weather.forecast(false), today, theme.text, theme.text2, theme.iconBg, theme.iconStroke);
+        else forecastWidget.setVisibility(View.GONE);
         updateScore();
     }
 
@@ -601,7 +823,6 @@ public class HomeActivity extends Activity {
         score.setText(b);
         score.setTextColor(theme.text);
         score.setVisibility(View.VISIBLE);
-        credit.setAlpha(0f);  // the score sits where the TMDB credit goes; TMDB is credited in the README too
     }
 
     // ---------------------------------------------------------------- now playing on Home (an idea from Home Deck, MIT)
@@ -679,7 +900,7 @@ public class HomeActivity extends Activity {
      * cost frames, and Full elsewhere. An idea from Aerial (aerial-tv, MIT), which does the same on low-memory TVs.
      */
     private boolean liteEffects() {
-        String e = prefs.getString("effects", "auto");
+        String e = prefs.getString("effects", "full");
         if (!e.equals("auto")) return e.equals("lite");
         ActivityManager am = getSystemService(ActivityManager.class);
         ActivityManager.MemoryInfo mi = new ActivityManager.MemoryInfo();
@@ -856,7 +1077,7 @@ public class HomeActivity extends Activity {
 
     /** An arrow press in Auto · Full on a TV not yet judged: time the next half second of frames, while things glide. */
     private void sampleSmoothness() {
-        if (lite || prefs.contains("slow_tv") || !prefs.getString("effects", "auto").equals("auto")) return;
+        if (lite || prefs.contains("slow_tv") || !prefs.getString("effects", "full").equals("auto")) return;
         boolean running = android.os.SystemClock.uptimeMillis() < sampleUntil;
         sampleUntil = android.os.SystemClock.uptimeMillis() + 500;
         if (!running) {
@@ -884,7 +1105,7 @@ public class HomeActivity extends Activity {
     }
 
     private String effectsLabel() {
-        String e = prefs.getString("effects", "auto");
+        String e = prefs.getString("effects", "full");
         return e.equals("full") ? "Full" : e.equals("lite") ? "Lite" : liteEffects() ? "Auto · Lite" : "Auto · Full";
     }
     /** How All apps is arranged (Talkies settings → All apps order). The dock always keeps your order. */
@@ -1016,8 +1237,8 @@ public class HomeActivity extends Activity {
     /** One app tile: its banner (or icon) on a rounded card. */
     private View appTile(AppEntry app, float wDp, float hDp) {
         FrameLayout card = new FrameLayout(this);
-        card.setBackground(rounded(theme.tileBg, 0, 11));
-        final float r = px(11);
+        card.setBackground(rounded(theme.tileBg, 0, 14));
+        final float r = px(14);
         card.setOutlineProvider(new ViewOutlineProvider() {
             @Override public void getOutline(View v, Outline o) { o.setRoundRect(0, 0, v.getWidth(), v.getHeight(), r); }
         });
@@ -1270,8 +1491,7 @@ public class HomeActivity extends Activity {
             title.setTag("chanTitle");
             title.setText(ch.title);
             title.setTextSize(16);
-            title.setTypeface(getResources().getFont(R.font.outfit));
-            title.setFontVariationSettings("'wght' 550");
+            title.setTypeface(Faces.outfit(this, 550));
             header.addView(title);
             row.addView(header, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, px(28)));
 
@@ -1311,8 +1531,7 @@ public class HomeActivity extends Activity {
             name.setSingleLine(true);
             name.setEllipsize(android.text.TextUtils.TruncateAt.END);
             name.setTextSize(15);
-            name.setTypeface(getResources().getFont(R.font.outfit));
-            name.setFontVariationSettings("'wght' 600");
+            name.setTypeface(Faces.outfit(this, 600));
             caption.addView(name);
             TextView meta = new TextView(this);
             meta.setTag("meta");
@@ -1426,8 +1645,7 @@ public class HomeActivity extends Activity {
         name.setTag("cricketText");
         name.setText(team);
         name.setTextSize(15);
-        name.setTypeface(getResources().getFont(R.font.outfit));
-        name.setFontVariationSettings("'wght' 600");
+        name.setTypeface(Faces.outfit(this, 600));
         name.setTextColor(theme.text);
         line.addView(name, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1));
         TextView sc = new TextView(this);
@@ -1435,8 +1653,7 @@ public class HomeActivity extends Activity {
         sc.setText(runs);
         sc.setSingleLine(true);
         sc.setTextSize(14);
-        sc.setTypeface(getResources().getFont(R.font.outfit));
-        sc.setFontVariationSettings("'wght' 500");
+        sc.setTypeface(Faces.outfit(this, 500));
         sc.setTextColor(theme.text);
         line.addView(sc);
         LinearLayout.LayoutParams ll = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, px(26));
@@ -1460,9 +1677,25 @@ public class HomeActivity extends Activity {
         recentPicks = continuePicks(RecentStore.load(this), watchNextPicks);
         trendPicks = trending.cached(Trending.TRENDING);
         indiaPicks = trending.cached(Trending.INDIA);
+        loadDiscover();
     }
 
-    private List<Trending.Pick> picksFor(int t) { return t == 0 ? recentPicks : t == 1 ? trendPicks : indiaPicks; }
+    private void loadDiscover() {
+        popularPicks = discover.cached(Discover.POPULAR);
+        upcomingPicks = discover.cached(Discover.UPCOMING);
+        artistPicks = discover.cached(Discover.ARTISTS);
+    }
+
+    private List<Trending.Pick> picksFor(int t) {
+        switch (t) {
+            case 0: return recentPicks;
+            case 1: return trendPicks;
+            case TAB_INDIA: return indiaPicks;
+            case TAB_POPULAR: return popularPicks;
+            case TAB_UPCOMING: return upcomingPicks;
+            default: return artistPicks;
+        }
+    }
 
     /**
      * Continue: what apps put on Android's Watch Next list (Netflix, Prime Video…, opening the right episode) plus what
@@ -1539,23 +1772,64 @@ public class HomeActivity extends Activity {
         if (picksFor(tabIdx).isEmpty()) {
             for (int t = 0; t < TAB_IDS.length; t++) if (!picksFor(t).isEmpty()) { tabIdx = t; break; }
         }
-        rowPicks = tabIdx == 0 ? picksFor(0) : rotated(picksFor(tabIdx));
+        // Ranked tabs start at number 1; only "New in" still moves its start through the day.
+        rowPicks = tabIdx == TAB_INDIA ? rotated(picksFor(tabIdx))
+                : tabIdx == 0 ? picksFor(0) : new ArrayList<>(picksFor(tabIdx).subList(0, Math.min(15, picksFor(tabIdx).size())));
+        if (rowPicks.isEmpty() && Keys.read(this, Keys.TMDB) != null && android.os.SystemClock.uptimeMillis() < skeletonUntil) {
+            // Nothing cached yet and the lists are on their way: shimmering cards, not an empty gap.
+            List<View> placeholders = new ArrayList<>();
+            for (int i = 0; i < 7; i++) placeholders.add(skeletonItem(i == 0));
+            picksRow.setItems(placeholders, 0);
+            picksRow.setVisibility(View.VISIBLE);
+            skeletonShown = true;
+            updateCounter();
+            showPicksHint();
+            styleTop();
+            return;
+        }
+        final boolean wasSkeleton = skeletonShown;
+        skeletonShown = false;
         StringBuilder from = new StringBuilder();
         if (tabIdx == 0) for (Trending.Pick p : rowPicks) from.append(' ').append(p.pkg.substring(p.pkg.lastIndexOf('.') + 1));
         Log.i(TAG, "row " + TAB_IDS[tabIdx] + ": " + rowPicks.size() + " cards" + from);
         List<View> views = new ArrayList<>();
-        for (Trending.Pick p : rowPicks) views.add(pickView(p));
+        List<Trending.Pick> ranked = picksFor(tabIdx);
+        // The first cards at once (the large one and those beside it), the rest a few frames later: building all
+        // fifteen in one go held the UI thread for 25-45 ms on every tab change.
+        final int gen = ++rowGen;
+        final int first = Math.min(rowPicks.size(), Math.max(6, anchor + 6));
+        final boolean ranks = tabIdx == TAB_TRENDING || tabIdx == TAB_POPULAR;
+        for (int i = 0; i < first; i++) views.add(pickView(rowPicks.get(i), ranks ? ranked.indexOf(rowPicks.get(i)) + 1 : 0));
         picksRow.setItems(views, anchor);
         updatePickImages(picksRow.anchor());
+        if (first < rowPicks.size()) picksRow.post(() -> buildRest(first, gen, ranked, ranks));
+        updateCounter();
+        restartBar();
         picksRow.setVisibility(rowPicks.isEmpty() ? View.INVISIBLE : View.VISIBLE);
         showPicksHint();
         styleTop();
         updateAmbient();
+        if (revealNext || wasSkeleton) revealRow();
+        revealNext = false;
+        prefetchNeighbors();
+    }
+
+    private int rowGen;
+
+    /** The cards after the first few, four a frame, unless the row was rebuilt meanwhile. */
+    private void buildRest(int from, int gen, List<Trending.Pick> ranked, boolean ranks) {
+        if (gen != rowGen || from >= rowPicks.size()) return;
+        int to = Math.min(rowPicks.size(), from + 4);
+        List<View> more = new ArrayList<>();
+        for (int i = from; i < to; i++) more.add(pickView(rowPicks.get(i), ranks ? ranked.indexOf(rowPicks.get(i)) + 1 : 0));
+        picksRow.appendItems(more);
+        updatePickImages(picksRow.anchor());
+        if (to < rowPicks.size()) picksRow.post(() -> buildRest(to, gen, ranked, ranks));
     }
 
     /** Nothing to show yet: say why, rather than leave a gap. Without a TMDB key only Continue ever fills. */
     private void showPicksHint() {
-        boolean show = forYou && rowPicks.isEmpty();
+        boolean show = forYou && rowPicks.isEmpty() && !skeletonShown;
         picksHint.setVisibility(show ? View.VISIBLE : View.GONE);
         if (!show) return;
         boolean radar = Trending.RADAR.equals(trending.source());
@@ -1570,13 +1844,17 @@ public class HomeActivity extends Activity {
     }
 
     /** A pick: the image card (with a progress bar when the app shares one), its title, and a description line. */
-    private View pickView(Trending.Pick p) {
+    private View pickView(Trending.Pick p, int rank) {
         LinearLayout item = new LinearLayout(this);
         item.setOrientation(LinearLayout.VERTICAL);
         item.setClipChildren(false);
         FrameLayout card = new FrameLayout(this);
-        card.setBackground(rounded(theme.tileBg, 0, 14));
-        final float r = px(14);
+        // A shimmering placeholder until the picture is decoded (loadInto stops it).
+        Shimmer shimmer = new Shimmer(theme.tileBg, shimmerHighlight(), px(20));
+        card.setBackground(shimmer);
+        card.setTag(R.id.shimmer, shimmer);
+        shimmer.start();
+        final float r = px(20);
         card.setOutlineProvider(new ViewOutlineProvider() {
             @Override public void getOutline(View v, Outline o) { o.setRoundRect(0, 0, v.getWidth(), v.getHeight(), r); }
         });
@@ -1585,7 +1863,10 @@ public class HomeActivity extends Activity {
         ImageView back = new ImageView(this);
         back.setTag("backdrop");
         back.setScaleType(ImageView.ScaleType.CENTER_CROP);
-        if (p.image == null || !p.image.isFile()) showAppLogo(card, back, p.pkg);
+        if (p.image == null || !p.image.isFile()) {
+            showAppLogo(card, back, p.pkg);
+            stopShimmer(card);
+        }
         card.addView(back, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
         ImageView poster = new ImageView(this);
         poster.setTag("poster");
@@ -1608,6 +1889,21 @@ public class HomeActivity extends Activity {
             tl.setMargins(px(14), 0, px(14), px(12));
             card.addView(track, tl);
         }
+        if (rank > 0) {
+            RankNumber num = new RankNumber(this, rank);
+            num.setTag("rank");
+            FrameLayout.LayoutParams nl = new FrameLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT,
+                    Gravity.BOTTOM | Gravity.START);
+            nl.leftMargin = px(4);
+            nl.bottomMargin = px(-2);
+            card.addView(num, nl);
+        } else if (Discover.UPCOMING.equals(p.tab)) {
+            TextView day = dateChip(p);
+            day.setTag("rank");   // fades with the rank numbers: only on the small cards
+            FrameLayout.LayoutParams dl = new FrameLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, px(22), Gravity.BOTTOM | Gravity.START);
+            dl.setMargins(px(10), 0, 0, px(10));
+            card.addView(day, dl);
+        }
         item.addView(card, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, px(PicksRow.CARD_H)));
         TextView name = new TextView(this);
         name.setTag("name");
@@ -1615,27 +1911,172 @@ public class HomeActivity extends Activity {
         name.setSingleLine(true);
         name.setEllipsize(android.text.TextUtils.TruncateAt.END);
         name.setTextSize(16);
-        name.setTypeface(getResources().getFont(R.font.outfit));
-        name.setFontVariationSettings("'wght' 600");
+        name.setTypeface(Faces.outfit(this, 600));
         LinearLayout.LayoutParams nl = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
         nl.topMargin = px(9);
         nl.leftMargin = px(2);
         item.addView(name, nl);
-        TextView meta = new TextView(this);
-        meta.setTag("meta");
-        meta.setText(p.meta);
-        meta.setSingleLine(true);
-        meta.setEllipsize(android.text.TextUtils.TruncateAt.END);
-        meta.setTextSize(12.5f);
-        meta.setTypeface(getResources().getFont(R.font.outfit));
-        meta.setFontVariationSettings("'wght' 400");
-        meta.setAlpha(0f);
-        LinearLayout.LayoutParams ml = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-        ml.topMargin = px(2);
-        ml.leftMargin = px(2);
-        item.addView(meta, ml);
         stylePickText(item);
         return item;
+    }
+
+    /**
+     * What the large card shows on its picture: a glass tag for the tab, a pink bar and the line of detail above the
+     * title, and an Open pill. Hidden on the small cards (PicksRow fades it by size).
+     */
+    /** The overlay for the pick at this place in the row, built only when it becomes the large card. */
+    private View overlayFor(int index) {
+        if (index < 0 || index >= rowPicks.size()) return null;
+        Trending.Pick p = rowPicks.get(index);
+        int rank = tabIdx == TAB_TRENDING || tabIdx == TAB_POPULAR ? picksFor(tabIdx).indexOf(p) + 1 : 0;
+        return featureOverlay(p, rank);
+    }
+
+    private View featureOverlay(Trending.Pick p, int rank) {
+        // Popular, Upcoming and Artists picks: the poster sits on the right of the picture (Discover.render), the words on the left.
+        boolean wide = Discover.PKG.equals(p.pkg);
+        FrameLayout o = new FrameLayout(this);
+        o.setTag("overlay");
+        o.setAlpha(0f);
+        View shade = new View(this);
+        shade.setBackground(new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM,
+                new int[]{0x660B0B0E, 0x000B0B0E, 0xB3101013, 0xF50A0A0C}));
+        o.addView(shade, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+
+        LinearLayout chip = new LinearLayout(this);
+        chip.setGravity(Gravity.CENTER_VERTICAL);
+        chip.setPadding(px(10), 0, px(11), 0);
+        chip.setBackground(rounded(0x29FFFFFF, 0x4DFFFFFF, 13));
+        View dot = new View(this);
+        dot.setBackground(rounded(0xFFF5F5F7, 0, 4));
+        chip.addView(dot, new LinearLayout.LayoutParams(px(7), px(7)));
+        TextView chipText = overlayText(tabs[tabIdx].getText().toString().toUpperCase(), 10.5f, 0xFFFFFFFF, 800);
+        chipText.setLetterSpacing(0.14f);
+        LinearLayout.LayoutParams ctl = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        ctl.leftMargin = px(7);
+        chip.addView(chipText, ctl);
+        // Top left: the tab's tag and, on Upcoming, the release date beside it.
+        LinearLayout topRow = new LinearLayout(this);
+        topRow.setGravity(Gravity.CENTER_VERTICAL);
+        topRow.addView(chip, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, px(26)));
+        if (Discover.UPCOMING.equals(p.tab)) {
+            LinearLayout.LayoutParams wl = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, px(26));
+            wl.leftMargin = px(8);
+            topRow.addView(dateChip(p), wl);
+        }
+        FrameLayout.LayoutParams cl = new FrameLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT, Gravity.TOP | Gravity.START);
+        cl.setMargins(px(16), px(14), 0, 0);
+        o.addView(topRow, cl);
+
+        // Top right: the rank on a ranked tab (gold, silver and bronze for the first three).
+        if (rank > 0) {
+            TextView r = overlayText("#" + rank, 12, rankColor(rank), 900);
+            r.setGravity(Gravity.CENTER);
+            r.setPadding(px(11), 0, px(11), 0);
+            r.setBackground(rounded(0x29FFFFFF, (rankColor(rank) & 0x00FFFFFF) | 0x80000000, 13));
+            FrameLayout.LayoutParams rl = new FrameLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, px(26), Gravity.TOP | Gravity.END);
+            rl.setMargins(0, px(14), px(16), 0);
+            o.addView(r, rl);
+        }
+
+        LinearLayout copy = new LinearLayout(this);
+        copy.setOrientation(LinearLayout.VERTICAL);
+        LinearLayout kicker = new LinearLayout(this);
+        kicker.setGravity(Gravity.CENTER_VERTICAL);
+        View kbar = new View(this);
+        kbar.setBackgroundColor(0x99FFFFFF);
+        kicker.addView(kbar, new LinearLayout.LayoutParams(px(18), px(2)));
+        TextView kt = overlayText(p.meta == null ? "" : p.meta.toUpperCase(), wide ? 9.5f : 10.5f, 0xFFC7C7CC, 800);
+        kt.setLetterSpacing(0.12f);
+        kt.setEllipsize(android.text.TextUtils.TruncateAt.END);
+        LinearLayout.LayoutParams ktl = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        ktl.leftMargin = px(8);
+        kicker.addView(kt, ktl);
+        copy.addView(kicker);
+        TextView title = overlayText(p.title, wide ? 21 : 25, 0xFFFFFFFF, 800);
+        title.setSingleLine(false);
+        title.setMaxLines(2);
+        title.setEllipsize(android.text.TextUtils.TruncateAt.END);
+        title.setLetterSpacing(-0.015f);
+        title.setShadowLayer(px(6), 0, px(2), 0x99000000);
+        LinearLayout.LayoutParams tl = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        tl.topMargin = px(6);
+        copy.addView(title, tl);
+
+        AppEntry app = appFor(p.pkg);
+        String pillText = wide ? "Details" : app == null ? "Open" : "Open in " + app.label;
+        TextView pill = null;
+        if (pillText != null) {
+            pill = overlayText(pillText, 12, 0xFF111113, 800);
+            pill.setEllipsize(android.text.TextUtils.TruncateAt.END);
+            pill.setMaxWidth(px(150));
+            pill.setPadding(px(14), 0, px(14), 0);
+            pill.setGravity(Gravity.CENTER);
+            pill.setBackground(rounded(0xFFF5F5F7, 0, 18));   // the launcher's own focused-button look
+        }
+        if (wide) {
+            if (pill != null) {
+                LinearLayout.LayoutParams pl2 = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, px(32));
+                pl2.topMargin = px(10);
+                copy.addView(pill, pl2);
+            }
+            FrameLayout.LayoutParams cpl = new FrameLayout.LayoutParams(px(PicksRow.LARGE_W * 0.56f), ViewGroup.LayoutParams.WRAP_CONTENT,
+                    Gravity.BOTTOM | Gravity.START);
+            cpl.setMargins(px(18), 0, 0, px(16));
+            o.addView(copy, cpl);
+        } else {
+            FrameLayout.LayoutParams cpl = new FrameLayout.LayoutParams(px(PicksRow.LARGE_W - 32 - 128), ViewGroup.LayoutParams.WRAP_CONTENT,
+                    Gravity.BOTTOM | Gravity.START);
+            cpl.setMargins(px(18), 0, 0, px(16));
+            o.addView(copy, cpl);
+            FrameLayout.LayoutParams pl = new FrameLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, px(34), Gravity.BOTTOM | Gravity.END);
+            pl.setMargins(0, 0, px(16), px(18));
+            o.addView(pill, pl);
+        }
+        // The line along the foot that fills while the row waits to slide on (restartBar).
+        View bar = new View(this);
+        bar.setTag("autobar");
+        bar.setBackgroundColor(0xE6FFFFFF);
+        bar.setPivotX(0);
+        bar.setScaleX(0f);
+        o.addView(bar, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, px(3), Gravity.BOTTOM));
+        return o;
+    }
+
+    /** The first three ranks in the site's gold, silver and bronze; the rest in white. */
+    private static int rankColor(int rank) {
+        return rank == 1 ? 0xFFFFD24A : rank == 2 ? 0xFFD9DCE6 : rank == 3 ? 0xFFE0915A : 0xFFFFFFFF;
+    }
+
+    /** "30 OCT" on a glass chip, or "TONIGHT" in the brand gradient: on an event's small card. */
+    private TextView dateChip(Trending.Pick p) {
+        java.util.Calendar a = java.util.Calendar.getInstance(), b = java.util.Calendar.getInstance();
+        b.setTimeInMillis(p.at);
+        boolean tonight = a.get(java.util.Calendar.YEAR) == b.get(java.util.Calendar.YEAR)
+                && a.get(java.util.Calendar.DAY_OF_YEAR) == b.get(java.util.Calendar.DAY_OF_YEAR);
+        TextView t = overlayText(tonight ? "TODAY" : new java.text.SimpleDateFormat("d MMM", Locale.US).format(new java.util.Date(p.at)).toUpperCase(),
+                10, 0xFFFFFFFF, 900);
+        t.setLetterSpacing(0.08f);
+        t.setGravity(Gravity.CENTER);
+        t.setPadding(px(9), 0, px(9), 0);
+        if (tonight) {
+            t.setTextColor(0xFF111113);
+            t.setBackground(rounded(0xFFF5F5F7, 0, 11));
+        } else {
+            t.setBackground(rounded(0x40FFFFFF, 0x59FFFFFF, 11));
+        }
+        return t;
+    }
+
+    private TextView overlayText(String text, float sp, int color, int weight) {
+        TextView t = new TextView(this);
+        t.setText(text);
+        t.setTextSize(sp);
+        t.setTextColor(color);
+        t.setSingleLine(true);
+        t.setIncludeFontPadding(false);
+        t.setTypeface(Faces.outfit(this, weight));
+        return t;
     }
 
     /**
@@ -1650,6 +2091,9 @@ public class HomeActivity extends Activity {
             ImageView back = item.findViewWithTag("backdrop"), poster = item.findViewWithTag("poster");
             if (back == null || poster == null) continue;
             boolean large = i == anchor, usePoster = !large && p.poster != null && p.poster.isFile();
+            // Only the cards that are, or are about to be, on screen: the rest wait until the row slides toward them.
+            if (i < anchor - 2 || i > anchor + 6) continue;
+            if (i == anchor + 1 || i == anchor + 2) Images.prefetch(p.image, 1);   // the next large cards
             if (usePoster) loadInto(poster, p.poster, 1, null);
             boolean hasImage = p.image != null && p.image.isFile();
             // Becoming the large card: the poster stays until the landscape picture is decoded (it was let go while
@@ -1703,8 +2147,9 @@ public class HomeActivity extends Activity {
     }
 
     /**
-     * Decodes `file` at 1/`sample` size in the background and shows it, unless it's already showing; then runs `shown`
-     * (if any), also when it was already there or couldn't be decoded.
+     * Shows `file` at 1/`sample` size, unless it's already showing: at once when it was decoded before, else after
+     * a background decode, fading in over the card's placeholder; then runs `shown` (if any), also when it was
+     * already there or couldn't be decoded.
      */
     private void loadInto(ImageView v, File file, int sample, Runnable shown) {
         String want = file.getName() + "@" + sample;
@@ -1714,14 +2159,93 @@ public class HomeActivity extends Activity {
             return;
         }
         v.setTag(R.id.img_state, want);
-        background.execute(() -> {
-            Bitmap b = decode(file, sample);
-            runOnUiThread(() -> {
-                if (!want.equals(v.getTag(R.id.img_state))) return;
-                if (b != null) v.setImageBitmap(b);
-                if (shown != null) shown.run();
-            });
+        Bitmap hit = Images.peek(file, sample);
+        if (hit != null) {
+            showBitmap(v, hit, false);
+            if (shown != null) shown.run();
+            return;
+        }
+        Images.load(file, sample, b -> {
+            if (!want.equals(v.getTag(R.id.img_state))) return;
+            if (b != null) showBitmap(v, b, true);
+            if (shown != null) shown.run();
         });
+    }
+
+    private void showBitmap(ImageView v, Bitmap b, boolean fade) {
+        if (fade) {
+            android.graphics.drawable.TransitionDrawable td = new android.graphics.drawable.TransitionDrawable(new Drawable[]{
+                    new android.graphics.drawable.ColorDrawable(0), new android.graphics.drawable.BitmapDrawable(getResources(), b)});
+            v.setImageDrawable(td);
+            td.startTransition(220);
+        } else {
+            v.setImageBitmap(b);
+        }
+        android.view.ViewParent parent = v.getParent();
+        if (parent instanceof View) {
+            final View card = (View) parent;
+            if (fade) card.postDelayed(() -> stopShimmer(card), 260); else stopShimmer(card);
+        }
+    }
+
+    /** Ends a card's placeholder shimmer and gives it its plain tile colour. */
+    private void stopShimmer(View card) {
+        Object sh = card.getTag(R.id.shimmer);
+        if (!(sh instanceof Shimmer)) return;
+        ((Shimmer) sh).stop();
+        card.setTag(R.id.shimmer, null);
+        if (!(card.getBackground() instanceof GradientDrawable)) card.setBackground(rounded(theme.tileBg, 0, 20));
+    }
+
+    private int shimmerHighlight() { return day ? 0x80FFFFFF : 0x22FFFFFF; }
+
+    /** One placeholder item of the loading row: a shimmering card (large for the first) and a title bar under it. */
+    private View skeletonItem(boolean large) {
+        LinearLayout item = new LinearLayout(this);
+        item.setOrientation(LinearLayout.VERTICAL);
+        item.setClipChildren(false);
+        FrameLayout card = new FrameLayout(this);
+        Shimmer sh = new Shimmer(theme.tileBg, shimmerHighlight(), px(20));
+        card.setBackground(sh);
+        sh.start();
+        item.addView(card, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, px(PicksRow.CARD_H)));
+        View bar = new View(this);
+        Shimmer bs = new Shimmer(theme.tileBg, shimmerHighlight(), px(6));
+        bar.setBackground(bs);
+        bs.start();
+        LinearLayout.LayoutParams bl = new LinearLayout.LayoutParams(px(large ? 230 : 84), px(14));
+        bl.topMargin = px(14);
+        bl.leftMargin = px(2);
+        item.addView(bar, bl);
+        return item;
+    }
+
+    /** The row coming in: a short fade and rise, on a hardware layer so it costs the main thread nothing. */
+    private void revealRow() {
+        picksRow.animate().cancel();
+        picksRow.setAlpha(0f);
+        picksRow.setTranslationY(px(10));
+        picksRow.animate().alpha(1f).translationY(0f).setDuration(240)
+                .setInterpolator(new android.view.animation.DecelerateInterpolator()).withLayer().start();
+    }
+
+    /** Decodes the first cards of the neighbouring tabs a moment after a tab settles, so switching to them is instant. */
+    private final Runnable prefetchTask = () -> {
+        for (int d : new int[]{1, -1, 2}) {
+            int t = tabIdx + d;
+            if (t < 0 || t >= TAB_IDS.length) continue;
+            List<Trending.Pick> list = picksFor(t);
+            for (int i = 0; i < Math.min(5, list.size()); i++) {
+                Trending.Pick p = list.get(i);
+                if (i == 0) Images.prefetch(p.image, 1);
+                Images.prefetch(p.poster, 1);
+            }
+        }
+    };
+
+    private void prefetchNeighbors() {
+        root.removeCallbacks(prefetchTask);
+        root.postDelayed(prefetchTask, 900);
     }
 
     /** Runs `shown` once `v` has its picture (checked every frame or so, for a second at most). */
@@ -1851,6 +2375,13 @@ public class HomeActivity extends Activity {
         trendPicks = trending.cached(Trending.TRENDING);
         indiaPicks = trending.cached(Trending.INDIA);
         if (zone != Z_PICKS && zone != Z_TABS) { tabIdx = TAB_TRENDING; buildPicksRow(0); } else styleTop();
+    }
+
+    /** The Popular, Upcoming and Artists lists arrived (or were refreshed): redraw the row if it is showing one of them. */
+    private void onDiscover() {
+        loadDiscover();
+        if (zone != Z_PICKS && (tabIdx >= TAB_POPULAR || rowPicks.isEmpty())) buildPicksRow(0);
+        else styleTop();
     }
 
     /** The section opens on Trending; if it had to fall back (no picks yet), switch back once they exist. */
@@ -1992,6 +2523,7 @@ public class HomeActivity extends Activity {
         scrollPage(0);
         if (t != tabIdx) {
             tabIdx = t;
+            revealNext = true;
             buildPicksRow(0);
         }
         setFocus(null, 1f, 0);
@@ -2006,7 +2538,9 @@ public class HomeActivity extends Activity {
         picksRow.setAnchor(i, moved);
         updatePickImages(i);
         updateAmbient();
-        setFocus(picksRow.anchorCard(), 1.04f, 14);
+        updateCounter();
+        restartBar();
+        setFocus(picksRow.anchorCard(), 1.04f, 20);
         styleTop();
         followRing(moved ? 360 : 220);
     }
@@ -2017,7 +2551,7 @@ public class HomeActivity extends Activity {
         dockIdx = Math.max(0, Math.min(i, dockTiles.size() - 1));
         prefs.edit().putInt("last_dock_col", dockIdx).apply();
         scrollPage(0);
-        setFocus(dockTiles.get(dockIdx), moving ? 1.22f : 1.14f, 11);
+        setFocus(dockTiles.get(dockIdx), moving ? 1.22f : 1.14f, 14);
         updateAmbient();
         styleTop();
         followRing(260);
@@ -2039,7 +2573,7 @@ public class HomeActivity extends Activity {
         int gridTop = gridTopDp();
         float rowTop = gridTop + row * (gridTileH + GRID_GAP_Y);
         scrollPage(px(Math.max(gridTop - 96, rowTop - 190)));
-        setFocus(gridTiles.get(gridIdx), moving ? 1.18f : 1.10f, 11);
+        setFocus(gridTiles.get(gridIdx), moving ? 1.18f : 1.10f, 14);
         updateAmbient();
         styleTop();
         followRing(420);
@@ -2081,6 +2615,11 @@ public class HomeActivity extends Activity {
 
     @Override
     public boolean dispatchKeyEvent(KeyEvent e) {
+        lastInput = android.os.SystemClock.uptimeMillis();
+        if (introView != null) {   // any button skips the opening animation
+            if (e.getAction() == KeyEvent.ACTION_DOWN && e.getRepeatCount() == 0) endIntro(true);
+            return true;
+        }
         int k = e.getKeyCode();
         boolean select = k == KeyEvent.KEYCODE_DPAD_CENTER || k == KeyEvent.KEYCODE_ENTER
                 || k == KeyEvent.KEYCODE_NUMPAD_ENTER || k == KeyEvent.KEYCODE_BUTTON_A;
@@ -2278,6 +2817,10 @@ public class HomeActivity extends Activity {
 
     /** Opens a pick or channel card: through the app's own link to that title when it gave one, else the app. */
     private void openPick(Trending.Pick p) {
+        if (Discover.PKG.equals(p.pkg)) {
+            showDiscoverQr(p);
+            return;
+        }
         if ("watchnext".equals(p.kind)) RecentStore.noteOpened(this, p);
         if (p.intentUri != null) {
             try {
@@ -2483,8 +3026,7 @@ public class HomeActivity extends Activity {
             h.setText(heading);
             h.setTextSize(13);
             h.setTextColor(theme.text2);
-            h.setTypeface(getResources().getFont(R.font.outfit));
-            h.setFontVariationSettings("'wght' 500");
+            h.setTypeface(Faces.outfit(this, 500));
             h.setPadding(px(14), px(8), px(14), px(6));
             menu.addView(h);
         }
@@ -2494,9 +3036,9 @@ public class HomeActivity extends Activity {
      * Outfit's weights for the layouts' text, as (view id, weight) pairs. They're set here rather than in the layouts
      * because the layout attribute only works from Android 9, while this call works from Android 8.
      */
-    private static void weigh(java.util.function.IntFunction<View> find, int... idWeight) {
+    private void weigh(java.util.function.IntFunction<View> find, int... idWeight) {
         for (int i = 0; i < idWeight.length; i += 2)
-            ((TextView) find.apply(idWeight[i])).setFontVariationSettings("'wght' " + idWeight[i + 1]);
+            ((TextView) find.apply(idWeight[i])).setTypeface(Faces.outfit(this, idWeight[i + 1]));
     }
 
     /** A row with a label, an optional status on the right, and what OK does. */
@@ -3018,8 +3560,7 @@ public class HomeActivity extends Activity {
         t.setTextColor(color);
         t.setSingleLine(true);
         t.setEllipsize(android.text.TextUtils.TruncateAt.END);
-        t.setTypeface(getResources().getFont(R.font.outfit));
-        t.setFontVariationSettings("'wght' " + weight);
+        t.setTypeface(Faces.outfit(this, weight));
         return t;
     }
 
@@ -3187,6 +3728,50 @@ public class HomeActivity extends Activity {
         focusMenu(focus);
     }
 
+    /** Cities on the list: name and "lat,lon". Turkish cities first, then Indulge's and other big ones. */
+    private static final String[][] CITIES = {
+            {"Istanbul", "41.0082,28.9784"}, {"Ankara", "39.9334,32.8597"}, {"Izmir", "38.4237,27.1428"},
+            {"Antalya", "36.8969,30.7133"}, {"Bursa", "40.1885,29.0610"}, {"Bodrum", "37.0344,27.4305"},
+            {"Barcelona", "41.3874,2.1686"}, {"Madrid", "40.4168,-3.7038"}, {"Valencia", "39.4699,-0.3763"},
+            {"Ibiza", "38.9067,1.4206"}, {"Porto", "41.1579,-8.6291"}, {"Lisbon", "38.7223,-9.1393"},
+            {"Munich", "48.1351,11.5820"}, {"Berlin", "52.5200,13.4050"}, {"Hamburg", "53.5511,9.9937"},
+            {"Amsterdam", "52.3676,4.9041"}, {"Rotterdam", "51.9244,4.4777"}, {"London", "51.5074,-0.1278"},
+            {"Paris", "48.8566,2.3522"}, {"Rome", "41.9028,12.4964"}, {"Dubai", "25.2048,55.2708"},
+            {"New York", "40.7128,-74.0060"},
+    };
+
+    /** The list city the weather area is set to, or null when it was typed or sent from a phone. */
+    private String cityName() {
+        String n = prefs.getString("city_name", null), a = prefs.getString("city_area", null);
+        return n != null && a != null && a.equals(Keys.read(this, Keys.LOCATION)) ? n : null;
+    }
+
+    /** Talkies settings → Weather city: pick from the list; OK on a city sets the weather area and the name shown. */
+    private void openCityPicker(int focus) {
+        beginMenu(settingsAt, "Weather city");
+        String area = Keys.read(this, Keys.LOCATION);
+        final View[] rows = new View[CITIES.length];
+        for (int i = 0; i < CITIES.length; i++) {
+            final int row = i;
+            rows[i] = addRow(CITIES[i][0], CITIES[i][1].equals(area) ? "Selected" : null, () -> {
+                if (!Keys.write(this, Keys.LOCATION, CITIES[row][1])) {
+                    Toast.makeText(this, "Couldn't save the city", Toast.LENGTH_SHORT).show();
+                    return;
+                }
+                prefs.edit().putString("city_name", CITIES[row][0]).putString("city_area", CITIES[row][1]).apply();
+                for (int j = 0; j < rows.length; j++) setStatus(rows[j], j == row ? "Selected" : null);
+                weatherLine = null;   // the old temperature was for the old city
+                updateInfo();
+                Toast.makeText(this, CITIES[row][0] + ". The weather follows in a moment", Toast.LENGTH_SHORT).show();
+                refreshOnline();
+            }, true);
+        }
+        addRow("Another place…", null, () -> askText("Weather location", "A town or area, like \"Camden, London\", or latitude,longitude, like "
+                + "\"51.54,-0.14\".", area, false, area != null, this::saveLocation), true);
+        showMenu(380);
+        focusMenu(focus);
+    }
+
     /** A one-line text box over the home screen. Save hands back the text; Remove (or saving it empty) hands back "". */
     private void askText(String title, String help, String current, boolean code, boolean canRemove,
                          java.util.function.Consumer<String> onSave) {
@@ -3245,6 +3830,7 @@ public class HomeActivity extends Activity {
     }
 
     private void saveLocation(String text) {
+        prefs.edit().remove("city_name").remove("city_area").apply();   // a typed place has no list name
         if (!Keys.write(this, Keys.LOCATION, text)) {
             Toast.makeText(this, "Couldn't save the location", Toast.LENGTH_SHORT).show();
             return;
@@ -3339,9 +3925,146 @@ public class HomeActivity extends Activity {
         return code;
     }
 
+    /** OK on a Popular, Upcoming or Artists pick: its TMDB page as a QR code, since a TV has no easy way to open a link. */
+    private void showDiscoverQr(Trending.Pick p) {
+        String url = p.intentUri != null && !p.intentUri.isEmpty() ? p.intentUri : "https://www.themoviedb.org/";
+        LinearLayout box = new LinearLayout(this);
+        box.setOrientation(LinearLayout.VERTICAL);
+        box.setGravity(Gravity.CENTER_HORIZONTAL);
+        box.setPadding(px(24), px(8), px(24), 0);
+        box.addView(qrCode(url), new LinearLayout.LayoutParams(px(190), px(190)));
+        TextView where = new TextView(this);
+        where.setText(p.title);
+        where.setTextSize(12);
+        where.setGravity(Gravity.CENTER);
+        where.setPadding(0, px(8), 0, 0);
+        box.addView(where);
+        new android.app.AlertDialog.Builder(this, android.R.style.Theme_DeviceDefault_Dialog_Alert)
+                .setTitle("Details on your phone")
+                .setMessage("Scan this with your phone's camera to open it on TMDB.")
+                .setView(box)
+                .setNegativeButton("Close", null)
+                .show();
+    }
+
     private static final String SUPPORT_URL = "https://buymeacoffee.com/rajupp";
 
     /** About → Support Talkies: the Buy Me a Coffee page as a QR code, since a TV has no easy way to open a link. */
+    private static final String DEV_NAME = "codermert", DEV_GITHUB = "https://github.com/codermert";
+
+    /**
+     * Talkies settings → Developer: a round photo, the name and a GitHub button. OK on the button opens the profile
+     * in a browser; a TV with none (Google TV only has a stub that sends you to the store) shows the page as a QR
+     * code to scan with a phone instead.
+     */
+    private void showDeveloper() {
+        LinearLayout box = new LinearLayout(this);
+        box.setOrientation(LinearLayout.VERTICAL);
+        box.setGravity(Gravity.CENTER_HORIZONTAL);
+        box.setPadding(px(28), px(8), px(28), px(4));
+
+        FrameLayout ring = new FrameLayout(this);
+        GradientDrawable rg = new GradientDrawable();
+        rg.setShape(GradientDrawable.OVAL);
+        rg.setColor(0);
+        rg.setStroke(px(2), 0x66FFFFFF);
+        ring.setBackground(rg);
+        ImageView photo = new ImageView(this);
+        photo.setImageResource(R.drawable.developer);
+        photo.setScaleType(ImageView.ScaleType.CENTER_CROP);
+        photo.setContentDescription(DEV_NAME);
+        photo.setOutlineProvider(new ViewOutlineProvider() {
+            @Override public void getOutline(View v, Outline o) { o.setOval(0, 0, v.getWidth(), v.getHeight()); }
+        });
+        photo.setClipToOutline(true);
+        FrameLayout.LayoutParams pl = new FrameLayout.LayoutParams(px(104), px(104), Gravity.CENTER);
+        ring.addView(photo, pl);
+        box.addView(ring, new LinearLayout.LayoutParams(px(116), px(116)));
+
+        TextView label = new TextView(this);
+        label.setText("DEVELOPER");
+        label.setTextSize(11);
+        label.setLetterSpacing(0.18f);
+        label.setTextColor(0xFFA1A1A6);
+        label.setTypeface(Faces.outfit(this, 600));
+        LinearLayout.LayoutParams ll = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        ll.topMargin = px(14);
+        box.addView(label, ll);
+        TextView name = new TextView(this);
+        name.setText(DEV_NAME);
+        name.setTextSize(24);
+        name.setTextColor(0xFFF5F5F7);
+        name.setTypeface(Faces.outfit(this, 700));
+        box.addView(name, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+
+        // The GitHub button: the launcher's own white pill with the GitHub mark, a little larger when focused.
+        LinearLayout button = new LinearLayout(this);
+        button.setOrientation(LinearLayout.HORIZONTAL);
+        button.setGravity(Gravity.CENTER);
+        button.setPadding(px(22), 0, px(26), 0);
+        button.setBackground(rounded(0xFFF5F5F7, 0, 22));
+        button.setFocusable(true);
+        button.setClickable(true);
+        button.setContentDescription("GitHub: " + DEV_NAME);
+        ImageView mark = new ImageView(this);
+        mark.setImageResource(R.drawable.ic_github);
+        button.addView(mark, new LinearLayout.LayoutParams(px(22), px(22)));
+        TextView gh = new TextView(this);
+        gh.setText("GitHub");
+        gh.setTextSize(15);
+        gh.setTextColor(0xFF111113);
+        gh.setTypeface(Faces.outfit(this, 700));
+        LinearLayout.LayoutParams gl = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        gl.leftMargin = px(10);
+        button.addView(gh, gl);
+        button.setOnFocusChangeListener((v, focused) -> v.animate().scaleX(focused ? 1.07f : 1f).scaleY(focused ? 1.07f : 1f).setDuration(140).start());
+        LinearLayout.LayoutParams bl = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, px(44));
+        bl.topMargin = px(18);
+        box.addView(button, bl);
+
+        android.app.AlertDialog dialog = new android.app.AlertDialog.Builder(this, android.R.style.Theme_DeviceDefault_Dialog_Alert)
+                .setView(box)
+                .setNegativeButton("Close", null)
+                .create();
+        button.setOnClickListener(v -> { dialog.dismiss(); openGithub(); });
+        // The dialog's own buttons take the first focus when it opens: put it on GitHub once it is up.
+        dialog.setOnShowListener(d -> button.requestFocus());
+        dialog.show();
+        if (dialog.getWindow() != null) dialog.getWindow().setBackgroundDrawable(rounded(theme.menuBg, theme.menuStroke, 20));
+    }
+
+    /** The developer's GitHub page in a browser, or, where the TV has none, as a QR code. */
+    private void openGithub() {
+        Intent i = new Intent(Intent.ACTION_VIEW, Uri.parse(DEV_GITHUB)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+        android.content.pm.ResolveInfo r = pm.resolveActivity(i, PackageManager.MATCH_DEFAULT_ONLY);
+        boolean browser = r != null && r.activityInfo != null && !r.activityInfo.packageName.contains("frameworkpackagestubs");
+        Log.i(TAG, "GitHub button: " + (browser ? "opening " + r.activityInfo.packageName : "no browser, showing the QR code"));
+        if (browser) {
+            try {
+                startActivity(i);
+                return;
+            } catch (RuntimeException e) {
+                Log.w(TAG, "Couldn't open GitHub: " + e);
+            }
+        }
+        LinearLayout box = new LinearLayout(this);
+        box.setOrientation(LinearLayout.VERTICAL);
+        box.setGravity(Gravity.CENTER_HORIZONTAL);
+        box.setPadding(px(24), px(8), px(24), 0);
+        box.addView(qrCode(DEV_GITHUB), new LinearLayout.LayoutParams(px(190), px(190)));
+        TextView where = new TextView(this);
+        where.setText("github.com/" + DEV_NAME);
+        where.setTextSize(13);
+        where.setPadding(0, px(8), 0, 0);
+        box.addView(where);
+        new android.app.AlertDialog.Builder(this, android.R.style.Theme_DeviceDefault_Dialog_Alert)
+                .setTitle("GitHub")
+                .setMessage("This TV has no web browser. Scan this with your phone to open the page.")
+                .setView(box)
+                .setNegativeButton("Close", null)
+                .show();
+    }
+
     private void showSupport() {
         LinearLayout box = new LinearLayout(this);
         box.setOrientation(LinearLayout.VERTICAL);
@@ -4441,6 +5164,7 @@ public class HomeActivity extends Activity {
         // it shows, the apps and inputs, the remote and power, and Talkies itself.
         int missing = setupMissing();
         if (missing > 0) addRow("Finish setup", missing + (missing == 1 ? " step left" : " steps left"), this::openFinishSetup, false);
+        addRow("Developer", DEV_NAME, this::showDeveloper, true);
         addMenuHeading("Look");
         final View[] look = new View[1];
         look[0] = addRow("Appearance", APPEARANCE[prefs.getInt("appearance", 0)], () -> {
@@ -4508,12 +5232,18 @@ public class HomeActivity extends Activity {
         final View[] fx = new View[1];
         fx[0] = addRow("Effects", effectsLabel(), () -> {
             String[] order = {"auto", "full", "lite"};
-            String next = order[(Arrays.asList(order).indexOf(prefs.getString("effects", "auto")) + 1) % order.length];
+            String next = order[(Arrays.asList(order).indexOf(prefs.getString("effects", "full")) + 1) % order.length];
             prefs.edit().putString("effects", next).apply();
             lite = liteEffects();
             backdrop.setLite(lite);
             updateAmbient();
             setStatus(fx[0], effectsLabel());
+        }, true);
+        final View[] intro = new View[1];
+        intro[0] = addRow("Opening animation", prefs.getBoolean("intro", true) ? "On" : "Off", () -> {
+            boolean on = !prefs.getBoolean("intro", true);
+            prefs.edit().putBoolean("intro", on).apply();
+            setStatus(intro[0], on ? "On" : "Off");
         }, true);
         final View[] ms = new View[1];
         ms[0] = addRow("RAM and storage", meters.getVisibility() == View.VISIBLE ? "Shown" : "Hidden", () -> {
@@ -4662,6 +5392,7 @@ public class HomeActivity extends Activity {
         addRow("Control Center shortcuts", null, this::openShortcuts, false);
         addMenuHeading("Talkies");
         addRow("Keys and location", null, () -> openKeysAndLocation(0), false);
+        addRow("Weather city", cityName() == null ? "Your own" : cityName(), () -> openCityPicker(0), false);
         addUpdatesRow();
         final View[] adb = new View[1];
         adb[0] = addRow("Network debugging", "Checking…", this::openNetworkDebugging, false);
@@ -5679,6 +6410,9 @@ public class HomeActivity extends Activity {
         ScoreCard.homeShowing(true);
         watchPlaying();
         root.post(this::snapRing);
+        root.removeCallbacks(this.autoSlide);
+        root.postDelayed(this.autoSlide, SLIDE_MS);
+        restartBar();
         // Give Android time to bind the service after Talkies (re)starts before calling it stopped.
         root.removeCallbacks(checkService);
         root.postDelayed(checkService, 6000);
@@ -5735,6 +6469,8 @@ public class HomeActivity extends Activity {
         pressedHere = 0;
         SleepService.learn(null);
         inFront = false;
+        root.removeCallbacks(this.autoSlide);
+        restartBar();
         ScoreCard.homeShowing(false);
         watchPlaying();   // stops following the player
     }
@@ -5755,6 +6491,7 @@ public class HomeActivity extends Activity {
         if (prefs.getBoolean("bing_wallpaper", false)) bing.refreshIfStale(this::loadWallpaper);
         nextFromFolder(null);  // no network needed, but the same moments: a new day's picture while you can see it
         if (forYou) trending.refreshIfStale(this::onPicks);
+        if (forYou) discover.refreshIfStale(this::onDiscover);
         // Just updated: what's new, once (showNewsCard checks again when it's time).
         if (zone != Z_MENU && WhatsNew.due(this, prefs)) root.postDelayed(this::showNewsCard, 1500);
         // A new install, Home button not set up yet: once, after the service has had time to connect.

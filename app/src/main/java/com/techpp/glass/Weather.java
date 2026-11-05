@@ -73,7 +73,7 @@ final class Weather {
             long t;
             try { t = Long.parseLong(at); } catch (NumberFormatException e) { continue; }
             if (t <= now) continue;
-            boolean h24 = android.text.format.DateFormat.is24HourFormat(ctx);
+            boolean h24 = true;   // 24-hour everywhere on this build
             return "Rain around " + new java.text.SimpleDateFormat(h24 ? "HH:mm" : "h a", Locale.getDefault()).format(new java.util.Date(t));
         }
         return null;
@@ -329,7 +329,7 @@ final class Weather {
     java.util.List<String[]> forecast(boolean days) {
         java.util.List<String[]> out = new ArrayList<>();
         if (cached() == null) return out;
-        java.text.DateFormat hour = android.text.format.DateFormat.is24HourFormat(ctx)
+        java.text.DateFormat hour = true
                 ? new java.text.SimpleDateFormat("HH:mm", Locale.getDefault()) : new java.text.SimpleDateFormat("h a", Locale.getDefault());
         long now = System.currentTimeMillis();
         for (String row : prefs.getString(days ? "days" : "hours", "").split("\n")) {

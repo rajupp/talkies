@@ -23,6 +23,12 @@ public class PicksRow extends ViewGroup {
     private Runnable onFrame;
     private long frameNanos;
     private final Runnable frame = this::step;
+    private OverlayFactory overlayFactory;
+
+    /** Makes the large card's overlay when a card first becomes the large one, so the others cost nothing. */
+    interface OverlayFactory { View make(int index); }
+
+    void setOverlayFactory(OverlayFactory f) { overlayFactory = f; }
 
     public PicksRow(Context c, AttributeSet a) {
         super(c, a);
@@ -51,6 +57,25 @@ public class PicksRow extends ViewGroup {
         }
         System.arraycopy(toX, 0, curX, 0, n);
         System.arraycopy(toW, 0, curW, 0, n);
+        requestLayout();
+    }
+
+    /** More items after the first ones: the row shows its first cards at once and gets the rest a few frames later. */
+    void appendItems(List<View> views) {
+        int old = getChildCount();
+        for (View v : views) addView(v);
+        int n = getChildCount();
+        curX = java.util.Arrays.copyOf(curX, n);
+        curW = java.util.Arrays.copyOf(curW, n);
+        springX = java.util.Arrays.copyOf(springX, n);
+        springW = java.util.Arrays.copyOf(springW, n);
+        targets();
+        for (int i = old; i < n; i++) {
+            springX[i] = new Spring(0.32f, 0.86f, toX[i], 0.1f);
+            springW[i] = new Spring(0.32f, 0.86f, toW[i], 0.1f);
+            curX[i] = toX[i];
+            curW[i] = toW[i];
+        }
         requestLayout();
     }
 
@@ -121,9 +146,28 @@ public class PicksRow extends ViewGroup {
             }
         }
         for (int i = 0; i < n; i++) {
-            View meta = getChildAt(i).findViewWithTag("meta");
-            if (meta != null) meta.animate().alpha(i == anchor ? 1f : 0f).setDuration(200).start();
+            // The large card carries its title and line on the picture (overlay); small ones keep the title below
+            // and, on Trending, their rank number on the poster.
+            View item = getChildAt(i);
+            boolean large = i == anchor;
+            if (large && overlayFactory != null && item.findViewWithTag("overlay") == null && item instanceof ViewGroup) {
+                View card = ((ViewGroup) item).getChildAt(0);
+                View o = overlayFactory.make(i);
+                if (o != null && card instanceof ViewGroup) {
+                    o.setAlpha(0f);
+                    ((ViewGroup) card).addView(o, new android.widget.FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+                    View bar = card.findViewWithTag("autobar");
+                    if (bar != null) bar.bringToFront();
+                }
+            }
+            fade(item.findViewWithTag("overlay"), large ? 1f : 0f);
+            fade(item.findViewWithTag("name"), large ? 0f : 1f);
+            fade(item.findViewWithTag("rank"), large ? 0f : 1f);
         }
+    }
+
+    private static void fade(View v, float to) {
+        if (v != null && v.getAlpha() != to) v.animate().alpha(to).setDuration(220).start();
     }
 
     @Override

@@ -10,9 +10,9 @@
         <item name="android:layout_width">wrap_content</item>
         <item name="android:layout_height">30dp</item>
         <item name="android:gravity">center</item>
-        <item name="android:paddingStart">12dp</item>
-        <item name="android:paddingEnd">12dp</item>
-        <item name="android:textSize">15sp</item>
+        <item name="android:paddingStart">10dp</item>
+        <item name="android:paddingEnd">10dp</item>
+        <item name="android:textSize">14.5sp</item>
         <item name="android:fontFamily">@font/outfit</item>
         <item name="android:singleLine">true</item>
     </style>

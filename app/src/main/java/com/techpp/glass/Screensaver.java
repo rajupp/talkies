@@ -164,7 +164,7 @@ public class Screensaver extends DreamService {
     /** The time (12 or 24 hours as the TV is set), the date, and the weather line Talkies last showed. */
     private void update() {
         Date now = new Date();
-        boolean h24 = DateFormat.is24HourFormat(this);
+        boolean h24 = true;   // 24-hour everywhere on this build
         // The seconds smaller and fainter after the time, "10:58·42"-like, so the time still reads first.
         String hm = DateFormat.format(h24 ? "H:mm" : "h:mm", now).toString(), sec = DateFormat.format(":ss", now).toString();
         android.text.SpannableString t = new android.text.SpannableString(hm + sec);
@@ -209,7 +209,7 @@ public class Screensaver extends DreamService {
         java.util.List<String> lines = new java.util.ArrayList<>();
         java.util.List<Integer> colors = new java.util.ArrayList<>();
         int white = 0xFFF2F2F2, grey = 0xFFB8B8BC, blue = 0xFF8CCBFF, amber = 0xFFFFC266;
-        boolean h24 = DateFormat.is24HourFormat(this);
+        boolean h24 = true;   // 24-hour everywhere on this build
         lines.add(DateFormat.format(h24 ? "HH:mm:ss" : "h:mm:ss a", now).toString());
         colors.add(white);
         lines.add(new java.text.SimpleDateFormat("EEEE d MMMM", java.util.Locale.ENGLISH).format(now));

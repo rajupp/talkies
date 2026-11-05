@@ -48,7 +48,7 @@ final class Football {
     /** Followed by the league's path: "soccer/eng.1", or the id itself for the other sports ("basketball/nba"). */
     private static final String API = "https://site.api.espn.com/apis/site/v2/sports/";
     private static final long FULL_MS = 15 * 60_000L, LIVE_MS = 30_000L, RETRY_MS = 5 * 60_000L;
-    private static final long PAST_MS = 12 * 3600_000L, AHEAD_MS = 24 * 3600_000L;
+    private static final long PAST_MS = 12 * 3600_000L, AHEAD_MS = 72 * 3600_000L;   // three days ahead: a league with one match day a week still has its next one on the line
     private static final int MAX = 12;
 
     /**
@@ -56,6 +56,7 @@ final class Football {
      * score line (10 characters at most), in menu order.
      */
     static final String[][] LEAGUES = {
+            {"tur.1", "S\u00fcper Lig", "S\u00fcper Lig"},
             {"eng.1", "Premier League", "EPL"}, {"uefa.champions", "Champions League", "UCL"},
             {"esp.1", "LaLiga", "LaLiga"}, {"ger.1", "Bundesliga", "Bundesliga"}, {"ita.1", "Serie A", "Serie A"},
             {"fra.1", "Ligue 1", "Ligue 1"}, {"uefa.europa", "Europa League", "UEL"},
@@ -73,7 +74,8 @@ final class Football {
     private static final Map<String, String[]> DEFAULTS = new HashMap<>();
     static {
         DEFAULTS.put("IN", new String[]{"eng.1", "uefa.champions", "ind.1"});
-        DEFAULTS.put("TR", new String[]{"tur.1", "uefa.champions", "eng.1"});
+        // Turkey: the Süper Lig, so the score line is always a Turkish match (Talkies settings → leagues adds more).
+        DEFAULTS.put("TR", new String[]{"tur.1"});
         DEFAULTS.put("GB", new String[]{"eng.1", "uefa.champions", "sco.1"});
         DEFAULTS.put("IE", new String[]{"eng.1", "uefa.champions"});
         DEFAULTS.put("US", new String[]{"usa.1", "eng.1", "uefa.champions"});
@@ -122,6 +124,10 @@ final class Football {
      * Your choice, or until you make one: cricket and football everywhere, and the NBA and NFL too in the US and
      * Canada. The old Live scores setting ("both", "cricket", "football", "off") carries over.
      */
+    /** Where cricket is on by default (Talkies settings → Sports can still turn it on anywhere). */
+    private static final Set<String> CRICKET_COUNTRIES = new java.util.HashSet<>(java.util.Arrays.asList(
+            "IN", "PK", "BD", "LK", "AF", "NP", "AU", "NZ", "GB", "IE", "ZA", "ZW", "AE", "JM", "TT", "BB", "GY", "AG", "DM", "GD", "KN", "LC", "VC"));
+
     static Set<String> sportsOn(Context c) {
         Set<String> on = new java.util.HashSet<>();
         SharedPreferences home = c.getSharedPreferences("home", Context.MODE_PRIVATE);
@@ -130,7 +136,8 @@ final class Football {
             for (String id : saved.split(",")) if (!id.isEmpty()) on.add(id);
         } else {
             String old = home.getString("scores", "both");
-            if (old.equals("both") || old.equals("cricket")) on.add("cricket");
+            // Cricket by default only where it is followed; elsewhere (Turkey, say) the line is for the local matches.
+            if (old.equals("cricket") || (old.equals("both") && CRICKET_COUNTRIES.contains(cc))) on.add("cricket");
             if (old.equals("both") || old.equals("football")) on.add("football");
             if (!home.contains("scores") && (cc.equals("US") || cc.equals("CA"))) { on.add("nba"); on.add("nfl"); }
         }
@@ -226,7 +233,7 @@ final class Football {
         List<String> on = leagues();
         if (on.isEmpty()) return;
         // A new set of leagues (a country's new default after an update, say): fetch now, not when the last list goes stale.
-        String sig = String.join(",", on);
+        String sig = String.join(",", on) + "|" + AHEAD_MS;   // a new look-ahead also fetches at once
         if (!sig.equals(prefs.getString("sig", ""))) prefs.edit().putString("sig", sig).remove("ok_at").remove("try_at").apply();
         long now = System.currentTimeMillis();
         boolean full = now - prefs.getLong("ok_at", 0) >= FULL_MS;
@@ -330,7 +337,9 @@ final class Football {
         for (String zone : new String[]{"UTC", "America/New_York"}) {
             SimpleDateFormat f = new SimpleDateFormat("yyyyMMdd", Locale.US);
             f.setTimeZone(TimeZone.getTimeZone(zone));
-            for (long t : new long[]{now - PAST_MS, now, now + AHEAD_MS}) out.add(f.format(new Date(t)));
+            // Every day of the window (it is longer than a day), not just its ends.
+            for (long t = now - PAST_MS; t < now + AHEAD_MS; t += 24 * 3600_000L) out.add(f.format(new Date(t)));
+            out.add(f.format(new Date(now + AHEAD_MS)));
         }
         return out;
     }
@@ -399,7 +408,7 @@ final class Football {
         if (american(o.optString("league"))) m.vs = "at";
         m.name = m.full1 + " " + m.vs + " " + m.full2;
         m.start = m.live || m.ended ? null
-                : new SimpleDateFormat("h:mm a", Locale.US).format(new Date(o.optLong("at"))).toLowerCase(Locale.ROOT);
+                : new SimpleDateFormat("HH:mm", Locale.US).format(new Date(o.optLong("at"))).toLowerCase(Locale.ROOT);
         if (!m.live && !m.ended && m.status.isEmpty()) {
             // Not today: say which day ("Sat 4:30 pm").
             SimpleDateFormat day = new SimpleDateFormat("yyyyMMdd", Locale.US);

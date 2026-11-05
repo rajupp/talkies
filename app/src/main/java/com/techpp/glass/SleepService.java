@@ -154,11 +154,11 @@ public class SleepService extends AccessibilityService {
         if (code == KeyEvent.KEYCODE_HOME) {
             // You chose a launcher you installed yourself (Projectivy…) as the home app: Home is its, not ours.
             if (otherLauncherChosen()) return false;
-            // Android's own Home also switches the TV to this device's input over HDMI-CEC (One Touch Play), which an
-            // app can't do: let it through where that matters. With Talkies the default home app, Android opens
-            // Talkies itself; on a streaming box, it opens Google TV's home and the window watcher below brings
-            // Talkies back over it. Only a TV with another default home has Home caught here.
-            if (talkiesIsDefaultHome() || streamingBox()) {
+            // Home is caught here and Talkies opened at once, so the TV's own home screen never starts (it costs
+            // 80-170 MB of RAM and flashes on screen for seconds on this box). The one thing lost is HDMI-CEC "One
+            // Touch Play" (Home waking the TV and switching it to this box), which Android only does when it opens
+            // the home app itself. Only where Talkies really outranks the built-in launcher is Home let through.
+            if (talkiesIsDefaultHome()) {
                 // Held: the dashboard here too. With Talkies the default home app Android doesn't open it; where it
                 // does, asking again leaves it open.
                 if (event.getAction() == KeyEvent.ACTION_DOWN && event.getRepeatCount() == 0) main.postDelayed(dashboard, HOLD_MS);
@@ -371,7 +371,7 @@ public class SleepService extends AccessibilityService {
 
     /** Watches the buttons while remote keys are on, the sleep warning is up, or a button is being chosen. */
     private void updateKeyFilter() {
-        boolean want = watchButtons(this) || warning != null || learning != null;
+        boolean want = watchButtons(this) || warning != null || learning != null || catchesHome();
         android.accessibilityservice.AccessibilityServiceInfo info = getServiceInfo();
         if (info == null) return;
         boolean has = (info.flags & android.accessibilityservice.AccessibilityServiceInfo.FLAG_REQUEST_FILTER_KEY_EVENTS) != 0;
@@ -383,10 +383,20 @@ public class SleepService extends AccessibilityService {
         Log.i(TAG, want ? "Watching the remote's buttons" : "Remote's buttons left to the TV");
     }
 
+    /**
+     * Whether Home is caught here (see onKeyEvent): when a built-in launcher outranks Talkies, so Android would open
+     * that one first, which on a 1 GB box costs its RAM and several seconds of its screen. Needs the key filter on.
+     */
+    private boolean catchesHome() {
+        return !otherLauncherChosen() && !talkiesIsDefaultHome();
+    }
+
     private boolean talkiesIsDefaultHome() {
-        android.content.pm.ResolveInfo r = getPackageManager().resolveActivity(
+        // The highest-priority home app, which is what Android's Home key opens on this kind of TV: a "preferred
+        // home" mark set over adb is ignored there, so it must not count.
+        java.util.List<android.content.pm.ResolveInfo> all = getPackageManager().queryIntentActivities(
                 new Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME), android.content.pm.PackageManager.MATCH_DEFAULT_ONLY);
-        return r != null && r.activityInfo != null && getPackageName().equals(r.activityInfo.packageName);
+        return !all.isEmpty() && all.get(0).activityInfo != null && getPackageName().equals(all.get(0).activityInfo.packageName);
     }
 
     /** A box or stick plugged into a TV (Google TV Streamer, Shield…) rather than a TV: it has no HDMI inputs of its own. */

@@ -46,6 +46,11 @@
                 <TextView android:id="@+id/tab_recent" style="@style/TabText" android:text="Continue" />
                 <TextView android:id="@+id/tab_trending" style="@style/TabText" android:layout_marginStart="2dp" android:text="Trending" />
                 <TextView android:id="@+id/tab_india" style="@style/TabText" android:layout_marginStart="2dp" android:text="New in India" />
+                <TextView android:id="@+id/tab_best" style="@style/TabText" android:layout_marginStart="2dp" android:text="Popular" />
+                <TextView android:id="@+id/tab_upcoming" style="@style/TabText" android:layout_marginStart="2dp" android:text="Upcoming" />
+                <TextView android:id="@+id/tab_artists" style="@style/TabText" android:layout_marginStart="2dp" android:text="Artists" />
+                <TextView android:id="@+id/pick_counter" style="@style/TabText" android:layout_marginStart="18dp"
+                    android:letterSpacing="0.1" android:textSize="12sp" android:visibility="gone" />
             </LinearLayout>
 
             <!-- Only while there are no picks to show: why (no TMDB key yet, or offline) -->
@@ -106,7 +111,7 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_gravity="end|top"
-            android:layout_marginTop="72dp"
+            android:layout_marginTop="66dp"
             android:layout_marginEnd="40dp"
             android:fontFamily="@font/outfit"
             android:singleLine="true"
@@ -118,7 +123,7 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_gravity="end|top"
-            android:layout_marginTop="106dp"
+            android:layout_marginTop="392dp"
             android:layout_marginEnd="40dp"
             android:fontFamily="@font/outfit"
             android:text="Picks from TMDB"

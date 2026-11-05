@@ -2,4 +2,5 @@
 <resources>
     <!-- Which picture a pick card's image view currently holds (see HomeActivity.updatePickImages). -->
     <item name="img_state" type="id" />
+    <item name="shimmer" type="id" />
 </resources>
