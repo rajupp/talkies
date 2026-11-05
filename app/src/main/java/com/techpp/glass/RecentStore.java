@@ -27,6 +27,9 @@ final class RecentStore {
     /** An app's first report this soon after a Watch Next card opened it is taken to be that title. */
     private static final long OPENED_MS = 10 * 60_000L;
     private static final String YOUTUBE = "com.google.android.youtube.tv";
+    /** Closer to the start or end than this, a title has no place to resume from. */
+    private static final long RESUME_MIN_MS = 5_000;
+    private static final float FINISHED = 0.97f;
 
     private RecentStore() { }
 
@@ -43,10 +46,11 @@ final class RecentStore {
                 .putLong("at", System.currentTimeMillis()).apply();
     }
 
-    static synchronized void record(Context c, String pkg, String title, String subtitle, Bitmap art) {
+    /** Saves a title that's playing; returns the name it's listed under, or null if it couldn't be saved. */
+    static synchronized String record(Context c, String pkg, String title, String subtitle, Bitmap art) {
         try {
             File dir = dir(c);
-            if (!dir.isDirectory() && !dir.mkdirs()) return;
+            if (!dir.isDirectory() && !dir.mkdirs()) return null;
             JSONArray old = read(c);
             JSONArray out = new JSONArray();
             String link = "";
@@ -89,6 +93,7 @@ final class RecentStore {
                     .put("at", System.currentTimeMillis()).put("image", image);
             if (hd) entry.put("hd", true);
             if (!link.isEmpty()) entry.put("link", link);
+            if (before != null && before.has("pos")) entry.put("pos", before.getLong("pos")).put("dur", before.optLong("dur"));
             out.put(entry);
             java.util.Map<String, Integer> perApp = new java.util.HashMap<>();
             perApp.put(pkg, 1);
@@ -99,14 +104,40 @@ final class RecentStore {
             }
             File tmp = new File(dir, "recent.json.tmp");
             try (OutputStream o = new FileOutputStream(tmp)) { o.write(out.toString().getBytes(StandardCharsets.UTF_8)); }
-            if (!tmp.renameTo(new File(dir, "recent.json"))) return;
+            if (!tmp.renameTo(new File(dir, "recent.json"))) return null;
             Set<String> keep = new HashSet<>();
             for (int i = 0; i < out.length(); i++) keep.add(out.getJSONObject(i).optString("image"));
             File[] files = dir.listFiles();
             if (files != null) for (File f : files) if (f.getName().endsWith(".jpg") && !keep.contains(f.getName())) f.delete();
             Log.i(TAG, "Saved " + pkg + " (" + (art != null ? "with" : "no") + " artwork), " + out.length() + " in list");
+            return title;
         } catch (Exception e) {
             Log.w(TAG, "Could not save: " + e);
+            return null;
+        }
+    }
+
+    /** How far into a saved title you got. At the very start or end there's nothing to resume, so the mark goes. */
+    static synchronized void notePosition(Context c, String pkg, String title, long position, long duration) {
+        try {
+            String id = Integer.toHexString((pkg + "\n" + title).hashCode());
+            JSONArray a = read(c);
+            for (int i = 0; i < a.length(); i++) {
+                JSONObject o = a.getJSONObject(i);
+                if (!o.getString("id").equals(id)) continue;
+                boolean finished = duration > 0 && position >= duration * FINISHED;
+                if (position < RESUME_MIN_MS || finished) {
+                    o.remove("pos");
+                    o.remove("dur");
+                } else {
+                    o.put("pos", position).put("dur", duration);
+                }
+                write(c, a);
+                Log.i(TAG, "Position " + pkg + " " + position / 1000 + " of " + duration / 1000 + " s" + (finished ? " (finished)" : ""));
+                return;
+            }
+        } catch (Exception e) {
+            Log.w(TAG, "Could not note position: " + e);
         }
     }
 
@@ -213,7 +244,12 @@ final class RecentStore {
                 p.meta = (sub.isEmpty() ? "" : sub + " · ") + p.service;
                 String image = o.optString("image");
                 p.image = image.isEmpty() ? null : new File(dir(c), image);
+                long position = o.optLong("pos"), duration = o.optLong("dur");
+                if (position > 0 && duration > 0) p.progress = Math.min(1f, position / (float) duration);
                 String link = o.optString("link");
+                if (position >= RESUME_MIN_MS && YOUTUBE.equals(pkg)) {
+                    link = link.replaceFirst("(watch\\?v=[^#&]+)", "$1&t=" + position / 1000 + "s");
+                }
                 if (!link.isEmpty()) p.intentUri = link;
                 // No exact match yet (or Sharp YouTube pictures is off): the search finds it, better than YouTube's front page.
                 else if (YOUTUBE.equals(pkg)) p.intentUri = view(pkg, "https://www.youtube.com/results?search_query="

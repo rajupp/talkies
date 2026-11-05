@@ -6,12 +6,19 @@ features, a new fix number only fixes. The version shows in Talkies settings →
 ## Unreleased
 
 ### New
+- **Continue knows more.** Cards Netflix marks "continue watching" on its own row now add to Watch Next, YouTube cards open
+  where you left off, cards from what apps played show a progress bar, and finished titles leave Watch Next's cards.
+  Netflix updates these in its own time, so a card can take a while to appear after you watch. Ideas from tvOS Launcher.
 - **Emoji on the Board.** Hearts and other emoji in your Screensaver message now get a tile of their own, instead of a
   blank.
 - **A live score over TV.** Hold OK on a match → **Pin over TV**: a small card stays in a corner, updating while you
   watch anything (not on Talkies' Home or the screensaver), and leaves about five minutes after the match ends. Control Center unpins it. An idea from Gulam.
 
 ### Changed
+- **Apps' rows update while Home is open.** When an app changes its row, Talkies rereads it, at most once a minute,
+  instead of waiting until you come back to Home. An idea from GlassOS+.
+- **Card links stay inside their app.** A card from an app's row can only open that app; a link aiming anywhere else
+  just opens the app. An idea from GlassOS+.
 - **Rows the screen cuts off fade away.** Moving down the page, the strips of the rows above and below fade out, and
   come back once they fit. An idea from dossantosee in Discussion #17.
 - **Many more jobs for Remote keys.** A button can now go to Previous app, Resume watching (the first Continue card) or

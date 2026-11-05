@@ -33,6 +33,10 @@ import java.util.Set;
 final class WatchNext {
     private static final String TAG = "GlassWatchNext";
     private static final int MAX = 16;
+    /** Past this far in, a title is done: apps don't always take it off their list. */
+    private static final float FINISHED = 0.97f;
+    /** Cards taken from one app's "Continue Watching" row. */
+    private static final int MAX_ROW = 8;
 
     private WatchNext() { }
 
@@ -83,6 +87,7 @@ final class WatchNext {
                 p.service = label(c, pkg);
                 p.meta = (m.length() > 0 ? m + " · " : "") + p.service;
                 long position = cur.isNull(7) ? 0 : cur.getLong(7), duration = cur.isNull(12) ? 0 : cur.getLong(12);
+                if (duration > 0 && position >= duration * FINISHED) continue;
                 if (position > 0 && duration > 0) p.progress = Math.min(1f, position / (float) duration);
                 p.at = cur.isNull(6) ? 0 : cur.getLong(6);
                 p.intentUri = str(cur, 10).isEmpty() ? null : str(cur, 10);
@@ -109,10 +114,53 @@ final class WatchNext {
         } catch (Exception e) {
             Log.w(TAG, "Could not read Watch Next: " + e);
         }
+        addContinueRows(c, out, dir, keep);
         File[] files = dir.listFiles();
         if (files != null) for (File f : files) if (!keep.contains(f.getName())) f.delete();
         Log.i(TAG, out.size() + " to show");
         return out;
+    }
+
+    /**
+     * Adds the cards apps mark "continue watching" on their rows that aren't on Watch Next, which Netflix can leave
+     * unchanged. These rarely say when you watched, so the time is when the first one last changed (title or episode);
+     * until it first does, new cards sit at the end of Continue, since a first look says nothing about when.
+     */
+    private static void addContinueRows(Context c, List<Trending.Pick> out, File dir, Set<String> keep) {
+        android.content.SharedPreferences seen = c.getSharedPreferences("continue_rows", Context.MODE_PRIVATE);
+        java.util.Map<String, Trending.Pick> known = new java.util.HashMap<>();
+        for (Trending.Pick p : out) known.put(p.pkg + "\n" + p.title, p);
+        for (Channels.Channel ch : Channels.continueRows(c, dir, keep, 1280)) {
+            if (ch.items.isEmpty()) continue;
+            String top = ch.items.get(0).title + "\n" + ch.items.get(0).meta, before = seen.getString(ch.key, null);
+            long changed = seen.getLong(ch.key + "@", 0);
+            if (!top.equals(before)) {
+                changed = before == null ? 0 : System.currentTimeMillis();
+                seen.edit().putString(ch.key, top).putLong(ch.key + "@", changed).apply();
+            }
+            Log.i(TAG, "row " + ch.key + ": " + ch.items.size() + " items, changed " + changed);
+            String service = label(c, ch.pkg);
+            int added = 0;
+            for (int i = 0; i < ch.items.size() && added < MAX_ROW; i++) {
+                Trending.Pick p = ch.items.get(i);
+                if (p.progress >= FINISHED) continue;
+                long at = p.at > 0 ? p.at : changed > 0 ? changed - i * 60_000L : 0;
+                Trending.Pick same = known.get(ch.pkg + "\n" + p.title);
+                if (same != null) {   // Watch Next's card opens the right episode: keep it, with the row's newer time
+                    if (i == 0 && at > same.at) same.at = at;
+                    continue;
+                }
+                p.kind = "watchnext";
+                p.tab = RecentStore.TAB;
+                p.service = service;
+                p.at = at;
+                p.id = (ch.pkg + "\n" + p.title + "\n" + p.meta).hashCode();
+                String about = p.meta.replaceFirst("(?i)^continue watching\\s*", "");
+                p.meta = (about.isEmpty() ? "" : about + " · ") + service;
+                out.add(p);
+                added++;
+            }
+        }
     }
 
     /** Talkies settings → Hide spoilers (off unless you turn it on: the app's own stills are what people expect). */

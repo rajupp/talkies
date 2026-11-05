@@ -1843,7 +1843,10 @@ public class HomeActivity extends Activity {
 
     private static boolean sameKeys(List<Trending.Pick> a, List<Trending.Pick> b) {
         if (a.size() != b.size()) return false;
-        for (int i = 0; i < a.size(); i++) if (!a.get(i).key().equals(b.get(i).key())) return false;
+        for (int i = 0; i < a.size(); i++) {
+            Trending.Pick x = a.get(i), y = b.get(i);
+            if (!x.key().equals(y.key()) || x.progress != y.progress || !java.util.Objects.equals(x.intentUri, y.intentUri)) return false;
+        }
         return true;
     }
 
@@ -2276,16 +2279,32 @@ public class HomeActivity extends Activity {
         }
     }
 
+    /**
+     * A card's link, kept inside the app the card belongs to. Any installed app can publish a row, and Talkies opens
+     * what it holds, so a link can't aim at another app or at Talkies' own private screens. Refused, the card opens its app.
+     */
+    static Intent cardLink(String uri, String pkg) throws java.net.URISyntaxException {
+        Intent i = Intent.parseUri(uri, Intent.URI_INTENT_SCHEME);
+        String scheme = i.getScheme() == null ? "" : i.getScheme().toLowerCase(java.util.Locale.ROOT);
+        if (scheme.equals("file") || scheme.equals("javascript") || scheme.equals("data")) throw new SecurityException(scheme + " link");
+        android.content.ComponentName to = i.getComponent();
+        if (pkg == null || (to != null && !pkg.equals(to.getPackageName())) || (i.getPackage() != null && !pkg.equals(i.getPackage())))
+            throw new SecurityException("link to another app");
+        i.setSelector(null);
+        i.setClipData(null);
+        return i.setPackage(pkg);
+    }
+
     /** Opens a pick or channel card: through the app's own link to that title when it gave one, else the app. */
     private void openPick(Trending.Pick p) {
         if ("watchnext".equals(p.kind)) RecentStore.noteOpened(this, p);
         if (p.intentUri != null) {
             try {
-                startActivity(Intent.parseUri(p.intentUri, Intent.URI_INTENT_SCHEME).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK), fromTile());
+                startActivity(cardLink(p.intentUri, p.pkg).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK), fromTile());
                 if (p.pkg != null) RecentApps.note(this, p.pkg);
                 return;
             } catch (Exception ex) {
-                Log.w(TAG, "Link failed, opening the app: " + ex.getClass().getSimpleName());
+                Log.w(TAG, "Link failed, opening " + p.pkg + ": " + ex.getClass().getSimpleName() + " " + (ex instanceof SecurityException ? ex.getMessage() : ""));
             }
         }
         // A match JioHotstar has no card for: open its search page and have SleepService type both teams in
@@ -5649,6 +5668,7 @@ public class HomeActivity extends Activity {
         if (!sameKeys(before, recentPicks) && (tabIdx == 0 || rowPicks.isEmpty())) buildPicksRow(0);
         refreshWatchNext();
         getContentResolver().registerContentObserver(TvContract.WatchNextPrograms.CONTENT_URI, true, watchNextChanged);
+        getContentResolver().registerContentObserver(TvContract.PreviewPrograms.CONTENT_URI, true, rowsChanged);
     }
 
     /** Apps update Watch Next a few seconds after you leave them (Netflix does): reread it then, once things settle. */
@@ -5660,12 +5680,35 @@ public class HomeActivity extends Activity {
     };
     private final Runnable rereadWatchNext = this::refreshWatchNext;
 
+    /** At most this often for apps' rows: they change far more often than Watch Next, in bursts, card by card. */
+    private static final long ROWS_MIN_GAP_MS = 60_000, ROWS_SETTLE_MS = 5_000;
+    private long rowsReadAt;
+    private boolean rowsReadWaiting;
+
+    /** An app changed its row (Netflix marks what you're watching on it): reread once it settles. */
+    private final android.database.ContentObserver rowsChanged = new android.database.ContentObserver(new android.os.Handler(android.os.Looper.getMainLooper())) {
+        @Override public void onChange(boolean selfChange) {
+            if (rowsReadWaiting) return;
+            rowsReadWaiting = true;
+            root.postDelayed(rereadRows, Math.max(ROWS_SETTLE_MS, rowsReadAt + ROWS_MIN_GAP_MS - android.os.SystemClock.elapsedRealtime()));
+        }
+    };
+    private final Runnable rereadRows = () -> {
+        rowsReadWaiting = false;
+        rowsReadAt = android.os.SystemClock.elapsedRealtime();
+        Log.i(TAG, "Apps' rows changed: rereading");
+        refreshWatchNext();
+    };
+
     @Override
     protected void onStop() {
         super.onStop();
         watchInputs(false);
         getContentResolver().unregisterContentObserver(watchNextChanged);
+        getContentResolver().unregisterContentObserver(rowsChanged);
         root.removeCallbacks(rereadWatchNext);
+        root.removeCallbacks(rereadRows);
+        rowsReadWaiting = false;
         unregisterReceiver(timeReceiver);
         unregisterReceiver(packageReceiver);
         getSystemService(ConnectivityManager.class).unregisterNetworkCallback(netCallback);

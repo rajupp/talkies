@@ -219,8 +219,8 @@ The first tab shows up to sixteen recent titles: first the newest from each app 
 one app can't take over the front of the row), then the next newest. YouTube gets up to four cards for the last two days,
 two otherwise; **OK** on one opens that video, or searches for it when Talkies hasn't matched it exactly (Sharp YouTube
 pictures finds the match). JioHotstar reports only "S1 E2 Allen" while it plays, so a title you opened from its Continue
-card keeps the show's name, picture and link; one you started inside the app is a plain card that opens the app. Cards from Watch Next show how far in you are when the app shares it (Prime Video and Xstream Play do).
-It combines two sources:
+card keeps the show's name, picture and link; one you started inside the app is a plain card that opens the app. Cards show how far in you are when the app shares it, and a YouTube card you matched opens the video where you left it. A title past 97% counts as finished: it leaves Watch Next's cards, and a card from what an app played stays but starts from the beginning.
+It combines three sources:
 
 - **Android TV's Watch Next list.** Netflix, Prime Video, JioHotstar, Apple TV and Xstream Play publish what you're
   in the middle of, with the show, season, episode and artwork. **OK** opens that exact title or episode
@@ -230,6 +230,7 @@ It combines two sources:
   and for apps whose Watch Next is behind: JioHotstar doesn't always update it, so a title it played more recently
   than its newest Watch Next entry shows too. Watch Next is reread whenever an app changes it (Netflix updates it a
   few seconds after you leave), and the Watch Next channel row shows this same list.
+- **Cards marked on apps' own rows.** Netflix's channel row starts with what you're watching, marked in the card's link and description, and a row with "continue", "keep watching" or "resume" in its name counts whole. These add titles Watch Next doesn't have, and when the first one changes, that title moves to the front of Continue. Everything else on those rows is a promotion and is left out. While Home is open, Talkies notices an app changing its row and rereads it, at most once a minute.
   Pictures: YouTube shares only a 640-pixel picture while playing (no video ID). With Talkies settings → **Sharp
   YouTube pictures** on (it's off by default), Talkies looks the video up on YouTube by title and channel,
   confirms it through YouTube's public oEmbed endpoint, and swaps in the 1280 × 720 thumbnail (only the title and

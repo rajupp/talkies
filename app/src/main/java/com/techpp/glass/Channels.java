@@ -160,7 +160,7 @@ final class Channels {
             if (WATCH_NEXT.equals(ch.key)) {
                 ch.items.addAll(watchNext);
             } else {
-                readItems(c, ch, dir, keep);
+                readItems(c, ch, dir, keep, ART_W, false);
             }
             if (!ch.items.isEmpty()) out.add(ch);
         }
@@ -168,6 +168,51 @@ final class Channels {
         if (files != null) for (File f : files) if (!keep.contains(f.getName())) f.delete();
         Log.i(TAG, out.size() + " rows shown");
         return out;
+    }
+
+    /**
+     * What apps' rows mark as partway through, shown or not: every card on a row named for it, and the cards marked one
+     * by one on other rows (Netflix's row is called "Netflix": the first cards are yours, the rest are promotions, and
+     * only the link and description tell them apart). With artwork. Blocking. An idea from tvOS Launcher (Apache-2.0).
+     */
+    static List<Channel> continueRows(Context c, File dir, Set<String> keep, int artWidth) {
+        PackageManager pm = c.getPackageManager();
+        Map<String, Channel> found = new LinkedHashMap<>();
+        String[] cols = {TvContract.Channels._ID, TvContract.Channels.COLUMN_PACKAGE_NAME,
+                TvContract.Channels.COLUMN_DISPLAY_NAME, TvContract.Channels.COLUMN_TYPE};
+        try (Cursor cur = c.getContentResolver().query(TvContract.Channels.CONTENT_URI, cols, null, null, null)) {
+            while (cur != null && cur.moveToNext()) {
+                String pkg = cur.getString(1), name = cur.getString(2);
+                if (!TvContract.Channels.TYPE_PREVIEW.equals(cur.getString(3)) || pkg == null || name == null
+                        || pm.getLeanbackLaunchIntentForPackage(pkg) == null) continue;
+                int count = count(c, cur.getLong(0));
+                String key = pkg + "|" + name;
+                if (count == 0 || found.containsKey(key) && found.get(key).count >= count) continue;
+                Channel ch = new Channel();
+                ch.key = key;
+                ch.pkg = pkg;
+                ch.name = name;
+                ch.id = cur.getLong(0);
+                ch.count = count;
+                found.put(key, ch);
+            }
+        } catch (Exception e) {
+            Log.w(TAG, "Couldn't read continue rows: " + e);
+        }
+        for (Channel ch : found.values()) readItems(c, ch, dir, keep, artWidth, !isContinueRow(ch.name));
+        return new ArrayList<>(found.values());
+    }
+
+    private static boolean isContinueRow(String name) {
+        String n = name.toLowerCase(Locale.ROOT);
+        return n.contains("continue") || n.contains("keep watching") || n.contains("resume");
+    }
+
+    /** Whether a card on a mixed row says it's partway through (as Netflix's do). */
+    private static boolean marksContinue(String link, String description) {
+        String l = link.toLowerCase(Locale.ROOT);
+        return l.contains("listcontext%3dcontinuewatching") || l.contains("listcontext=continuewatching")
+                || description.toLowerCase(Locale.ROOT).startsWith("continue watching");
     }
 
     private static int count(Context c, long id) {
@@ -179,13 +224,14 @@ final class Channels {
         }
     }
 
-    private static void readItems(Context c, Channel ch, File dir, Set<String> keep) {
+    private static void readItems(Context c, Channel ch, File dir, Set<String> keep, int artWidth, boolean markedOnly) {
         String[] cols = {TvContract.PreviewPrograms.COLUMN_TITLE, TvContract.PreviewPrograms.COLUMN_SHORT_DESCRIPTION,
                 TvContract.PreviewPrograms.COLUMN_POSTER_ART_URI, TvContract.PreviewPrograms.COLUMN_THUMBNAIL_URI,
                 TvContract.PreviewPrograms.COLUMN_INTENT_URI, TvContract.PreviewPrograms.COLUMN_BROWSABLE,
                 TvContract.PreviewPrograms.COLUMN_SEASON_DISPLAY_NUMBER, TvContract.PreviewPrograms.COLUMN_EPISODE_DISPLAY_NUMBER,
                 TvContract.PreviewPrograms.COLUMN_EPISODE_TITLE, TvContract.PreviewPrograms.COLUMN_WEIGHT,
-                ENGAGED};
+                ENGAGED, TvContract.PreviewPrograms.COLUMN_LAST_PLAYBACK_POSITION_MILLIS,
+                TvContract.PreviewPrograms.COLUMN_DURATION_MILLIS};
         // Android declares the last-watched column for Watch Next only, but its table for channel cards has it too;
         // read it by name in case a TV's doesn't.
         try (Cursor cur = c.getContentResolver().query(TvContract.buildPreviewProgramsUriForChannel(ch.id), null, null, null, null)) {
@@ -210,6 +256,7 @@ final class Channels {
             for (int i : order) {
                 if (ch.items.size() >= MAX_ITEMS) break;
                 cur.moveToPosition(rows.get(i));
+                if (markedOnly && !marksContinue(str(cur, col[4]), str(cur, col[1]))) continue;
                 Trending.Pick p = new Trending.Pick();
                 p.kind = "channel";
                 p.tab = ch.key;
@@ -224,7 +271,10 @@ final class Channels {
                 p.intentUri = str(cur, col[4]).isEmpty() ? null : str(cur, col[4]);
                 String art = !str(cur, col[3]).isEmpty() ? str(cur, col[3]) : str(cur, col[2]);
                 p.id = (ch.key + "\n" + p.title + "\n" + art).hashCode();
-                p.image = art.isEmpty() ? null : WatchNext.cached(c, dir, art, ART_W);
+                p.image = art.isEmpty() ? null : WatchNext.cached(c, dir, art, artWidth);
+                p.at = num(cur, col[10]);
+                long position = num(cur, col[11]), duration = num(cur, col[12]);
+                if (position > 0 && duration > 0) p.progress = Math.min(1f, position / (float) duration);
                 if (p.image != null) keep.add(p.image.getName());
                 ch.items.add(p);
             }

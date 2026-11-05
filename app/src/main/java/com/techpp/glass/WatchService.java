@@ -8,6 +8,7 @@ import android.media.session.MediaSessionManager;
 import android.media.session.PlaybackState;
 import android.os.Handler;
 import android.os.Looper;
+import android.os.SystemClock;
 import android.service.notification.NotificationListenerService;
 import android.util.Log;
 
@@ -22,7 +23,8 @@ import java.util.Map;
  * Any app is recorded if it reports a real title; apps that send none (Netflix) or only their own name (Prime Video
  * sends "PrimeVideo") are skipped by that rule, and music apps by the list below.
  * Event-driven (session callbacks), no polling. A title is saved after it has played for 20 seconds, which skips
- * ads, trailers and autoplay previews.
+ * ads, trailers and autoplay previews. How far in it got is noted when it pauses, changes or its session ends, for the
+ * card's progress bar and for opening a YouTube video where you left it.
  */
 public class WatchService extends NotificationListenerService {
     /** Music and system sessions: not "watched". */
@@ -40,22 +42,30 @@ public class WatchService extends NotificationListenerService {
         final MediaController c;
         String title = "";
         final Runnable save = this::save;
+        /** The title last saved, as the app calls it and as the list knows it; its last position report. */
+        String savedRaw = "", savedAs;
+        PlaybackState last;
+        long duration;
 
         Watch(MediaController c) { this.c = c; }
 
         @Override public void onMetadataChanged(MediaMetadata m) { update(); }
         @Override public void onPlaybackStateChanged(PlaybackState s) { update(); }
-        @Override public void onSessionDestroyed() { stop(this); }
+        @Override public void onSessionDestroyed() { notePosition(); stop(this); }
 
         void update() {
             String now = text(c.getMetadata(), MediaMetadata.METADATA_KEY_DISPLAY_TITLE, MediaMetadata.METADATA_KEY_TITLE);
             boolean playing = c.getPlaybackState() != null && c.getPlaybackState().getState() == PlaybackState.STATE_PLAYING;
+            if (now.equals(savedRaw)) track();
             if (!playing || now.isEmpty() || isAppName(c.getPackageName(), now)) {
+                notePosition();
                 main.removeCallbacks(save);
                 title = "";
                 return;
             }
             if (!now.equals(title)) {  // a new title started: wait 20 s before saving it
+                notePosition();
+                if (!now.equals(savedRaw)) { savedRaw = ""; last = null; }
                 title = now;
                 logKeys(c.getPackageName(), c.getMetadata());
                 Log.i("GlassRecent", c.getPackageName() + " playing a new title; saving it after 20 s");
@@ -70,7 +80,28 @@ public class WatchService extends NotificationListenerService {
             String sub = text(m, MediaMetadata.METADATA_KEY_DISPLAY_SUBTITLE, MediaMetadata.METADATA_KEY_ARTIST,
                     MediaMetadata.METADATA_KEY_ALBUM);
             Bitmap art = art(m);
-            RecentStore.record(WatchService.this, c.getPackageName(), title, sub, art);
+            savedAs = RecentStore.record(WatchService.this, c.getPackageName(), title, sub, art);
+            savedRaw = title;
+            track();
+        }
+
+        /** Keeps the saved title's latest position. A stopped app often reports 0, which isn't where you were. */
+        void track() {
+            PlaybackState s = c.getPlaybackState();
+            if (s == null || s.getPosition() <= 0
+                    || s.getState() != PlaybackState.STATE_PLAYING && s.getState() != PlaybackState.STATE_PAUSED) return;
+            last = s;
+            MediaMetadata m = c.getMetadata();
+            if (m != null) duration = m.getLong(MediaMetadata.METADATA_KEY_DURATION);
+        }
+
+        void notePosition() {
+            if (savedRaw.isEmpty() || savedAs == null || last == null) return;
+            long at = last.getPosition();
+            if (last.getState() == PlaybackState.STATE_PLAYING && last.getLastPositionUpdateTime() > 0) {
+                at += (long) ((SystemClock.elapsedRealtime() - last.getLastPositionUpdateTime()) * last.getPlaybackSpeed());
+            }
+            RecentStore.notePosition(WatchService.this, c.getPackageName(), savedAs, at, duration);
         }
     }
 
