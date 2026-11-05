@@ -118,9 +118,14 @@ final class Football {
         return id;
     }
 
+    /** Where cricket is on until you choose (Talkies settings → Sports turns it on anywhere). An idea from codermert. */
+    private static final Set<String> CRICKET_COUNTRIES = new java.util.HashSet<>(java.util.Arrays.asList(
+            "IN", "PK", "BD", "LK", "AF", "NP", "AE", "OM", "AU", "NZ", "GB", "IE", "ZA", "ZW",
+            "JM", "TT", "BB", "GY", "AG", "DM", "GD", "KN", "LC", "VC"));
+
     /**
-     * Your choice, or until you make one: cricket and football everywhere, and the NBA and NFL too in the US and
-     * Canada. The old Live scores setting ("both", "cricket", "football", "off") carries over.
+     * Your choice, or until you make one: football everywhere, cricket where it's widely followed, and the NBA and NFL
+     * too in the US and Canada. The old Live scores setting ("both", "cricket", "football", "off") carries over.
      */
     static Set<String> sportsOn(Context c) {
         Set<String> on = new java.util.HashSet<>();
@@ -130,7 +135,7 @@ final class Football {
             for (String id : saved.split(",")) if (!id.isEmpty()) on.add(id);
         } else {
             String old = home.getString("scores", "both");
-            if (old.equals("both") || old.equals("cricket")) on.add("cricket");
+            if (old.equals("cricket") || (old.equals("both") && (home.contains("scores") || CRICKET_COUNTRIES.contains(cc)))) on.add("cricket");
             if (old.equals("both") || old.equals("football")) on.add("football");
             if (!home.contains("scores") && (cc.equals("US") || cc.equals("CA"))) { on.add("nba"); on.add("nfl"); }
         }

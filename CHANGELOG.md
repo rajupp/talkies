@@ -3,6 +3,15 @@
 Versions are numbered *major.minor.fix*. While Talkies is in beta they start with 0: a new minor number brings new
 features, a new fix number only fixes. The version shows in Talkies settings → About.
 
+## Unreleased
+
+### Changed
+- **Home is smoother.** Pictures you've just seen stay in memory and the rest load on their own threads, and fonts are
+  made once. Switching tabs on a OnePlus TV went from over a third of frames running late to about one in ten or
+  fewer. Ideas from codermert.
+- **Cricket is on to start only where it's widely followed.** Elsewhere, Talkies settings → Sports turns it on. If you
+  already chose your sports, nothing changes. An idea from codermert.
+
 ## 1.2.9 — 5 November 2026
 
 ### New

@@ -89,7 +89,7 @@ Control Center → **Talkies settings**, or **hold OK on the ⚙ icon** (a press
 | Picks languages | Only while For You is shown: **All** (the default) or the languages you choose for Trending and New in …. See [Languages](#languages) |
 | Hide spoilers | Off (default) or On. On: an episode you haven't started yet shows the show's own art in Continue instead of the app's still from that episode, or the still blurred when the app gives nothing else. Episodes you're partway through keep their still |
 | Sharp YouTube pictures | Off by default. On: YouTube cards in Continue get YouTube's 1280-pixel thumbnails, looked up by title and channel |
-| Sports | Cricket, Football, NBA and NFL, each On or Off: what the score line and the score rows show. Cricket and football to start, plus the NBA and NFL in the US and Canada |
+| Sports | Cricket, Football, NBA and NFL, each On or Off: what the score line and the score rows show. Football to start, cricket too where it's widely followed, plus the NBA and NFL in the US and Canada |
 | Football leagues | Only while Football is on: the leagues the Football row follows; see [Football](#football) |
 | Continue apps | Each app with something to continue: Shown or Hidden, for the Continue tab and the Watch Next row |
 | Channels | Choose which app channels show below the dock, and their order |

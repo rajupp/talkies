@@ -456,7 +456,7 @@ public class HomeActivity extends Activity {
             boolean selected = i == tabIdx, f = zone == Z_TABS && selected;
             tabs[i].setVisibility(picksFor(i).isEmpty() ? View.GONE : View.VISIBLE);
             tabs[i].setTextColor(f ? theme.iconFocusFg : selected ? theme.text : theme.text2);
-            tabs[i].setFontVariationSettings(selected ? "'wght' 600" : "'wght' 400");
+            tabs[i].setTypeface(Fonts.outfit(this, selected ? 600 : 400));
             tabs[i].setBackground(f ? rounded(theme.iconFocusBg, 0, 15) : null);
         }
         credit.setVisibility(!forYou || tabIdx == 0 || rowPicks.isEmpty() ? View.GONE : View.VISIBLE);
@@ -1270,8 +1270,7 @@ public class HomeActivity extends Activity {
             title.setTag("chanTitle");
             title.setText(ch.title);
             title.setTextSize(16);
-            title.setTypeface(getResources().getFont(R.font.outfit));
-            title.setFontVariationSettings("'wght' 550");
+            title.setTypeface(Fonts.outfit(this, 550));
             header.addView(title);
             row.addView(header, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, px(28)));
 
@@ -1311,8 +1310,7 @@ public class HomeActivity extends Activity {
             name.setSingleLine(true);
             name.setEllipsize(android.text.TextUtils.TruncateAt.END);
             name.setTextSize(15);
-            name.setTypeface(getResources().getFont(R.font.outfit));
-            name.setFontVariationSettings("'wght' 600");
+            name.setTypeface(Fonts.outfit(this, 600));
             caption.addView(name);
             TextView meta = new TextView(this);
             meta.setTag("meta");
@@ -1352,13 +1350,9 @@ public class HomeActivity extends Activity {
         img.setScaleType(ImageView.ScaleType.CENTER_CROP);
         card.addView(img, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
         if (p.image != null && p.image.isFile()) {
-            final File f = p.image;
-            background.execute(() -> {
-                BitmapFactory.Options o = new BitmapFactory.Options();
-                o.inPreferredConfig = Bitmap.Config.RGB_565;
-                Bitmap b = BitmapFactory.decodeFile(f.getPath(), o);
-                if (b != null) runOnUiThread(() -> img.setImageBitmap(b));
-            });
+            Bitmap ready = Pictures.ready(p.image, 1);
+            if (ready != null) img.setImageBitmap(ready);
+            else Pictures.load(p.image, 1, b -> { if (b != null) img.setImageBitmap(b); });
         } else if (p.pkg != null) {
             showAppLogo(card, img, p.pkg);
         }
@@ -1426,8 +1420,7 @@ public class HomeActivity extends Activity {
         name.setTag("cricketText");
         name.setText(team);
         name.setTextSize(15);
-        name.setTypeface(getResources().getFont(R.font.outfit));
-        name.setFontVariationSettings("'wght' 600");
+        name.setTypeface(Fonts.outfit(this, 600));
         name.setTextColor(theme.text);
         line.addView(name, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1));
         TextView sc = new TextView(this);
@@ -1435,8 +1428,7 @@ public class HomeActivity extends Activity {
         sc.setText(runs);
         sc.setSingleLine(true);
         sc.setTextSize(14);
-        sc.setTypeface(getResources().getFont(R.font.outfit));
-        sc.setFontVariationSettings("'wght' 500");
+        sc.setTypeface(Fonts.outfit(this, 500));
         sc.setTextColor(theme.text);
         line.addView(sc);
         LinearLayout.LayoutParams ll = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, px(26));
@@ -1615,8 +1607,7 @@ public class HomeActivity extends Activity {
         name.setSingleLine(true);
         name.setEllipsize(android.text.TextUtils.TruncateAt.END);
         name.setTextSize(16);
-        name.setTypeface(getResources().getFont(R.font.outfit));
-        name.setFontVariationSettings("'wght' 600");
+        name.setTypeface(Fonts.outfit(this, 600));
         LinearLayout.LayoutParams nl = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
         nl.topMargin = px(9);
         nl.leftMargin = px(2);
@@ -1627,8 +1618,7 @@ public class HomeActivity extends Activity {
         meta.setSingleLine(true);
         meta.setEllipsize(android.text.TextUtils.TruncateAt.END);
         meta.setTextSize(12.5f);
-        meta.setTypeface(getResources().getFont(R.font.outfit));
-        meta.setFontVariationSettings("'wght' 400");
+        meta.setTypeface(Fonts.outfit(this, 400));
         meta.setAlpha(0f);
         LinearLayout.LayoutParams ml = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
         ml.topMargin = px(2);
@@ -1714,13 +1704,16 @@ public class HomeActivity extends Activity {
             return;
         }
         v.setTag(R.id.img_state, want);
-        background.execute(() -> {
-            Bitmap b = decode(file, sample);
-            runOnUiThread(() -> {
-                if (!want.equals(v.getTag(R.id.img_state))) return;
-                if (b != null) v.setImageBitmap(b);
-                if (shown != null) shown.run();
-            });
+        Bitmap ready = Pictures.ready(file, sample);
+        if (ready != null) {
+            v.setImageBitmap(ready);
+            if (shown != null) shown.run();
+            return;
+        }
+        Pictures.load(file, sample, b -> {
+            if (!want.equals(v.getTag(R.id.img_state))) return;
+            if (b != null) v.setImageBitmap(b);
+            if (shown != null) shown.run();
         });
     }
 
@@ -1734,14 +1727,6 @@ public class HomeActivity extends Activity {
         TextView name = item.findViewWithTag("name"), meta = item.findViewWithTag("meta");
         if (name != null) name.setTextColor(theme.text);
         if (meta != null) meta.setTextColor(theme.text2);
-    }
-
-    /** Photos don't need an alpha channel: RGB_565 halves their memory with no visible difference here. */
-    private static Bitmap decode(File f, int sample) {
-        BitmapFactory.Options o = new BitmapFactory.Options();
-        o.inSampleSize = sample;
-        o.inPreferredConfig = Bitmap.Config.RGB_565;
-        return BitmapFactory.decodeFile(f.getPath(), o);
     }
 
     /**
@@ -2502,8 +2487,7 @@ public class HomeActivity extends Activity {
             h.setText(heading);
             h.setTextSize(13);
             h.setTextColor(theme.text2);
-            h.setTypeface(getResources().getFont(R.font.outfit));
-            h.setFontVariationSettings("'wght' 500");
+            h.setTypeface(Fonts.outfit(this, 500));
             h.setPadding(px(14), px(8), px(14), px(6));
             menu.addView(h);
         }
@@ -3037,8 +3021,7 @@ public class HomeActivity extends Activity {
         t.setTextColor(color);
         t.setSingleLine(true);
         t.setEllipsize(android.text.TextUtils.TruncateAt.END);
-        t.setTypeface(getResources().getFont(R.font.outfit));
-        t.setFontVariationSettings("'wght' " + weight);
+        t.setTypeface(Fonts.outfit(this, weight));
         return t;
     }
 
@@ -4280,8 +4263,7 @@ public class HomeActivity extends Activity {
         h.setTextSize(11);
         h.setLetterSpacing(0.12f);
         h.setTextColor(theme.text2);
-        h.setTypeface(getResources().getFont(R.font.outfit));
-        h.setFontVariationSettings("'wght' 600");
+        h.setTypeface(Fonts.outfit(this, 600));
         h.setPadding(px(14), px(12), px(14), px(4));
         menu.addView(h);
     }
@@ -4291,8 +4273,7 @@ public class HomeActivity extends Activity {
         t.setText(text);
         t.setTextSize(21);
         t.setTextColor(theme.text);
-        t.setTypeface(getResources().getFont(R.font.outfit));
-        t.setFontVariationSettings("'wght' 600");
+        t.setTypeface(Fonts.outfit(this, 600));
         t.setPadding(px(14), px(10), px(14), px(8));
         menu.addView(t);
         return t;
@@ -5699,6 +5680,14 @@ public class HomeActivity extends Activity {
         Log.i(TAG, "Apps' rows changed: rereading");
         refreshWatchNext();
     };
+
+    /** Short of memory, or a low-memory TV with Talkies out of sight: decoded pictures can be made again. */
+    @Override
+    public void onTrimMemory(int level) {
+        super.onTrimMemory(level);
+        if (level >= TRIM_MEMORY_BACKGROUND || level == TRIM_MEMORY_RUNNING_LOW || level == TRIM_MEMORY_RUNNING_CRITICAL
+                || (level == TRIM_MEMORY_UI_HIDDEN && lowMemory())) Pictures.clear();
+    }
 
     @Override
     protected void onStop() {
