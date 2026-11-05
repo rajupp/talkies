@@ -1,14 +1,7 @@
-### New
-- **Continue knows more.** YouTube cards open where you left off, cards can show a progress bar, and finished titles leave Watch Next's cards. Netflix's cards can take a while to appear after you watch.
-- **Emoji on the Board.** Hearts and other emoji in your message get a tile of their own. Select **Talkies settings → Screensaver message**.
-- **A live score over TV.** Hold OK on a match, then select **Pin over TV**. A small card stays in a corner while you watch.
-
 ### Changed
-- **More jobs for Remote keys.** Previous app, Resume watching, one input, Play / pause, Mute and more. Select **Talkies settings → Remote keys**.
-- **All apps button.** Hide the round button so your apps fill the dock. Select **Talkies settings → All apps button**.
-- **Rows the screen cuts off fade away** as you move down the page.
-- **TV's screensaver.** Make Talkies the TV's screensaver, for TVs whose settings don't list it. Select **Talkies settings → TV's screensaver**.
-- **App rows and links.** Rows update while Home is open, and a card from an app's row can only open that app.
+- **Home is smoother.** Pictures you've just seen stay in memory, so switching tabs runs more smoothly.
+- **Cricket to start.** It's on to start only where it's widely followed. Select **Talkies settings → Sports** to change it.
 
 ### Fixed
-- **Continue shows what you just watched.** Today's titles come first, and a YouTube card opens that video.
+- **For You keeps its cards offline.** With StreamRadar, a refresh with no internet could leave the row blank for hours. Now the cards stay.
+- **For You after a restart.** If the TV's storage is slow to start, your saved cards still appear, without waiting for the internet.

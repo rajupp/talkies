@@ -8,8 +8,8 @@ android {
         minSdk 26          // Android 8.0, the first with home-screen channels (TvContract preview programs)
         targetSdk 35
         // Each release: versionName as in CHANGELOG.md, versionCode one higher (Android installs only higher codes as updates).
-        versionCode 24
-        versionName '1.2.9'
+        versionCode 25
+        versionName '1.2.10'
     }
     // The project's release key, when this computer has it (release.properties, never in git): APKs signed with it
     // can update each other from Talkies settings → Updates. Anyone else's build signs with their own debug key.
