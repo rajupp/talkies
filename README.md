@@ -181,6 +181,7 @@ What people have told us, besides the OnePlus TV it's made on. Yours isn't here,
 | Sony (Google TV) | Sound output opens Display & sound, where Audio output picks the speakers. |
 | Sony XF9005 (2018, Android TV) | Responsive, with CleanYourTV alongside. |
 | TCL with 1 GB of memory | Can feel slow; Effects switches to Lite on its own on TVs like these (Talkies settings → Effects). |
+| Jio 4K set-top box (JMSC200A, Android 11) | Runs it. On one tested box the in-app updater downloaded the APK but no install confirmation screen appeared, so updating over ADB is the reliable fallback ([Updates](#updates)). |
 
 ## Updates
 
@@ -196,6 +197,21 @@ at any time. Your settings stay as they are.
   `adb install -r talkies.apk` installs the same APK and keeps your settings ([With a computer](#with-a-computer)).
 - Only APKs from this project's releases, signed with its key, are installed. Talkies checks the download's size and
   checksum against GitHub's, its version and its signature first.
+
+**If the update downloads but no Install screen appears.** Some TVs and set-top boxes do not complete the on-device
+confirmation flow even though Android's package installer is present. From a computer, `adb install -r` installs the
+same APK through Android's package manager and replaces the app while keeping its data, so the same command installs
+and updates:
+
+```bash
+adb -s 192.168.1.20:5555 install -r talkies.apk
+```
+
+`adb` and the TV's address are set up as under [With a computer](#with-a-computer); the version shows in Talkies
+settings → About. From a clone of this repository, `./update.sh` downloads the latest release and runs that command.
+The optional `WRITE_SECURE_SETTINGS` grant lets Talkies change certain TV settings; it does not give the app ADB shell
+access, so an app on the TV cannot run `adb install` itself. `./update.sh` also needs Python 3 plus `aapt` and
+`apksigner` from Android SDK Build Tools to verify the release before installing it.
 
 **Coming from a version you built yourself** (0.4 or earlier)? It's signed with your own computer's key, so the
 release APK can't install over it. Back up your settings (`./backup-settings.sh`), uninstall Talkies, install the
@@ -234,6 +250,7 @@ Control Center and remote-button remapping. They work together: run CleanYourTV 
 | **No Notification access screen** (many Android 8 TVs) | The TV's settings don't have one, so Finish setup leaves it out: it's optional, for Continue, Now playing and the bell. From a computer: `adb shell cmd notification allow_listener com.techpp.glass/com.techpp.glass.WatchService`. With the `WRITE_SECURE_SETTINGS` grant from the install steps, Finish setup switches it on itself. |
 | **Google Play Protect blocks the install** | Choose *More details* → *Install anyway*. Talkies isn't on the Play Store, so Protect doesn't know it. |
 | **"App blocked to protect your device"** (only a *Got it* button) | Play Protect blocks apps from outside the Play Store that ask for Accessibility or notification access, which Talkies uses for Home, Turn off and Continue; it's about those permissions, not Talkies' code, and there's no *Install anyway*. Turn off Play Protect's scanning (Play Store → your profile → Play Protect → ⚙ → *Scan apps with Play Protect*), install, then turn it back on; Talkies keeps working. Or install from a computer: `adb install talkies.apk` isn't blocked. |
+| **The bell downloads an update, then nothing opens to install it** | The TV did not complete Android's install-confirmation flow. From a computer, `adb -s <TV-address> install -r talkies.apk` installs the update through Android's package manager and keeps the app's data ([Updates](#updates)). |
 | **"App not installed."** | Usually a Talkies you built yourself is already on the TV, signed with another key: see *Coming from a version you built yourself* under [Updates](#updates). On a first install, it can also be Play Protect refusing it without saying so: some TVs block apps from outside the Play Store that ask for Accessibility or notification access, which Talkies uses for Home, Turn off and Continue. Turn Play Protect off (Play Store → your profile → Play Protect), install, then turn it back on; Talkies keeps working. Otherwise, free some storage and try again. |
 | **Inputs shows only Live TV** | Your device has no HDMI inputs of its own (a streamer like the Google TV Streamer or Shield). On a TV, its HDMI ports are listed. |
 | **No Screensaver** in Control Center | Your device gives apps no way to start the screensaver, so Talkies leaves the button out. It still starts by itself after the idle time set in the TV's settings. |
