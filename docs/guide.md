@@ -53,7 +53,7 @@ you set once is in **Talkies settings**, at the top.
 | Weather | The current weather on the right; OK shows the next six hours, and OK again the next six days (high / low and conditions) |
 | Sleep timer | Cycles Off → 30 → 60 → 90 min; the time left shows on the right. A minute before, a card counts down over whatever is playing: **OK** gives 15 more minutes |
 | Turn off now | Puts the TV in standby |
-| Recent apps | The apps you opened through Talkies (dock, All apps, picks, channels, remote buttons), newest first, with their banners; OK opens one. Also on a remote button: Remote keys → Recent apps |
+| Recent apps | Big cards of the apps you opened through Talkies (dock, All apps, picks, channels, remote buttons) or left with Home, newest first. A card shows the app's logo on its colour. Left and Right move, OK opens, Back closes. **Press Home twice quickly** to open it, from Talkies or from inside an app (needs Remote keys On). Also on a remote button: Remote keys → Recent apps |
 | Storage | Shows the free space ("12.4 GB free of 32 GB"); OK opens the TV's storage settings |
 | Animations | Cycles the speed of every animation on the TV: 1× → 0.5× → Off. Faster makes menus and app switches feel snappier; Off also stills Talkies' own motion. Needs the `WRITE_SECURE_SETTINGS` grant (see [Google Assistant](#google-assistant-and-the-google-tv-launcher)) |
 | Network | Shows the Wi-Fi name (or Ethernet); OK opens Wi-Fi settings |
@@ -521,8 +521,9 @@ Preferences → Accessibility → Talkies). It:
   of its pages), except within 8 seconds of the Assistant, so its results stay up. The built-in launchers are found
   when the service starts (Google TV's, Android TV's or the TV maker's: system apps that can be the home screen);
   launchers you installed yourself, like Projectivy, are left alone;
-- sees only the windows of JioHotstar, those launchers and the Assistant, and filters only Home, OK while the sleep
-  warning is up, and remote buttons you've given a job.
+- watches only the windows of JioHotstar, those launchers and the Assistant, and filters only Home, OK while the
+  sleep warning is up, and remote buttons you've given a job;
+- when you press Home in an app, asks which app that was, for Recent apps.
 
 If the service is ever off, Home shows Google TV (with its ads) until you switch it back on. `build-and-install.sh`
 warns when it's off. Android switches it off if Talkies is force-stopped (it counts as a crash), so don't use

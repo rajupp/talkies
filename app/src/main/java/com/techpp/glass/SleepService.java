@@ -48,6 +48,8 @@ import java.util.List;
  * With "At power-on: Talkies, every time" set, Talkies also comes up each time the TV wakes from standby, unless you
  * press a button first (an idea from CleanYourTV's power_on_home_always, MIT); with an app or input chosen there, that
  * opens instead, after a restart too (an idea from Aerial, MIT).
+ * When you press Home in an app it asks which app that was, for Recent apps (some apps don't say).
+ * Pressing Home twice quickly opens Recent apps; the second press doesn't reach Android.
  * The sleep warning is a small card drawn as an accessibility overlay, so no "display over other apps" permission.
  * You switch it on yourself in Settings → Device Preferences → Accessibility; if a force stop switches it off,
  * ServiceRepair can put it back (see there).
@@ -73,6 +75,24 @@ public class SleepService extends AccessibilityService {
     private final Runnable dashboard = () -> performGlobalAction(GLOBAL_ACTION_NOTIFICATIONS);
     private final Runnable homeHold = () -> { homeHeld = true; dashboard.run(); };
     private boolean homeHeld;
+    /**
+     * Android holds Home until this service answers, on the main thread. If that's late (busy TV, a video playing) it
+     * sees a key still down, takes it for a long press, and doesn't go home. So: nothing slow is asked while answering
+     * (these two are read beforehand), and if Talkies still isn't up soon after a press, it's opened from here.
+     */
+    private volatile boolean otherHome, systemHome = true;
+    private static final long HOME_NET_MS = 1000;
+    private final Runnable homeSafetyNet = () -> {
+        if (HomeState.inFront) return;
+        Log.i(TAG, "Home didn't open Talkies: opening it");
+        openHome();
+    };
+    /** Home's second press within DOUBLE_MS of the first's release opens Recent apps. */
+    private static final long DOUBLE_MS = 400;
+    private long homeDownAt, homeUpAt;
+    private boolean homeSecond;
+    /** For what waits on other processes: this service's main thread is the one Home's key is waiting on. */
+    private static final java.util.concurrent.ExecutorService slowThread = java.util.concurrent.Executors.newSingleThreadExecutor();
     private BroadcastReceiver screenOn;
     private final Handler main = new Handler(Looper.getMainLooper());
 
@@ -116,6 +136,7 @@ public class SleepService extends AccessibilityService {
     @Override protected void onServiceConnected() {
         running = this;
         findStockHomes();
+        readHomeSetup();
         ServiceRepair.connected(this, SleepService.class);
         if (ScoreCard.pinnedId(this) != null) scoreChanged(null);
         // After a restart the Google TV home screen is up before this service binds: take over once.
@@ -153,12 +174,33 @@ public class SleepService extends AccessibilityService {
         keyAt = SystemClock.elapsedRealtime();
         if (code == KeyEvent.KEYCODE_HOME) {
             // You chose a launcher you installed yourself (Projectivy…) as the home app: Home is its, not ours.
-            if (otherLauncherChosen()) return false;
+            if (otherHome) return false;
+            boolean firstDown = event.getAction() == KeyEvent.ACTION_DOWN && event.getRepeatCount() == 0;
+            // When you pressed it, not when this got to it: the main thread can be busy as Talkies comes up.
+            long pressedAt = event.getEventTime();
+            if (firstDown && pressedAt - homeUpAt < DOUBLE_MS) homeSecond = true;
+            if (homeSecond) {
+                if (event.getAction() == KeyEvent.ACTION_UP) {
+                    homeSecond = false;
+                    homeUpAt = 0;
+                    recentsFromHome();
+                }
+                return true;
+            }
+            if (firstDown) {
+                homeDownAt = pressedAt;
+                noteLeftApp();
+            } else if (event.getAction() == KeyEvent.ACTION_UP && pressedAt - homeDownAt < HOLD_MS) {
+                homeUpAt = pressedAt;
+                main.removeCallbacks(homeSafetyNet);
+                if (!HomeState.inFront) main.postDelayed(homeSafetyNet, HOME_NET_MS);
+                slowThread.execute(this::readHomeSetup);  // may have changed in the TV's settings: for next time
+            }
             // Android's own Home also switches the TV to this device's input over HDMI-CEC (One Touch Play), which an
             // app can't do: let it through where that matters. With Talkies the default home app, Android opens
             // Talkies itself; on a streaming box, it opens Google TV's home and the window watcher below brings
             // Talkies back over it. Only a TV with another default home has Home caught here.
-            if (talkiesIsDefaultHome() || streamingBox()) {
+            if (systemHome) {
                 // Held: the dashboard here too. With Talkies the default home app Android doesn't open it; where it
                 // does, asking again leaves it open.
                 if (event.getAction() == KeyEvent.ACTION_DOWN && event.getRepeatCount() == 0) main.postDelayed(dashboard, HOLD_MS);
@@ -211,6 +253,32 @@ public class SleepService extends AccessibilityService {
             held = false;
         }
         return true;
+    }
+
+    /** Home twice. If Talkies somehow doesn't come up for the first press, it's started the ordinary way. */
+    private void recentsFromHome() {
+        HomeState.askRecents();
+        main.postDelayed(() -> { if (HomeState.takeRecentsAsked()) RemoteKeys.run(this, RemoteKeys.RECENTS); }, 1500);
+    }
+
+    /** Home was pressed in an app: Recent apps lists it even if Talkies didn't open it. Off the main thread: this call waits on the app. */
+    private void noteLeftApp() {
+        if (HomeState.inFront) return;
+        slowThread.execute(() -> {
+            try {
+                AccessibilityNodeInfo root = getRootInActiveWindow();
+                CharSequence name = root == null ? null : root.getPackageName();
+                if (name == null) return;  // some apps don't say
+                String pkg = name.toString();
+                android.content.pm.PackageManager pm = getPackageManager();
+                if (pkg.equals(getPackageName()) || stockPackages.contains(pkg)
+                        || (pm.getLeanbackLaunchIntentForPackage(pkg) == null && pm.getLaunchIntentForPackage(pkg) == null)) return;
+                main.post(() -> RecentApps.note(this, pkg));
+            } catch (RuntimeException e) {
+                // A crash here would cost Talkies its place as the default home app, for one line in a list.
+                Log.w(TAG, "Couldn't tell which app Home left: " + e);
+            }
+        });
     }
 
     /** Reports the next remote button to {@code l} (or stops listening, with null). False if the service is off. */
@@ -381,6 +449,15 @@ public class SleepService extends AccessibilityService {
         setServiceInfo(info);
         filtering = want;
         Log.i(TAG, want ? "Watching the remote's buttons" : "Remote's buttons left to the TV");
+    }
+
+    private void readHomeSetup() {
+        try {
+            otherHome = otherLauncherChosen();
+            systemHome = talkiesIsDefaultHome() || streamingBox();
+        } catch (RuntimeException e) {
+            Log.w(TAG, "Couldn't read the home app: " + e);
+        }
     }
 
     private boolean talkiesIsDefaultHome() {

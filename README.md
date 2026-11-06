@@ -161,6 +161,7 @@ opens its switch.
 > Android shows the same strong warning for every accessibility service. Talkies' service filters only the Home
 > button, the buttons you give a job and OK while the sleep timer's warning is up, and notices only when the TV's own launcher, the Assistant or JioHotstar
 > comes up; it reads nothing on screen except JioHotstar's search box, when you open a cricket match there.
+> When you press Home in an app it also asks which app that was, for Recent apps.
 
 Cricket and football scores need no key. Without a TMDB key, Trending and *New in your country* stay away (Continue
 still works), except in India, where they come from [StreamRadar](https://streamradar.bricksgenius.com) until you add

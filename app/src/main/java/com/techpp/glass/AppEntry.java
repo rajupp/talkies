@@ -82,7 +82,7 @@ final class AppEntry {
     /** The pixel size banners are prepared at: the largest a tile is ever drawn. */
     static void setBannerSize(int w, int h) { bannerW = w; bannerH = h; }
 
-    private void load(PackageManager pm) {
+    private synchronized void load(PackageManager pm) {
         if (loaded) return;
         loaded = true;
         banner = customBanner();
@@ -175,6 +175,17 @@ final class AppEntry {
         android.graphics.Paint p = new android.graphics.Paint(android.graphics.Paint.FILTER_BITMAP_FLAG | android.graphics.Paint.ANTI_ALIAS_FLAG);
         c.drawBitmap(b, new android.graphics.Rect(sx, sy, sx + sw, sy + sh), new android.graphics.Rect(0, 0, w, h), p);
         return out;
+    }
+
+    /** The same app, listed again: its art is already in memory, if it was loaded. */
+    synchronized void keepArt(AppEntry old) {
+        synchronized (old) {
+            if (!old.loaded) return;
+            loaded = true;
+            banner = old.banner;
+            icon = old.icon;
+            glow = old.glow;
+        }
     }
 
     Drawable banner(PackageManager pm) { load(pm); return banner; }

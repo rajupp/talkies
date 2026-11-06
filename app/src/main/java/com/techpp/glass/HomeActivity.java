@@ -262,6 +262,7 @@ public class HomeActivity extends Activity {
         pm = getPackageManager();
 
         root = findViewById(R.id.root);
+        HomeState.recentsHere(this::openRecents);
         backdrop = findViewById(R.id.backdrop);
         lite = liteEffects();
         backdrop.setLite(lite);
@@ -972,6 +973,10 @@ public class HomeActivity extends Activity {
             });
         } else if (order == ORDER_AZ) {
             Collections.sort(all, (a, b) -> a.label.compareToIgnoreCase(b.label));
+        }
+        if (artToKeep != null) {
+            for (AppEntry a : all) for (AppEntry old : artToKeep) if (old.pkg.equals(a.pkg)) { a.keepArt(old); break; }
+            for (AppEntry a : docked) for (AppEntry old : artToKeep) if (old.pkg.equals(a.pkg)) { a.keepArt(old); break; }
         }
         apps.clear();
         apps.addAll(docked);
@@ -2087,6 +2092,15 @@ public class HomeActivity extends Activity {
             pressedHere = 0;
             if (!ours) return true;
         }
+        if (recents != null) {
+            if (e.getAction() == KeyEvent.ACTION_DOWN && (k == KeyEvent.KEYCODE_DPAD_LEFT || k == KeyEvent.KEYCODE_DPAD_RIGHT)) {
+                if (recents.move(k == KeyEvent.KEYCODE_DPAD_LEFT ? -1 : 1)) navigationSound(k);
+            } else if (e.getAction() == KeyEvent.ACTION_UP && !e.isCanceled()) {
+                if (back) closeRecents();
+                else if (select) openFromRecents();
+            }
+            return true;
+        }
         boolean onApp = zone == Z_DOCK || zone == Z_GRID || (zone == Z_MENU && menuMode == MENU_CHANNELS)
                 || continueCard() != null || matchCard() != null || (zone == Z_TOP && iconIdx == P_SETTINGS);
         // Holding OK on an app opens its menu, on a Continue card the card's menu, and in the Channels editor
@@ -2345,14 +2359,27 @@ public class HomeActivity extends Activity {
                 Math.round(r.width()), Math.round(r.height())).toBundle();
     }
 
-    private void startFromTile(Intent i) {
+    private void startFromTile(Intent i) { startApp(i, fromTile()); }
+
+    private void startApp(Intent i, Bundle options) {
         try {
-            startActivity(i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK), fromTile());
+            startActivity(i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK), options);
             String pkg = i.getPackage() != null ? i.getPackage() : i.getComponent() != null ? i.getComponent().getPackageName() : null;
             if (pkg != null && !pkg.equals(getPackageName())) RecentApps.note(this, pkg);
         } catch (ActivityNotFoundException | SecurityException ex) {
             Log.w(TAG, "Cannot start " + i, ex);
         }
+    }
+
+    /** The app's banner, else its icon; null if it's gone. */
+    private Drawable artOf(String pkg) {
+        AppEntry a = appFor(pkg);
+        Drawable d = a != null ? a.banner(pm) : null;
+        try {
+            if (d == null) d = pm.getApplicationBanner(pkg);
+            if (d == null) d = pm.getApplicationIcon(pkg);
+        } catch (PackageManager.NameNotFoundException ignored) { }
+        return d;
     }
 
     private void start(Intent i) {
@@ -5179,45 +5206,64 @@ public class HomeActivity extends Activity {
 
     // ---------------------------------------------------------------- recent apps
 
+    private RecentsCards recents;
+
     /**
-     * Control Center → Recent apps (or a remote button set to it): the apps you opened last, newest first, each with
-     * its banner. OK opens one.
+     * Double-press Home, Control Center → Recent apps, or a remote button set to it: big cards of the apps you used
+     * last, newest first (RecentsCards).
      */
     private void openRecents() {
         if (menuScroll.getVisibility() == View.VISIBLE) closeMenu();
-        List<String> recent = RecentApps.list(this);
-        beginMenu(P_CONTROL, recent.isEmpty() ? "Recent apps" : "Recent apps  ·  newest first");
-        int shown = 0;
-        for (String pkg : recent) {
-            Intent launch = pm.getLeanbackLaunchIntentForPackage(pkg);
-            if (launch == null) launch = pm.getLaunchIntentForPackage(pkg);
-            if (launch == null) continue;  // uninstalled since
-            final Intent open = launch;
+        closeRecents();
+        recentsOpenedAt = android.os.SystemClock.elapsedRealtime();
+        List<RecentsCards.Entry> entries = new ArrayList<>();
+        for (String pkg : RecentApps.list(this)) {
             AppEntry a = appFor(pkg);
-            String label = a != null ? a.label : Channels.label(pm, pkg);
-            LinearLayout row = (LinearLayout) addRow(label, shown == 0 ? "last used" : null, () -> startFromTile(open), false);
-            ImageView thumb = new ImageView(this);
-            Drawable d = a != null ? a.banner(pm) : null;
-            if (d == null) {
-                try { d = pm.getApplicationBanner(pkg); } catch (PackageManager.NameNotFoundException ignored) { }
-            }
-            if (d != null) {
-                thumb.setScaleType(ImageView.ScaleType.CENTER_CROP);
-                thumb.setImageDrawable(d);
-            } else {
-                thumb.setScaleType(ImageView.ScaleType.FIT_CENTER);
-                try { thumb.setImageDrawable(pm.getApplicationIcon(pkg)); } catch (PackageManager.NameNotFoundException ignored) { }
-            }
-            thumb.setBackground(rounded(theme.tileBg, 0, 4));
-            thumb.setClipToOutline(true);
-            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(px(64), px(36));
-            lp.setMarginEnd(px(12));
-            lp.gravity = Gravity.CENTER_VERTICAL;
-            row.addView(thumb, 0, lp);
-            shown++;
+            if (a == null && pm.getLeanbackLaunchIntentForPackage(pkg) == null && pm.getLaunchIntentForPackage(pkg) == null) continue;  // uninstalled since
+            entries.add(new RecentsCards.Entry(pkg, a != null ? a.label : Channels.label(pm, pkg)));
         }
-        if (shown == 0) addRow("Apps you open show up here", null, () -> { }, true);
-        showMenu(460);
+        RecentsCards cards = new RecentsCards(this, entries, theme.tileBg, lite);
+        recents = cards;
+        cards.setElevation(px(20));
+        ((ViewGroup) findViewById(android.R.id.content)).addView(cards, new ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+        if (!lite) {
+            cards.setAlpha(0f);
+            cards.animate().alpha(1f).setDuration(140).start();
+        }
+        int fallback = theme.tileBg;
+        Thread art = new Thread(() -> {
+            for (RecentsCards.Entry e : entries) {
+                Drawable d = artOf(e.pkg);
+                int color = RecentsCards.colorOf(d, fallback);
+                android.graphics.Bitmap sized;
+                try {
+                    sized = RecentsCards.rounded(d, cards.artWidth(), px(11));
+                } catch (RuntimeException | OutOfMemoryError ex) {
+                    continue;  // its card stays plain
+                }
+                runOnUiThread(() -> { if (recents == cards) cards.showArt(e.pkg, sized, color); });
+            }
+        }, "Recents art");
+        art.setPriority(Thread.NORM_PRIORITY - 1);
+        art.start();
+    }
+
+    /** When the cards came up: the first Home press's own Home may still be on its way, and shouldn't close them. */
+    private long recentsOpenedAt;
+
+    private void closeRecents() {
+        if (recents == null) return;
+        ((ViewGroup) recents.getParent()).removeView(recents);
+        recents = null;
+    }
+
+    private void openFromRecents() {
+        RecentsCards.Entry e = recents.focused();
+        if (e == null) { closeRecents(); return; }
+        Intent open = pm.getLeanbackLaunchIntentForPackage(e.pkg);
+        if (open == null) open = pm.getLaunchIntentForPackage(e.pkg);
+        if (open == null) return;
+        startApp(open, null);
     }
 
     // ---------------------------------------------------------------- control center shortcuts
@@ -5708,6 +5754,7 @@ public class HomeActivity extends Activity {
     @Override
     protected void onStop() {
         super.onStop();
+        closeRecents();
         watchInputs(false);
         getContentResolver().unregisterContentObserver(watchNextChanged);
         getContentResolver().unregisterContentObserver(rowsChanged);
@@ -5725,20 +5772,36 @@ public class HomeActivity extends Activity {
         super.onResume();
         tabs[2].setText("New in " + Region.name(Region.country(this)));  // the country can change (Region)
         inFront = true;
+        HomeState.inFront = true;
         ScoreCard.homeShowing(true);
         watchPlaying();
+        if (HomeState.takeRecentsAsked()) openRecents();
         root.post(this::snapRing);
         // Give Android time to bind the service after Talkies (re)starts before calling it stopped.
         root.removeCallbacks(checkService);
         root.postDelayed(checkService, 6000);
         refreshOnline();   // back on the home screen: catch up on anything that went stale meanwhile
-        if (appsOrder() == ORDER_RECENT && !moving && !recentSig.equals(String.join(",", RecentApps.all(this)))) {
-            String focused = zone == Z_GRID && dockCount + gridIdx < apps.size() ? apps.get(dockCount + gridIdx).pkg : null;
-            reloadApps();
-            int at = focused == null ? -1 : indexOf(focused);
-            if (at >= dockCount) focusGrid(at - dockCount);
-        }
+        root.removeCallbacks(reorderApps);
+        if (appsOrder() == ORDER_RECENT && !recentSig.equals(String.join(",", RecentApps.all(this)))) root.postDelayed(reorderApps, 800);
     }
+
+    /**
+     * All apps sorted by Recently opened, and the order changed: once Home is up, since it rebuilds every tile. Only the
+     * order is new, so the banners already in memory are kept: decoding them all again took half a second.
+     */
+    private final Runnable reorderApps = () -> {
+        if (moving || menuMoving || zone == Z_MENU || recents != null) return;
+        String focused = zone == Z_GRID && dockCount + gridIdx < apps.size() ? apps.get(dockCount + gridIdx).pkg : null;
+        artToKeep = new ArrayList<>(apps);
+        try {
+            reloadApps();
+        } finally {
+            artToKeep = null;
+        }
+        int at = focused == null ? -1 : indexOf(focused);
+        if (at >= dockCount) focusGrid(at - dockCount);
+    };
+    private List<AppEntry> artToKeep;
 
     /** Is the accessibility service down when it should be up? Switch it off and on if we may; else say so. */
     private final Runnable checkService = () -> {
@@ -5781,9 +5844,11 @@ public class HomeActivity extends Activity {
     @Override
     protected void onPause() {
         super.onPause();
+        root.removeCallbacks(reorderApps);
         pressedHere = 0;
         SleepService.learn(null);
         inFront = false;
+        HomeState.inFront = false;
         ScoreCard.homeShowing(false);
         watchPlaying();   // stops following the player
     }
@@ -5825,11 +5890,15 @@ public class HomeActivity extends Activity {
         });
     }
 
+    private final Runnable refreshAfterFocus = this::refreshOnline;
+
     @Override
     public void onWindowFocusChanged(boolean hasFocus) {
         super.onWindowFocusChanged(hasFocus);
         // The screensaver or a system dialog took the screen, or gave it back.
-        if (hasFocus) refreshOnline();
+        // Once Home is drawn: new data can rebuild rows, which would hold it up.
+        root.removeCallbacks(refreshAfterFocus);
+        if (hasFocus) root.postDelayed(refreshAfterFocus, 700);
     }
 
     @Override
@@ -5846,6 +5915,8 @@ public class HomeActivity extends Activity {
             return;
         }
         SleepService.learn(null);  // Home while "Waiting for a button…": stop listening
+        if (recents != null && android.os.SystemClock.elapsedRealtime() - recentsOpenedAt < 800 && intent.getStringExtra(RemoteKeys.EXTRA_OPEN) == null) return;
+        closeRecents();
         // Home: back to the dock at the top, on the Trending tab.
         if (menuMoving) endMenuMove(false);
         if (zone == Z_MENU) {

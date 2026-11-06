@@ -3,6 +3,18 @@
 Versions are numbered *major.minor.fix*. While Talkies is in beta they start with 0: a new minor number brings new
 features, a new fix number only fixes. The version shows in Talkies settings → About.
 
+## Unreleased
+
+### Added
+- **Recent apps as big cards.** Press Home twice quickly, in Talkies or inside an app, then Left and Right to move and
+  OK to switch. Apps you left with Home are listed even if Talkies didn't open them.
+
+### Fixed
+- **Home works when the TV is busy.** With Remote keys On, a slow moment while a video played could make Android take a
+  quick press for a long one, and Home did nothing. Talkies now answers at once, and opens itself if Home still hasn't.
+- **Coming back to Home is smoother with All apps set to Recently opened.** Talkies used to rebuild every tile and decode
+  every app's banner as you returned, whenever the order had changed.
+
 ## 1.2.10 — 5 November 2026
 
 ### Changed

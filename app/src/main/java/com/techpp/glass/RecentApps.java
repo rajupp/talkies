@@ -8,8 +8,8 @@ import java.util.Arrays;
 import java.util.List;
 
 /**
- * The apps you opened most recently through Talkies (the dock, All apps, picks, channel cards, remote buttons), newest
- * first: Control Center → Recent apps, or a remote button set to it. Only what Talkies itself opened, so the
+ * The apps you opened most recently through Talkies (the dock, All apps, picks, channel cards, remote buttons) or left
+ * with Home, newest first: double-press Home, Control Center → Recent apps, or a remote button set to it. The
  * accessibility service still watches no other app's windows. An idea from tvOS Launcher's Recent Apps.
  */
 final class RecentApps {
