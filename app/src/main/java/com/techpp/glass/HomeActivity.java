@@ -97,6 +97,9 @@ public class HomeActivity extends Activity {
     // Channel rows, below the dock: header, a row of cards, the focused card's title and description.
     private static final int CHAN_TOP = 548, CHAN_ROW_H = 212, CH_W = 200, CH_H = 112, CH_GAP = 18, CRICKET_W = 280;
     private static final int MENU_PLAIN = 0, MENU_CHANNELS = 1;
+    // Talkies settings → Apps on Home: All apps above the dock, two rows of five at a time.
+    private static final int HOME_APPS_W = 730, HOME_APPS_GAP_X = 20, HOME_APPS_GAP_Y = 24, HOME_APPS_COLS = 5, HOME_APPS_TOP = 172,
+            HOME_APPS_PAD_X = 20, HOME_APPS_PAD_Y = 14;
 
     private float dp;
     private SharedPreferences prefs;
@@ -1012,7 +1015,8 @@ public class HomeActivity extends Activity {
     private void applyTileSizes() {
         gridCols = prefs.getInt("grid_cols", 6);
         if (gridCols < 4 || gridCols > 6) gridCols = 6;
-        gridTileW = (GRID_WIDTH - (gridCols - 1) * GRID_GAP_X) / gridCols;
+        if (appsOnHome()) gridCols = HOME_APPS_COLS;
+        gridTileW = ((appsOnHome() ? HOME_APPS_W : GRID_WIDTH) - (gridCols - 1) * gridGapX()) / gridCols;
         gridTileH = Math.round(gridTileW * 9 / 16f);
         int dockW = dockSize() == 4 ? DOCK_4_W : DOCK_MAX_W;
         AppEntry.setBannerSize(px(Math.max(gridTileW * 1.10f, dockW * 1.14f)), px(Math.max(gridTileH * 1.10f, dockW * 9 / 16f * 1.14f)));
@@ -1061,7 +1065,7 @@ public class HomeActivity extends Activity {
         dockTiles.clear();
         // The dock's apps and, when any are left over, the round All apps button share the band's width: seven
         // apps are 106 dp wide, five 146, ten 73. Four are 198, too tall for the band, which grows upward to hold them.
-        boolean more = apps.size() > dockCount && prefs.getBoolean("all_apps_button", true);
+        boolean more = apps.size() > dockCount && prefs.getBoolean("all_apps_button", true) && !appsOnHome();
         int n = Math.max(1, dockCount);   // the apps it has: with fewer than Dock size, they needn't shrink for empty places
         float inner = getResources().getDisplayMetrics().widthPixels / dp - 40 - 36;
         boolean four = dockSize() == 4;
@@ -1094,21 +1098,25 @@ public class HomeActivity extends Activity {
                 row.setOrientation(LinearLayout.HORIZONTAL);
                 row.setClipChildren(false);
                 LinearLayout.LayoutParams rl = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-                if (g > 0) rl.topMargin = px(GRID_GAP_Y);
+                if (g > 0) rl.topMargin = px(gridGapY());
                 grid.addView(row, rl);
             }
             View t = appTile(apps.get(i), gridTileW, gridTileH);
             LinearLayout.LayoutParams lp = (LinearLayout.LayoutParams) t.getLayoutParams();
-            if (g % gridCols > 0) lp.leftMargin = px(GRID_GAP_X);
+            if (g % gridCols > 0) lp.leftMargin = px(gridGapX());
             row.addView(t, lp);
             gridTiles.add(t);
         }
-        allAppsLabel.setVisibility(gridTiles.isEmpty() ? View.GONE : View.VISIBLE);
+        allAppsLabel.setVisibility(gridTiles.isEmpty() || appsOnHome() ? View.GONE : View.VISIBLE);
         layoutPage();
         focusedView = null;
     }
 
     /** Where All apps starts: after the channel rows. */
+    private int gridGapX() { return appsOnHome() ? HOME_APPS_GAP_X : GRID_GAP_X; }
+
+    private int gridGapY() { return appsOnHome() ? HOME_APPS_GAP_Y : GRID_GAP_Y; }
+
     private int gridTopDp() { return CHAN_TOP + chanRows.size() * CHAN_ROW_H + 18 + 40; }
 
     /**
@@ -1116,15 +1124,97 @@ public class HomeActivity extends Activity {
      * without this the parent caps it at the screen and everything below is clipped away).
      */
     private void layoutPage() {
+        placeGrid();
+        if (appsOnHome()) {
+            ViewGroup.LayoutParams plp = page.getLayoutParams();
+            plp.height = px(CHAN_TOP + chanRows.size() * CHAN_ROW_H + 120);
+            page.setLayoutParams(plp);
+            return;
+        }
         int gridTop = gridTopDp();
         ((ViewGroup.MarginLayoutParams) allAppsLabel.getLayoutParams()).topMargin = px(gridTop - 40);
         ((ViewGroup.MarginLayoutParams) grid.getLayoutParams()).topMargin = px(gridTop);
         int rows = (gridTiles.size() + gridCols - 1) / gridCols;
         ViewGroup.LayoutParams plp = page.getLayoutParams();
-        plp.height = px(gridTop + rows * (gridTileH + GRID_GAP_Y) + 120);
+        plp.height = px(gridTop + rows * (gridTileH + gridGapY()) + 120);
         page.setLayoutParams(plp);
         allAppsLabel.requestLayout();
         grid.requestLayout();
+    }
+
+    /** Talkies settings → Apps on Home: with For You hidden, All apps fills the space above the dock. */
+    private boolean appsOnHome() { return !forYou && prefs.getBoolean("apps_on_home", false); }
+
+    private FrameLayout homeApps;
+    private ImageView homeAppsMore;
+    private ViewGroup.LayoutParams gridPageParams;
+    private int gridPageIndex, homeTopRow;
+
+    /** All apps in its place: on the page below everything, or in the window above the dock that shows two rows. */
+    private void placeGrid() {
+        if (homeApps == null) {
+            gridPageParams = grid.getLayoutParams();
+            gridPageIndex = page.indexOfChild(grid);
+            homeApps = new FrameLayout(this);
+            homeApps.setPadding(px(HOME_APPS_PAD_X), px(HOME_APPS_PAD_Y), px(HOME_APPS_PAD_X), px(HOME_APPS_PAD_Y));
+            homeApps.setClipToPadding(false);
+            homeApps.setClipChildren(false);
+            FrameLayout.LayoutParams lp = new FrameLayout.LayoutParams(px(HOME_APPS_W + 2 * HOME_APPS_PAD_X), ViewGroup.LayoutParams.WRAP_CONTENT, Gravity.CENTER_HORIZONTAL | Gravity.TOP);
+            page.addView(homeApps, lp);
+            homeAppsMore = new ImageView(this);
+            homeAppsMore.setImageResource(R.drawable.ic_chevron_down);
+            homeAppsMore.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);
+            page.addView(homeAppsMore, new FrameLayout.LayoutParams(px(24), px(24), Gravity.CENTER_HORIZONTAL | Gravity.TOP));
+        }
+        boolean on = appsOnHome();
+        homeApps.setVisibility(on ? View.VISIBLE : View.GONE);
+        if (!on) {
+            homeAppsMore.setVisibility(View.GONE);
+            grid.setTranslationY(0);
+            homeTopRow = 0;
+            if (grid.getParent() != page) {
+                homeApps.removeView(grid);
+                grid.setPaddingRelative(px(40), 0, px(40), 0);
+                page.addView(grid, gridPageIndex, gridPageParams);
+            }
+            return;
+        }
+        if (grid.getParent() != homeApps) {
+            page.removeView(grid);
+            grid.setPaddingRelative(0, 0, 0, 0);
+            homeApps.addView(grid);
+        }
+        int rows = (gridTiles.size() + gridCols - 1) / gridCols;
+        int rowH = gridTileH + HOME_APPS_GAP_Y;
+        int shown = Math.min(rows, 2);
+        // Tall enough for every row, or the rows below the window would be squeezed to fit it.
+        grid.setLayoutParams(new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, px(Math.max(1, rows) * rowH)));
+        FrameLayout.LayoutParams window = (FrameLayout.LayoutParams) homeApps.getLayoutParams();
+        window.topMargin = px(HOME_APPS_TOP - HOME_APPS_PAD_Y);
+        window.height = px(Math.max(0, shown * rowH - HOME_APPS_GAP_Y) + 2 * HOME_APPS_PAD_Y);
+        homeApps.setLayoutParams(window);
+        // clipChildren wouldn't do: it clips each child to its own bounds, and the grid is as tall as all its rows.
+        homeApps.setClipBounds(new android.graphics.Rect(0, 0, px(HOME_APPS_W + 2 * HOME_APPS_PAD_X), window.height));
+        ((FrameLayout.LayoutParams) homeAppsMore.getLayoutParams()).topMargin = px(HOME_APPS_TOP + 2 * rowH - HOME_APPS_GAP_Y + 12);
+        homeAppsMore.setImageTintList(ColorStateList.valueOf(theme.text));
+        homeAppsMore.setImageAlpha(170);
+        homeTopRow = Math.max(0, Math.min(homeTopRow, rows - 2));
+        showHomeRows(false);
+    }
+
+    /** Keeps {@code row} in the two rows the window shows. */
+    private void scrollHomeApps(int row) {
+        if (row < homeTopRow) homeTopRow = row;
+        else if (row > homeTopRow + 1) homeTopRow = row - 1;
+        showHomeRows(true);
+    }
+
+    private void showHomeRows(boolean glide) {
+        float y = -px(homeTopRow * (gridTileH + HOME_APPS_GAP_Y));
+        grid.animate().cancel();
+        if (glide && !lite) grid.animate().translationY(y).setDuration(220).start();
+        else grid.setTranslationY(y);
+        homeAppsMore.setVisibility((homeTopRow + 2) * gridCols < gridTiles.size() ? View.VISIBLE : View.GONE);
     }
 
     // ---------------------------------------------------------------- channels
@@ -1962,7 +2052,7 @@ public class HomeActivity extends Activity {
         for (View v : new View[]{forYouHead, picksRow, dockBand}) fade(v, top <= 0 || v == on, top, bottom);
         fade(allAppsLabel, false, top, bottom);
         for (int i = 0; i < channelsBox.getChildCount(); i++) fade(channelsBox.getChildAt(i), channelsBox.getChildAt(i) == on, top, bottom);
-        for (int i = 0; i < grid.getChildCount(); i++) fade(grid.getChildAt(i), grid.getChildAt(i) == on, top, bottom);
+        if (!appsOnHome()) for (int i = 0; i < grid.getChildCount(); i++) fade(grid.getChildAt(i), grid.getChildAt(i) == on, top, bottom);
     }
 
     private void fade(View v, boolean keep, float top, float bottom) {
@@ -2029,9 +2119,14 @@ public class HomeActivity extends Activity {
         zone = Z_GRID;
         gridIdx = Math.max(0, Math.min(i, gridTiles.size() - 1));
         int row = gridIdx / gridCols;
-        int gridTop = gridTopDp();
-        float rowTop = gridTop + row * (gridTileH + GRID_GAP_Y);
-        scrollPage(px(Math.max(gridTop - 96, rowTop - 190)));
+        if (appsOnHome()) {
+            scrollPage(0);
+            scrollHomeApps(row);
+        } else {
+            int gridTop = gridTopDp();
+            float rowTop = gridTop + row * (gridTileH + GRID_GAP_Y);
+            scrollPage(px(Math.max(gridTop - 96, rowTop - 190)));
+        }
         setFocus(gridTiles.get(gridIdx), moving ? 1.18f : 1.10f, 11);
         updateAmbient();
         styleTop();
@@ -2155,6 +2250,7 @@ public class HomeActivity extends Activity {
             case Z_TOP:
                 if (left && iconIdx > 0) focusTop(iconIdx - 1);
                 else if (right && iconIdx < icons.length - 1 && icons[iconIdx + 1].getVisibility() == View.VISIBLE) focusTop(iconIdx + 1);
+                else if (down && appsOnHome() && !gridTiles.isEmpty()) focusGrid(Math.min(homeTopRow * gridCols + dockToGridCol(dockIdx), gridTiles.size() - 1));
                 else if (down) { if (hasPicks) focusTabs(tabIdx); else focusDock(dockIdx); }
                 break;  // Up, and the ends of the row, go nowhere.
             case Z_TABS:
@@ -2173,9 +2269,13 @@ public class HomeActivity extends Activity {
                 if (left && dockIdx > 0) focusDock(dockIdx - 1);
                 else if (right && dockIdx < dockTiles.size() - 1) focusDock(dockIdx + 1);
                 else if (right && allTile != null) focusAllTile();
+                else if (up && appsOnHome() && !gridTiles.isEmpty()) {
+                    int rows = (gridTiles.size() + gridCols - 1) / gridCols;
+                    focusGrid(Math.min(Math.min(homeTopRow + 1, rows - 1) * gridCols + dockToGridCol(dockIdx), gridTiles.size() - 1));
+                }
                 else if (up) { if (hasPicks) focusPicks(picksRow.anchor()); else focusTop(iconIdx); }
                 else if (down && !chanRows.isEmpty()) focusChan(0, chanCol[0]);
-                else if (down && !gridTiles.isEmpty()) focusGrid(Math.min(dockToGridCol(dockIdx), gridTiles.size() - 1));
+                else if (down && !gridTiles.isEmpty() && !appsOnHome()) focusGrid(Math.min(dockToGridCol(dockIdx), gridTiles.size() - 1));
                 break;
             case Z_ALL:
                 if (left) focusDock(dockTiles.size() - 1);
@@ -2190,13 +2290,15 @@ public class HomeActivity extends Activity {
                 else if (up && chanIdx == 0) focusDock(dockIdx);
                 else if (up) focusChan(chanIdx - 1, chanCol[chanIdx - 1]);
                 else if (down && chanIdx < chanRows.size() - 1) focusChan(chanIdx + 1, chanCol[chanIdx + 1]);
-                else if (down && !gridTiles.isEmpty()) focusGrid(0);
+                else if (down && !gridTiles.isEmpty() && !appsOnHome()) focusGrid(0);
                 break;
             }
             case Z_GRID: {
                 int row = gridIdx / gridCols, col = gridIdx % gridCols;
                 if (left && col > 0) focusGrid(gridIdx - 1);
                 else if (right && col < gridCols - 1 && gridIdx + 1 < gridTiles.size()) focusGrid(gridIdx + 1);
+                else if (up && row == 0 && appsOnHome()) focusTop(iconIdx);
+                else if (down && appsOnHome() && (row + 1) * gridCols >= gridTiles.size()) focusDock(gridToDockCol(col));
                 else if (up && row == 0 && !chanRows.isEmpty()) focusChan(chanRows.size() - 1, chanCol[chanRows.size() - 1]);
                 else if (up && row == 0) focusDock(gridToDockCol(col));
                 else if (up) focusGrid(gridIdx - gridCols);
@@ -4567,7 +4669,17 @@ public class HomeActivity extends Activity {
             tabIdx = TAB_TRENDING;
             buildPicksRow(0);
             if (forYou) refreshOnline();
+            if (prefs.getBoolean("apps_on_home", false)) reloadApps();
         }, true);
+        if (!forYou) {
+            final View[] oh = new View[1];
+            oh[0] = addRow("Apps on Home", prefs.getBoolean("apps_on_home", false) ? "Shown" : "Hidden", () -> {
+                boolean on = !prefs.getBoolean("apps_on_home", false);
+                prefs.edit().putBoolean("apps_on_home", on).apply();
+                setStatus(oh[0], on ? "Shown" : "Hidden");
+                reloadApps();
+            }, true);
+        }
         if (forYou && trending.inIndia()) {
             final View[] pf = new View[1];
             pf[0] = addRow("Picks from", picksFromLabel(), () -> {
@@ -5930,6 +6042,10 @@ public class HomeActivity extends Activity {
         if (tabIdx != TAB_TRENDING && !picksFor(TAB_TRENDING).isEmpty()) {
             tabIdx = TAB_TRENDING;
             buildPicksRow(0);
+        }
+        if (appsOnHome() && homeApps != null) {
+            homeTopRow = 0;
+            showHomeRows(false);
         }
         focusDock(dockIdx);
         // A remote button set to "Inputs" (Control Center → Remote keys).

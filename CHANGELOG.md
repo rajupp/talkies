@@ -9,6 +9,9 @@ features, a new fix number only fixes. The version shows in Talkies settings →
 - **Recent apps as big cards.** Press Home twice quickly, in Talkies or inside an app, then Left and Right to move and
   OK to switch. Apps you left with Home are listed even if Talkies didn't open them.
 
+- **Apps on Home.** With For You hidden, Talkies settings can put All apps above the dock: two rows of five, and Down
+  scrolls to the rest. An idea from Dhananjay.
+
 ### Fixed
 - **Home works when the TV is busy.** With Remote keys On, a slow moment while a video played could make Android take a
   quick press for a long one, and Home did nothing. Talkies now answers at once, and opens itself if Home still hasn't.

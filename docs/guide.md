@@ -85,6 +85,7 @@ Control Center → **Talkies settings**, or **hold OK on the ⚙ icon** (a press
 | **For You and scores** | |
 | Country | **Automatic** (where the TV is, by its time zone), about 25 common countries, or **More countries** (A to Z): the country the picks and scores are for; see [Which country](#trending-and-new-in-) |
 | For You | Shown or Hidden. Hidden removes the tabs and picks (the weather, time and date stay, larger), Up from the dock goes to the icons, and TMDB picks aren't fetched |
+| Apps on Home | Only with For You hidden. Shown puts All apps above the dock, two rows of five, and Down scrolls to the rest. Hidden (the default) leaves that space empty, with All apps below the dock |
 | Picks from | India only: TMDB or StreamRadar, where the picks come from ([In India without a key](#in-india-without-a-key)) |
 | Picks languages | Only while For You is shown: **All** (the default) or the languages you choose for Trending and New in …. See [Languages](#languages) |
 | Hide spoilers | Off (default) or On. On: an episode you haven't started yet shows the show's own art in Continue instead of the app's still from that episode, or the still blurred when the app gives nothing else. Episodes you're partway through keep their still |
