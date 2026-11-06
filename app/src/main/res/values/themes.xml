@@ -6,5 +6,8 @@
         <item name="android:windowNoTitle">true</item>
         <item name="android:colorBackground">@android:color/black</item>
         <item name="android:windowAnimationStyle">@null</item>
+        <!-- A little deeper than Android's 0.19 and 0.039, so a focused tile lifts clearly off the light background. -->
+        <item name="android:spotShadowAlpha">0.26</item>
+        <item name="android:ambientShadowAlpha">0.05</item>
     </style>
 </resources>

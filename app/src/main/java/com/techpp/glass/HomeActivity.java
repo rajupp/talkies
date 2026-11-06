@@ -335,18 +335,19 @@ public class HomeActivity extends Activity {
     /** Colours for the light (day) and dark (night) looks. */
     private static final class Theme {
         int bgTop, bgBottom, text, text2, iconBg, iconStroke, iconFocusBg, iconFocusFg, band, bandStroke,
-                scrimTop, scrimMid, scrimBottom, menuBg, menuStroke, menuFocusBg, menuFocusText, tileBg;
+                scrimTop, scrimMid, scrimBottom, menuBg, menuStroke, menuFocusBg, menuFocusText, tileBg, tileStroke;
         float ambientAlpha;
 
         static Theme of(boolean day) {
             Theme t = new Theme();
             if (day) {
-                t.bgTop = 0xFFF5F6F8; t.bgBottom = 0xFFE2E5EA; t.text = 0xFF1D1D1F; t.text2 = 0xFF55555A;
+                // A cool white fading to soft blue-grey, so white cards and the glass band stand off it.
+                t.bgTop = 0xFFF7F8FB; t.bgBottom = 0xFFDBE1EA; t.text = 0xFF1D1D1F; t.text2 = 0xFF55555A;
                 t.iconBg = 0xC0FFFFFF; t.iconStroke = 0x10000000; t.iconFocusBg = 0xFF1D1D1F; t.iconFocusFg = 0xFFFFFFFF;
-                t.band = 0x94FFFFFF; t.bandStroke = 0xF2FFFFFF;
+                t.band = 0xADFFFFFF; t.bandStroke = 0xF2FFFFFF;
                 t.scrimTop = 0x8CF5F6F8; t.scrimMid = 0x33EBEEF2; t.scrimBottom = 0xA6E2E5EA;
                 t.menuBg = 0xFFFFFFFF; t.menuStroke = 0x14000000; t.menuFocusBg = 0xFF1D1D1F; t.menuFocusText = 0xFFFFFFFF;
-                t.tileBg = 0xFFD9DCE1; t.ambientAlpha = 0.5f;
+                t.tileBg = 0xFFFFFFFF; t.tileStroke = 0x14000000; t.ambientAlpha = 0.5f;
             } else {
                 t.bgTop = 0xFF121419; t.bgBottom = 0xFF08090C; t.text = 0xFFF5F5F7; t.text2 = 0xFFA1A1A6;
                 t.iconBg = 0x1AFFFFFF; t.iconStroke = 0x1FFFFFFF; t.iconFocusBg = 0xFFF5F5F7; t.iconFocusFg = 0xFF111113;
@@ -1345,7 +1346,7 @@ public class HomeActivity extends Activity {
     private View channelCard(Trending.Pick p) {
         if (p.extra instanceof Cricket.Match) return cricketCard((Cricket.Match) p.extra);
         FrameLayout card = new FrameLayout(this);
-        card.setBackground(rounded(theme.tileBg, 0, 10));
+        card.setBackground(rounded(theme.tileBg, theme.tileStroke, 10));
         final float r = px(10);
         card.setOutlineProvider(new ViewOutlineProvider() {
             @Override public void getOutline(View v, Outline o) { o.setRoundRect(0, 0, v.getWidth(), v.getHeight(), r); }
@@ -1379,7 +1380,7 @@ public class HomeActivity extends Activity {
     /** A match card: each team's flag, short name and score, then the status ("India need 38 off 24"). */
     private View cricketCard(Cricket.Match m) {
         FrameLayout card = new FrameLayout(this);
-        card.setBackground(rounded(theme.tileBg, 0, 10));
+        card.setBackground(rounded(theme.tileBg, theme.tileStroke, 10));
         LinearLayout col = new LinearLayout(this);
         col.setOrientation(LinearLayout.VERTICAL);
         col.setPadding(px(14), px(12), px(14), px(10));
