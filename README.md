@@ -157,6 +157,16 @@ opens its switch.
 > `adb shell appops set com.techpp.glass ACCESS_RESTRICTED_SETTINGS allow`. Finish setup shows a
 > **Switch greyed out?** row for this.
 
+> [!TIP]
+> **Fire TV** doesn't list Talkies under Accessibility and has no Notification access screen. From a computer, once:
+> ```bash
+> adb shell settings put secure enabled_accessibility_services com.techpp.glass/com.techpp.glass.SleepService
+> adb shell settings put secure accessibility_enabled 1
+> adb shell cmd notification allow_listener com.techpp.glass/com.techpp.glass.WatchService
+> ```
+> The first command replaces the list of accessibility services that are on. If you use others, add them to it,
+> separated by `:`.
+
 > [!NOTE]
 > Android shows the same strong warning for every accessibility service. Talkies' service filters only the Home
 > button, the buttons you give a job and OK while the sleep timer's warning is up, and notices only when the TV's own launcher, the Assistant or JioHotstar
@@ -177,6 +187,7 @@ What people have told us, besides the OnePlus TV it's made on. Yours isn't here,
 | OnePlus TV (Google TV, Android 11) | Everything; it's built and tested on one. |
 | Google TV Streamer (Android 14) | Works. The Accessibility switch needs [one `adb` command](#first-time-setup); Inputs shows only Live TV and there's no Screensaver button, since the Streamer allows neither. |
 | NVIDIA SHIELD (Android 11) | Installs from the release APK ([#2](https://github.com/rajupp/talkies/issues/2)); a SHIELD TV Pro runs it as its main home screen. |
+| Fire TV Cube (3rd gen, Fire OS 7, Android 9) | Runs, but can't be the real home screen: Fire OS keeps Amazon's launcher and doesn't pass Home to apps. With the Home button service on, Home shows Amazon's home first and Talkies comes back about 5 seconds later. The Accessibility and Notification access switches need [`adb`](#first-time-setup). From Dhananjay's testing. |
 | Xiaomi Mi Box S | Holding Home opens Google TV's dashboard since 1.2.5. |
 | Sony (Google TV) | Sound output opens Display & sound, where Audio output picks the speakers. |
 | Sony XF9005 (2018, Android TV) | Responsive, with CleanYourTV alongside. |
