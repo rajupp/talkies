@@ -195,7 +195,9 @@
             android:clipChildren="false"
             android:clipToPadding="false" />
 
-        <!-- Dock: one band, 4 to 10 apps (Talkies settings → Dock size), then the All apps button -->
+        <!-- Dock: one band, 4 to 10 apps (Talkies settings → Dock size), then the All apps button. With For You hidden,
+             1 to 3 rows of five right under the clock instead (one row scrolls through ten); its height and position
+             are set in code. -->
         <FrameLayout
             android:id="@+id/dock_band"
             android:layout_width="match_parent"
@@ -213,8 +215,8 @@
                 android:orientation="horizontal" />
         </FrameLayout>
 
-        <!-- Below the fold: app channels (chosen in Control Center → Channels), then every other app.
-             Their positions are set in code. -->
+        <!-- Below the fold, or right under the dock's rows with For You hidden: live scores and app channels (chosen in
+             Control Center → Channels), then every other app. Their positions are set in code. -->
         <LinearLayout
             android:id="@+id/channels"
             android:layout_width="match_parent"

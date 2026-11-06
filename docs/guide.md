@@ -84,7 +84,7 @@ Control Center → **Talkies settings**, or **hold OK on the ⚙ icon** (a press
 | Apps open from their tile | On by default: an app's window grows out of the tile or card you chose. It's Android's normal opening animation, started from the tile, so it costs nothing extra |
 | **For You and scores** | |
 | Country | **Automatic** (where the TV is, by its time zone), about 25 common countries, or **More countries** (A to Z): the country the picks and scores are for; see [Which country](#trending-and-new-in-) |
-| For You | Shown or Hidden. Hidden removes the tabs and picks (the weather, time and date stay, larger), Up from the dock goes to the icons, and TMDB picks aren't fetched |
+| For You | Shown or Hidden. Hidden removes the tabs and picks (the weather, time and date stay, larger), the dock moves up under them as rows of larger apps (**Dock size**), Up from the dock goes to the icons, and TMDB picks aren't fetched |
 | Picks from | India only: TMDB or StreamRadar, where the picks come from ([In India without a key](#in-india-without-a-key)) |
 | Picks languages | Only while For You is shown: **All** (the default) or the languages you choose for Trending and New in …. See [Languages](#languages) |
 | Hide spoilers | Off (default) or On. On: an episode you haven't started yet shows the show's own art in Continue instead of the app's still from that episode, or the still blurred when the app gives nothing else. Episodes you're partway through keep their still |
@@ -95,7 +95,7 @@ Control Center → **Talkies settings**, or **hold OK on the ⚙ icon** (a press
 | Channels | Choose which app channels show below the dock, and their order |
 | **Apps and inputs** | |
 | Dock apps | Every app, the dock's first (numbered): OK puts one in the dock or takes it out, the same as **Add to dock** and **Remove from dock** when you hold OK on an app. To change the order, hold OK on an app in the dock and choose **Move** |
-| Dock size | 4, 5, 6, 7 (default), 8, 9 or 10 apps. The tiles grow or shrink so the dock always fills the screen's width; apps that no longer fit move to the front of All apps, and come back when it grows again |
+| Dock size | 4, 5, 6, 7 (default), 8, 9 or 10 apps. The tiles grow or shrink so the dock always fills the screen's width; apps that no longer fit move to the front of All apps, and come back when it grows again. With **For You** hidden, the dock sits right under the clock instead, and this is 1 (default), 2 or 3 rows of five apps, each about 1.4 times as wide as in the band; Up and Down move between the rows, Right at the end of a row goes to the All apps button. One row scrolls instead: it holds ten apps, Right goes along them to the All apps button, and the live scores and channel rows sit right under it |
 | All apps button | **Shown** (default) or Hidden: the round button at the end of the dock. Hidden, the dock's apps fill its width; All apps is still below, further down the page |
 | All apps size | 6 (default), 5 or 4 across. Fewer across means larger tiles |
 | All apps order | **Your order** (default: apps you moved with hold OK → Move stay put, the rest A to Z), **Recently opened** (the apps you last opened through Talkies first, the rest A to Z) or **A to Z**. In the two sorted orders only the dock's apps can be moved; the dock always keeps your order |

@@ -78,7 +78,8 @@ import java.util.concurrent.Executors;
 /**
  * Talkies. One screen: "For You" with tabs (Continue, Trending, New in India) and a row of picks, round icon
  * buttons and a small time · date · weather line at the top right, a dock of seven apps in one band, and every other
- * app below the fold. Light by day, dark at night. The remote is handled entirely here, so navigation is exact.
+ * app below the fold. With For You hidden, the dock goes up under the clock instead, as rows of five larger tiles.
+ * Light by day, dark at night. The remote is handled entirely here, so navigation is exact.
  */
 public class HomeActivity extends Activity {
     private static final String TAG = "GlassHome";
@@ -94,8 +95,12 @@ public class HomeActivity extends Activity {
     // Geometry (dp, on a 960 × 540 dp screen).
     private static final int DOCK_MAX_W = 146, DOCK_4_W = 198, DOCK_GAP = 12, ALL_BUTTON = 44, GRID_WIDTH = 878, GRID_GAP_X = 16,
             GRID_GAP_Y = 18;
-    // Channel rows, below the dock: header, a row of cards, the focused card's title and description.
-    private static final int CHAN_TOP = 548, CHAN_ROW_H = 212, CH_W = 200, CH_H = 112, CH_GAP = 18, CRICKET_W = 280;
+    /** For You hidden: the dock's rows under the clock (Talkies settings → Dock size, 1 to 3 rows), five apps to a row.
+     *  One row scrolls instead: ten apps, five in view, then the All apps button. */
+    private static final int ROW_COLS = 5, ROW_MAX_W = 176, ROW_GAP = 16, ROW_PAD = 18, ROW_BELOW_CLOCK = 10, ROW_SCROLL_APPS = 10;
+    // Channel rows, below the dock (just below the fold, or right under the dock's rows): header, a row of cards, the
+    // focused card's title and description.
+    private static final int CHAN_TOP = 548, CHAN_BELOW_ROWS = 22, CHAN_ROW_H = 212, CH_W = 200, CH_H = 112, CH_GAP = 18, CRICKET_W = 280;
     private static final int MENU_PLAIN = 0, MENU_CHANNELS = 1;
 
     private float dp;
@@ -125,6 +130,12 @@ public class HomeActivity extends Activity {
     /** The tile after the dock: OK goes to All apps, rather than down past every channel row. */
     private View allTile;
     private final List<View> dockTiles = new ArrayList<>(), gridTiles = new ArrayList<>();
+    /** The dock in one row under the clock slides along this; null otherwise. Its spring outlives rebuilds. */
+    private android.widget.HorizontalScrollView dockScroll;
+    private final Spring dockSpring = new Spring(0.34f, 1f, 0, 0.25f);
+    private float dockStepPx, dockTrackPx;
+    /** Where the channel rows start, in dp (placeDock). */
+    private float chanTopDp = CHAN_TOP;
 
     // Channel rows.
     private List<Channels.Channel> chanRows = new ArrayList<>();
@@ -279,6 +290,8 @@ public class HomeActivity extends Activity {
         getWindow().setBackgroundDrawable(null);   // the backdrop covers the screen: don't paint it black first
         page = findViewById(R.id.page);
         dockBand = findViewById(R.id.dock_band);
+        // The dock's rows sit right under the clock, which grows or shrinks as the weather line comes and goes.
+        bigClock.addOnLayoutChangeListener((v, l, t, r, b, ol, ot, or, ob) -> { if (b != ob) root.post(this::placeDock); });
         // Rows rebuilt or a new size: what's cut off may have changed without the page moving.
         findViewById(R.id.page).addOnLayoutChangeListener((v, l, t, r, b, ol, ot, or, ob) -> fadeCutOff());
         dock = findViewById(R.id.dock);
@@ -465,7 +478,7 @@ public class HomeActivity extends Activity {
 
     /**
      * The weather, time and date always sit top left (the small line under the icons isn't used). For You shown: its
-     * tabs and picks follow below them; hidden: just the clock, 1.6 times the size, with the dock below.
+     * tabs and picks follow below them; hidden: just the clock, 1.6 times the size, with the dock's rows right under it.
      */
     private void applyForYou() {
         forYouHead.setVisibility(forYou ? View.VISIBLE : View.GONE);
@@ -484,6 +497,7 @@ public class HomeActivity extends Activity {
         rule.setMarginEnd(px(16 * k));
         ((ViewGroup.MarginLayoutParams) bigClock.getLayoutParams()).topMargin = px(forYou ? 26 : 34);
         bigClock.requestLayout();
+        placeDock();
         styleTop();
     }
 
@@ -940,7 +954,7 @@ public class HomeActivity extends Activity {
             for (Port port : shownPorts()) if (onHome.contains(port.id)) all.add(new AppEntry(port.id, port.tile(), port.color, glyph));
         }
         // Your arrangement (hold OK on an app to move it), else dock.xml; the dock fills up to its size.
-        int dockSize = dockSize();
+        int dockSize = dockHolds();
         List<String> dockPkgs = new ArrayList<>();
         String savedDock = prefs.getString("order_dock", null);
         if (savedDock != null) dockPkgs.addAll(Arrays.asList(savedDock.split(",")));
@@ -995,6 +1009,63 @@ public class HomeActivity extends Activity {
         return n < DOCK_SIZES[0] || n > DOCK_SIZES[DOCK_SIZES.length - 1] ? 7 : n;
     }
 
+    /**
+     * With For You hidden, the middle of Home is free: the dock goes up under the clock, as rows of five apps about 1.4
+     * times as wide as the band's seven.
+     */
+    private boolean dockInRows() { return !forYou; }
+
+    /** Talkies settings → Dock size with For You hidden: 1 to 3 rows, 1 unless chosen. */
+    private int dockRows() {
+        int n = prefs.getInt("dock_rows", 1);
+        return n < 1 || n > 3 ? 1 : n;
+    }
+
+    /** One row under the clock: it scrolls, so the score and channel rows fit on the first screen below it. */
+    private boolean dockScrolls() { return dockInRows() && dockRows() == 1; }
+
+    /** Talkies settings → Dock size: "7 apps" in the band, "2 rows" under the clock. */
+    private String dockSizeLabel() {
+        if (!dockInRows()) return dockSize() + " apps";
+        return dockRows() == 1 ? "1 row" : dockRows() + " rows";
+    }
+
+    /** How many apps the dock holds: Dock size in the band, five a row up under the clock, ten in one scrolling row. */
+    private int dockHolds() { return dockScrolls() ? ROW_SCROLL_APPS : dockInRows() ? dockRows() * ROW_COLS : dockSize(); }
+
+    /** Apps across one row of the dock: all of them in the band or a scrolling row. */
+    private int dockCols() { return dockInRows() && !dockScrolls() ? ROW_COLS : Math.max(1, dockCount); }
+
+    /** The dock's tile in its last row under column c, or the row's last tile when it's short. */
+    private int dockLastRow(int c) {
+        int cols = dockCols();
+        return Math.max(0, Math.min((Math.max(1, dockCount) - 1) / cols * cols + c, dockCount - 1));
+    }
+
+    /** The band at the bottom, or the rows right under the clock, whatever its size (the weather line comes and goes). */
+    private void placeDock() {
+        int top;
+        if (dockInRows()) {
+            int any = View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED);
+            bigClock.measure(any, any);
+            top = ((ViewGroup.MarginLayoutParams) bigClock.getLayoutParams()).topMargin + bigClock.getMeasuredHeight() + px(ROW_BELOW_CLOCK);
+        } else {
+            top = px(dockSize() == 4 ? 386 : 414);
+        }
+        ViewGroup.MarginLayoutParams band = (ViewGroup.MarginLayoutParams) dockBand.getLayoutParams();
+        // Under the clock the dock leaves room below it: the score and channel rows follow right after.
+        float chanTop = dockInRows() ? (top + band.height) / dp + CHAN_BELOW_ROWS : CHAN_TOP;
+        if (chanTop != chanTopDp) {
+            chanTopDp = chanTop;
+            ((ViewGroup.MarginLayoutParams) channelsBox.getLayoutParams()).topMargin = px(chanTop);
+            channelsBox.requestLayout();
+            layoutPage();
+        }
+        if (band.topMargin == top) return;
+        band.topMargin = top;
+        dockBand.setLayoutParams(band);
+    }
+
     private void reloadApps() {
         endMove(false);
         applyTileSizes();
@@ -1014,7 +1085,7 @@ public class HomeActivity extends Activity {
         if (gridCols < 4 || gridCols > 6) gridCols = 6;
         gridTileW = (GRID_WIDTH - (gridCols - 1) * GRID_GAP_X) / gridCols;
         gridTileH = Math.round(gridTileW * 9 / 16f);
-        int dockW = dockSize() == 4 ? DOCK_4_W : DOCK_MAX_W;
+        int dockW = dockInRows() ? ROW_MAX_W : dockSize() == 4 ? DOCK_4_W : DOCK_MAX_W;
         AppEntry.setBannerSize(px(Math.max(gridTileW * 1.10f, dockW * 1.14f)), px(Math.max(gridTileH * 1.10f, dockW * 9 / 16f * 1.14f)));
     }
 
@@ -1059,30 +1130,111 @@ public class HomeActivity extends Activity {
     private void buildAppViews() {
         dock.removeAllViews();
         dockTiles.clear();
-        // The dock's apps and, when any are left over, the round All apps button share the band's width: seven
-        // apps are 106 dp wide, five 146, ten 73. Four are 198, too tall for the band, which grows upward to hold them.
+        dockScroll = null;
         boolean more = apps.size() > dockCount && prefs.getBoolean("all_apps_button", true);
-        int n = Math.max(1, dockCount);   // the apps it has: with fewer than Dock size, they needn't shrink for empty places
         float inner = getResources().getDisplayMetrics().widthPixels / dp - 40 - 36;
-        boolean four = dockSize() == 4;
-        float w = Math.min(four ? DOCK_4_W : DOCK_MAX_W, (inner - (more ? n * DOCK_GAP + ALL_BUTTON : (n - 1) * DOCK_GAP)) / n);
         ViewGroup.MarginLayoutParams band = (ViewGroup.MarginLayoutParams) dockBand.getLayoutParams();
-        band.height = px(four ? 132 : 104);
-        band.topMargin = px(four ? 386 : 414);
-        dockBand.setLayoutParams(band);
-        float h = w * 9 / 16;
-        for (int i = 0; i < dockCount; i++) {
-            View t = appTile(apps.get(i), w, h);
-            LinearLayout.LayoutParams lp = (LinearLayout.LayoutParams) t.getLayoutParams();
-            if (i > 0) lp.leftMargin = px(DOCK_GAP);
-            dock.addView(t, lp);
-            dockTiles.add(t);
+        ViewGroup allParent = dock;
+        if (dockScrolls()) {
+            // One row under the clock, as wide as in rows: five in view and the next peeking in, the rest (up to ten)
+            // and the All apps button further along. Focus slides it (scrollDock).
+            float w = Math.min(ROW_MAX_W, (inner - ROW_COLS * ROW_GAP - ALL_BUTTON) / ROW_COLS);
+            float h = w * 9 / 16;
+            band.height = px(h + 2 * ROW_PAD);
+            android.widget.HorizontalScrollView hsv = new android.widget.HorizontalScrollView(this);
+            hsv.setHorizontalScrollBarEnabled(false);
+            hsv.setOverScrollMode(View.OVER_SCROLL_NEVER);
+            hsv.setFocusable(false);
+            hsv.setDescendantFocusability(ViewGroup.FOCUS_BLOCK_DESCENDANTS);
+            hsv.setClipChildren(false);
+            hsv.setClipToPadding(false);
+            // Apps slide out of sight where the first one sits, on a side only while there are apps hidden that way;
+            // the focused one's growth and shadow are never cut.
+            final int pad = px(ROW_PAD), over = px(60);
+            hsv.setOutlineProvider(new ViewOutlineProvider() {
+                @Override public void getOutline(View v, Outline o) {
+                    int x = v.getScrollX(), max = ((ViewGroup) v).getChildAt(0).getWidth() - v.getWidth();
+                    o.setRect(x > 0 ? pad : -over, -over, x < max ? v.getWidth() - pad : v.getWidth() + over, v.getHeight() + over);
+                }
+            });
+            hsv.setClipToOutline(true);
+            hsv.setOnScrollChangeListener((v, x, y, ox, oy) -> v.invalidateOutline());
+            LinearLayout track = new LinearLayout(this);
+            track.setOrientation(LinearLayout.HORIZONTAL);
+            track.setGravity(android.view.Gravity.CENTER_VERTICAL);
+            track.setClipChildren(false);
+            track.setClipToPadding(false);
+            track.setPadding(px(ROW_PAD), 0, px(ROW_PAD), 0);
+            for (int i = 0; i < dockCount; i++) {
+                View t = appTile(apps.get(i), w, h);
+                LinearLayout.LayoutParams lp = (LinearLayout.LayoutParams) t.getLayoutParams();
+                lp.gravity = android.view.Gravity.CENTER_VERTICAL;
+                if (i > 0) lp.leftMargin = px(ROW_GAP);
+                track.addView(t, lp);
+                dockTiles.add(t);
+            }
+            hsv.addView(track, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.MATCH_PARENT));
+            dock.addView(hsv, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+            dockStepPx = px(w + ROW_GAP);
+            dockTrackPx = px(2 * ROW_PAD + dockCount * w + Math.max(0, dockCount - 1) * ROW_GAP + (more ? ROW_GAP + ALL_BUTTON : 0));
+            dockScroll = hsv;
+            allParent = track;
+            // Rebuilt (an app moved, Dock size changed): back where the row was. HorizontalScrollView drops a scroll
+            // made before its first layout, so it's set again after each; the clip, too, needs the row's laid-out width.
+            hsv.addOnLayoutChangeListener((v, l, t, r, b, ol, ot, or, ob) -> {
+                v.scrollTo(Math.round(dockSpring.value), 0);
+                v.invalidateOutline();
+            });
+        } else if (dockInRows()) {
+            // Up under the clock: rows of five, 152 dp wide (146 at most in the band), the All apps button beside them.
+            float w = Math.min(ROW_MAX_W, (inner - (more ? ROW_COLS * ROW_GAP + ALL_BUTTON : (ROW_COLS - 1) * ROW_GAP)) / ROW_COLS);
+            float h = w * 9 / 16;
+            int rows = Math.max(1, (dockCount + ROW_COLS - 1) / ROW_COLS);
+            band.height = px(rows * h + (rows - 1) * ROW_GAP + 2 * ROW_PAD);
+            LinearLayout box = new LinearLayout(this);
+            box.setOrientation(LinearLayout.VERTICAL);
+            box.setClipChildren(false);
+            box.setClipToPadding(false);
+            LinearLayout row = null;
+            for (int i = 0; i < dockCount; i++) {
+                if (i % ROW_COLS == 0) {
+                    row = new LinearLayout(this);
+                    row.setOrientation(LinearLayout.HORIZONTAL);
+                    row.setClipChildren(false);
+                    LinearLayout.LayoutParams rl = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+                    if (i > 0) rl.topMargin = px(ROW_GAP);
+                    box.addView(row, rl);
+                }
+                View t = appTile(apps.get(i), w, h);
+                LinearLayout.LayoutParams lp = (LinearLayout.LayoutParams) t.getLayoutParams();
+                if (i % ROW_COLS > 0) lp.leftMargin = px(ROW_GAP);
+                row.addView(t, lp);
+                dockTiles.add(t);
+            }
+            dock.addView(box, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+        } else {
+            // The dock's apps and, when any are left over, the round All apps button share the band's width: seven
+            // apps are 106 dp wide, five 146, ten 73. Four are 198, too tall for the band, which grows upward to hold them.
+            int n = Math.max(1, dockCount);   // the apps it has: with fewer than Dock size, they needn't shrink for empty places
+            boolean four = dockSize() == 4;
+            float w = Math.min(four ? DOCK_4_W : DOCK_MAX_W, (inner - (more ? n * DOCK_GAP + ALL_BUTTON : (n - 1) * DOCK_GAP)) / n);
+            band.height = px(four ? 132 : 104);
+            float h = w * 9 / 16;
+            for (int i = 0; i < dockCount; i++) {
+                View t = appTile(apps.get(i), w, h);
+                LinearLayout.LayoutParams lp = (LinearLayout.LayoutParams) t.getLayoutParams();
+                if (i > 0) lp.leftMargin = px(DOCK_GAP);
+                dock.addView(t, lp);
+                dockTiles.add(t);
+            }
         }
+        dockBand.setLayoutParams(band);
+        placeDock();
         allTile = more ? allAppsButton() : null;
         if (allTile != null) {
             LinearLayout.LayoutParams lp = (LinearLayout.LayoutParams) allTile.getLayoutParams();
-            lp.leftMargin = px(DOCK_GAP);
-            dock.addView(allTile, lp);
+            lp.leftMargin = px(dockInRows() ? ROW_GAP : DOCK_GAP);
+            allParent.addView(allTile, lp);
         }
         grid.removeAllViews();
         gridTiles.clear();
@@ -1109,7 +1261,7 @@ public class HomeActivity extends Activity {
     }
 
     /** Where All apps starts: after the channel rows. */
-    private int gridTopDp() { return CHAN_TOP + chanRows.size() * CHAN_ROW_H + 18 + 40; }
+    private int gridTopDp() { return Math.round(chanTopDp + chanRows.size() * CHAN_ROW_H + 18 + 40); }
 
     /**
      * Places All apps under the channel rows and gives the page its full height (it is taller than the screen;
@@ -1918,9 +2070,12 @@ public class HomeActivity extends Activity {
             pageSpring.snap(pageSpring.target);
             for (Spring sp : chanSprings) sp.snap(sp.target);
             for (Spring sp : scaleSprings.values()) sp.snap(sp.target);
+            dockSpring.snap(dockSpring.target);
         }
         boolean moving = pageSpring.step(dt);
         page.setTranslationY(-pageSpring.value);
+        if (dockSpring.step(dt)) moving = true;
+        if (dockScroll != null && dockScroll.getScrollX() != Math.round(dockSpring.value)) dockScroll.scrollTo(Math.round(dockSpring.value), 0);
         for (int i = 0; i < chanSprings.size() && i < chanScrolls.size(); i++) {
             Spring sp = chanSprings.get(i);
             if (!sp.step(dt) && chanScrolls.get(i).getScrollX() == Math.round(sp.value)) continue;
@@ -2010,6 +2165,7 @@ public class HomeActivity extends Activity {
         dockIdx = Math.max(0, Math.min(i, dockTiles.size() - 1));
         prefs.edit().putInt("last_dock_col", dockIdx).apply();
         scrollPage(0);
+        scrollDock(dockIdx);
         setFocus(dockTiles.get(dockIdx), moving ? 1.22f : 1.14f, 11);
         updateAmbient();
         styleTop();
@@ -2019,9 +2175,28 @@ public class HomeActivity extends Activity {
     private void focusAllTile() {
         zone = Z_ALL;
         scrollPage(0);
+        scrollDock(dockCount);
         setFocus(null, 1f, 0);  // no ring: the button fills in, like the icons at the top (styleTop)
         updateAmbient();
         styleTop();
+    }
+
+    /**
+     * Slides the one-row dock just enough to show item i (the All apps button after the last app) and part of its
+     * neighbour, so there's always a glimpse of what Left or Right goes to.
+     */
+    private void scrollDock(int i) {
+        if (dockScroll == null) return;
+        float view = getResources().getDisplayMetrics().widthPixels - px(40), max = Math.max(0, dockTrackPx - view);
+        float left = px(ROW_PAD) + i * dockStepPx, right = left + (i < dockCount ? dockStepPx - px(ROW_GAP) : px(ALL_BUTTON));
+        float lead = dockStepPx * 0.4f, s = dockSpring.target;
+        if (right + lead > s + view) s = right + lead - view;
+        if (left - lead < s) s = left - lead;
+        // Near an end, all the way: no half-hidden first app or All apps button.
+        s = s < lead ? 0 : s > max - lead ? max : s;
+        if (s == dockSpring.target) return;
+        dockSpring.target = s;
+        startMotion();
     }
 
     private void focusGrid(int i) {
@@ -2045,7 +2220,9 @@ public class HomeActivity extends Activity {
         List<Trending.Pick> items = chanRows.get(chanIdx).items;
         int col = Math.max(0, Math.min(c, items.size() - 1));
         chanCol[chanIdx] = col;
-        scrollPage(px(CHAN_TOP + chanIdx * CHAN_ROW_H - 64));
+        // A row that fits under the dock leaves the page where it is: the clock and apps stay in view.
+        float rowTop = chanTopDp + chanIdx * CHAN_ROW_H;
+        scrollPage(root.getHeight() > 0 && px(rowTop + CHAN_ROW_H) <= root.getHeight() ? 0 : px(rowTop - 64));
         // Slide the row so the focused card sits at the left, like Projectivy.
         if (chanIdx < chanSprings.size()) chanSprings.get(chanIdx).target = px(col * (cardW(chanRows.get(chanIdx)) + CH_GAP));
         startMotion();
@@ -2065,10 +2242,11 @@ public class HomeActivity extends Activity {
         followRing(440);
     }
 
-    /** Dock column (0–6) → grid column (0–5) and back, by position across the screen. */
-    private int dockToGridCol(int c) { return Math.round(c * (gridCols - 1) / (float) Math.max(1, dockCount - 1)); }
+    /** Dock tile → grid column (0–5), by its column's position across the screen. */
+    private int dockToGridCol(int i) { return Math.round(i % dockCols() * (gridCols - 1) / (float) Math.max(1, dockCols() - 1)); }
 
-    private int gridToDockCol(int c) { return Math.round(c * Math.max(0, dockCount - 1) / (float) (gridCols - 1)); }
+    /** Grid column → the dock tile above it, in the dock's last row. */
+    private int gridToDockCol(int c) { return dockLastRow(Math.round(c * Math.max(0, dockCols() - 1) / (float) (gridCols - 1))); }
 
     // ---------------------------------------------------------------- keys
 
@@ -2155,7 +2333,7 @@ public class HomeActivity extends Activity {
             case Z_TOP:
                 if (left && iconIdx > 0) focusTop(iconIdx - 1);
                 else if (right && iconIdx < icons.length - 1 && icons[iconIdx + 1].getVisibility() == View.VISIBLE) focusTop(iconIdx + 1);
-                else if (down) { if (hasPicks) focusTabs(tabIdx); else focusDock(dockIdx); }
+                else if (down) { if (hasPicks) focusTabs(tabIdx); else focusDock(dockIdx % dockCols()); }  // the first row
                 break;  // Up, and the ends of the row, go nowhere.
             case Z_TABS:
                 if (left && nextTab(tabIdx, -1) >= 0) focusTabs(nextTab(tabIdx, -1));
@@ -2169,16 +2347,22 @@ public class HomeActivity extends Activity {
                 else if (up) focusTabs(tabIdx);
                 else if (down) focusDock(dockIdx);
                 break;
-            case Z_DOCK:
-                if (left && dockIdx > 0) focusDock(dockIdx - 1);
-                else if (right && dockIdx < dockTiles.size() - 1) focusDock(dockIdx + 1);
+            case Z_DOCK: {
+                // One row in the band; with For You hidden, up to three under the clock.
+                int cols = dockCols(), row = dockIdx / cols, col = dockIdx % cols, lastRow = (dockTiles.size() - 1) / cols;
+                if (left && col > 0) focusDock(dockIdx - 1);
+                else if (right && col < cols - 1 && dockIdx < dockTiles.size() - 1) focusDock(dockIdx + 1);
                 else if (right && allTile != null) focusAllTile();
+                else if (up && row > 0) focusDock(dockIdx - cols);
                 else if (up) { if (hasPicks) focusPicks(picksRow.anchor()); else focusTop(iconIdx); }
+                else if (down && row < lastRow) focusDock(Math.min(dockIdx + cols, dockTiles.size() - 1));
                 else if (down && !chanRows.isEmpty()) focusChan(0, chanCol[0]);
                 else if (down && !gridTiles.isEmpty()) focusGrid(Math.min(dockToGridCol(dockIdx), gridTiles.size() - 1));
                 break;
+            }
             case Z_ALL:
-                if (left) focusDock(dockTiles.size() - 1);
+                // Back to the end of the row you came from.
+                if (left) focusDock(Math.min(dockIdx / dockCols() * dockCols() + dockCols() - 1, dockTiles.size() - 1));
                 else if (up) { if (hasPicks) focusPicks(picksRow.anchor()); else focusTop(iconIdx); }
                 else if (down && !chanRows.isEmpty()) focusChan(0, chanCol[0]);
                 else if (down) focusGrid(gridCols - 1);
@@ -2187,7 +2371,7 @@ public class HomeActivity extends Activity {
                 int n = chanRows.get(chanIdx).items.size(), c = chanCol[chanIdx];
                 if (left && c > 0) focusChan(chanIdx, c - 1);
                 else if (right && c < n - 1) focusChan(chanIdx, c + 1);
-                else if (up && chanIdx == 0) focusDock(dockIdx);
+                else if (up && chanIdx == 0) focusDock(dockLastRow(dockIdx % dockCols()));
                 else if (up) focusChan(chanIdx - 1, chanCol[chanIdx - 1]);
                 else if (down && chanIdx < chanRows.size() - 1) focusChan(chanIdx + 1, chanCol[chanIdx + 1]);
                 else if (down && !gridTiles.isEmpty()) focusGrid(0);
@@ -2416,7 +2600,7 @@ public class HomeActivity extends Activity {
     }
 
     /** Moves the picked-up app one step. In a row it swaps with its neighbour; between the dock and the grid it
-     *  trades places with the app there (the dock keeps seven); within the grid the others shift along. */
+     *  trades places with the app there (the dock keeps its size); within the grid the others shift along. */
     private void moveApp(int k) {
         int ai = -1;
         for (int i = 0; i < apps.size(); i++) if (apps.get(i).pkg.equals(movingPkg)) ai = i;
@@ -2424,8 +2608,11 @@ public class HomeActivity extends Activity {
         int gridSize = apps.size() - dockCount, target = -1;
         boolean swap = true;
         if (ai < dockCount) {
-            if (k == KeyEvent.KEYCODE_DPAD_LEFT && ai > 0) target = ai - 1;
-            else if (k == KeyEvent.KEYCODE_DPAD_RIGHT && ai < dockCount - 1) target = ai + 1;
+            int cols = dockCols(), row = ai / cols, col = ai % cols, lastRow = (dockCount - 1) / cols;
+            if (k == KeyEvent.KEYCODE_DPAD_LEFT && col > 0) target = ai - 1;
+            else if (k == KeyEvent.KEYCODE_DPAD_RIGHT && col < cols - 1 && ai < dockCount - 1) target = ai + 1;
+            else if (k == KeyEvent.KEYCODE_DPAD_UP && row > 0) target = ai - cols;
+            else if (k == KeyEvent.KEYCODE_DPAD_DOWN && row < lastRow) target = Math.min(ai + cols, dockCount - 1);
             else if (k == KeyEvent.KEYCODE_DPAD_DOWN && gridSize > 0) target = dockCount + Math.min(dockToGridCol(ai), gridSize - 1);
         } else {
             int g = ai - dockCount, row = g / gridCols, col = g % gridCols;
@@ -4558,12 +4745,15 @@ public class HomeActivity extends Activity {
         }, true);
         addMenuHeading("For You and scores");
         addRow("Country", countryLabel(), this::openCountry, false);
-        final View[] fy = new View[1];
+        final View[] fy = new View[1], da = new View[1], ds = new View[1];
         fy[0] = addRow("For You", forYou ? "Shown" : "Hidden", () -> {
             forYou = !forYou;
             prefs.edit().putBoolean("for_you", forYou).apply();
             setStatus(fy[0], forYou ? "Shown" : "Hidden");
             applyForYou();
+            reloadApps();  // the dock moves between the band and the rows under the clock
+            if (da[0] != null) setStatus(da[0], dockCount + " in the dock");
+            if (ds[0] != null) setStatus(ds[0], dockSizeLabel());
             tabIdx = TAB_TRENDING;
             buildPicksRow(0);
             if (forYou) refreshOnline();
@@ -4601,14 +4791,19 @@ public class HomeActivity extends Activity {
         addRow("Continue apps", continueAppsLabel(), this::openContinueApps, false);
         addRow("Channels", null, this::openChannelsEditor, false);
         addMenuHeading("Apps and inputs");
-        addRow("Dock apps", dockCount + " in the dock", this::openDockApps, false);
-        final View[] ds = new View[1];
-        ds[0] = addRow("Dock size", dockSize() + " apps", () -> {
-            int n = dockSize() + 1;
-            if (n > DOCK_SIZES[DOCK_SIZES.length - 1]) n = DOCK_SIZES[0];
-            prefs.edit().putInt("dock_size", n).apply();
-            setStatus(ds[0], n + " apps");
+        da[0] = addRow("Dock apps", dockCount + " in the dock", this::openDockApps, false);
+        // In the band, how many apps; with For You hidden, how many rows of five under the clock.
+        ds[0] = addRow("Dock size", dockSizeLabel(), () -> {
+            if (dockInRows()) {
+                prefs.edit().putInt("dock_rows", dockRows() % 3 + 1).apply();
+            } else {
+                int n = dockSize() + 1;
+                if (n > DOCK_SIZES[DOCK_SIZES.length - 1]) n = DOCK_SIZES[0];
+                prefs.edit().putInt("dock_size", n).apply();
+            }
+            setStatus(ds[0], dockSizeLabel());
             reloadApps();
+            setStatus(da[0], dockCount + " in the dock");
         }, true);
         final View[] ab = new View[1];
         ab[0] = addRow("All apps button", prefs.getBoolean("all_apps_button", true) ? "Shown" : "Hidden", () -> {

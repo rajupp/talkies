@@ -8,6 +8,10 @@ features, a new fix number only fixes. The version shows in Talkies settings →
 ### Added
 - **Recent apps as big cards.** Press Home twice quickly, in Talkies or inside an app, then Left and Right to move and
   OK to switch. Apps you left with Home are listed even if Talkies didn't open them.
+- **Larger apps with For You hidden.** The dock moves up from the bottom to just under the clock, as rows of five apps
+  about 1.4 times as wide, in the space the picks leave. Talkies settings → **Dock size** chooses 1 (the default), 2 or
+  3 rows while For You is hidden. One row scrolls: it holds ten apps, five in view, with the All apps button after the
+  tenth, and the live scores and channel rows sit right under it on the first screen.
 
 ### Fixed
 - **Home works when the TV is busy.** With Remote keys On, a slow moment while a video played could make Android take a
