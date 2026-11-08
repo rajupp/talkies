@@ -3,12 +3,11 @@
 Versions are numbered *major.minor.fix*. While Talkies is in beta they start with 0: a new minor number brings new
 features, a new fix number only fixes. The version shows in Talkies settings → About.
 
-## Unreleased
+## 1.2.11 — 8 November 2026
 
 ### Added
 - **Recent apps as big cards.** Press Home twice quickly, in Talkies or inside an app, then Left and Right to move and
   OK to switch. Apps you left with Home are listed even if Talkies didn't open them.
-
 - **Apps on Home.** With For You hidden, Talkies settings can put All apps above the dock: two rows of five, and Down
   scrolls to the rest. An idea from Dhananjay.
 

@@ -1,7 +1,9 @@
-### Changed
-- **Home is smoother.** Pictures you've just seen stay in memory, so switching tabs runs more smoothly.
-- **Cricket to start.** It's on to start only where it's widely followed. Select **Talkies settings → Sports** to change it.
+### New
+- **Recent apps.** Press Home twice quickly, then Left and Right to choose an app and OK to switch to it.
+- **Apps on Home.** With For You hidden, your apps can sit above the dock. Select **Talkies settings → Apps on Home**.
 
 ### Fixed
-- **For You keeps its cards offline.** With StreamRadar, a refresh with no internet could leave the row blank for hours. Now the cards stay.
-- **For You after a restart.** If the TV's storage is slow to start, your saved cards still appear, without waiting for the internet.
+- **Talkies stays your home app.** A crash that could make Android ask which home app to use is fixed.
+- **The All apps button** no longer goes missing with 8 or more apps in the dock on some TVs.
+- **Home works when the TV is busy.** Home now answers at once, even while a video is playing.
+- **Coming back to Home is smoother** with All apps set to Recently opened.
