@@ -55,7 +55,10 @@ public class WatchService extends NotificationListenerService {
 
         void update() {
             String now = text(c.getMetadata(), MediaMetadata.METADATA_KEY_DISPLAY_TITLE, MediaMetadata.METADATA_KEY_TITLE);
-            boolean playing = c.getPlaybackState() != null && c.getPlaybackState().getState() == PlaybackState.STATE_PLAYING;
+            // Read once: a player that's stopping can answer null the second time, and a crash here costs Talkies its
+            // place as the default home app.
+            PlaybackState state = c.getPlaybackState();
+            boolean playing = state != null && state.getState() == PlaybackState.STATE_PLAYING;
             if (now.equals(savedRaw)) track();
             if (!playing || now.isEmpty() || isAppName(c.getPackageName(), now)) {
                 notePosition();

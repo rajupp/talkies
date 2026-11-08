@@ -199,7 +199,8 @@ public class SleepService extends AccessibilityService {
             // Android's own Home also switches the TV to this device's input over HDMI-CEC (One Touch Play), which an
             // app can't do: let it through where that matters. With Talkies the default home app, Android opens
             // Talkies itself; on a streaming box, it opens Google TV's home and the window watcher below brings
-            // Talkies back over it. Only a TV with another default home has Home caught here.
+            // Talkies back over it. Home is caught here on a TV with another default home, and anywhere Android would
+            // only ask which app to open.
             if (systemHome) {
                 // Held: the dashboard here too. With Talkies the default home app Android doesn't open it; where it
                 // does, asking again leaves it open.
@@ -454,7 +455,7 @@ public class SleepService extends AccessibilityService {
     private void readHomeSetup() {
         try {
             otherHome = otherLauncherChosen();
-            systemHome = talkiesIsDefaultHome() || streamingBox();
+            systemHome = talkiesIsDefaultHome() || streamingBox() && !noDefaultHome();
         } catch (RuntimeException e) {
             Log.w(TAG, "Couldn't read the home app: " + e);
         }
@@ -464,6 +465,13 @@ public class SleepService extends AccessibilityService {
         android.content.pm.ResolveInfo r = getPackageManager().resolveActivity(
                 new Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME), android.content.pm.PackageManager.MATCH_DEFAULT_ONLY);
         return r != null && r.activityInfo != null && getPackageName().equals(r.activityInfo.packageName);
+    }
+
+    /** No default home app, so Android's Home would only show its "which app?" chooser. */
+    private boolean noDefaultHome() {
+        android.content.pm.ResolveInfo r = getPackageManager().resolveActivity(
+                new Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME), android.content.pm.PackageManager.MATCH_DEFAULT_ONLY);
+        return r != null && r.activityInfo != null && "android".equals(r.activityInfo.packageName);
     }
 
     /** A box or stick plugged into a TV (Google TV Streamer, Shield…) rather than a TV: it has no HDMI inputs of its own. */
