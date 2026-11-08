@@ -16,6 +16,8 @@ features, a new fix number only fixes. The version shows in Talkies settings →
 - **A crash that could lose Talkies its place as the home app.** When a player stopped at the wrong moment, Talkies could
   crash, and Android then asked which home app to use. Thanks to dossantosee for the logs.
 - **Home on a box with no default home app.** Boxes without HDMI inputs now open Talkies instead of Android's chooser.
+- **The All apps button could be missing with 8 or more dock apps** on some TVs. The dock now sizes itself to the room
+  it really has. Thanks to AndyVRD for reporting it.
 - **Home works when the TV is busy.** With Remote keys On, a slow moment while a video played could make Android take a
   quick press for a long one, and Home did nothing. Talkies now answers at once, and opens itself if Home still hasn't.
 - **Coming back to Home is smoother with All apps set to Recently opened.** Talkies used to rebuild every tile and decode

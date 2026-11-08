@@ -127,6 +127,8 @@ public class HomeActivity extends Activity {
     private int dockCount;
     /** The tile after the dock: OK goes to All apps, rather than down past every channel row. */
     private View allTile;
+    /** The band width, in pixels, the dock was last sized for. */
+    private int dockBuiltW;
     private final List<View> dockTiles = new ArrayList<>(), gridTiles = new ArrayList<>();
 
     // Channel rows.
@@ -282,6 +284,11 @@ public class HomeActivity extends Activity {
         getWindow().setBackgroundDrawable(null);   // the backdrop covers the screen: don't paint it black first
         page = findViewById(R.id.page);
         dockBand = findViewById(R.id.dock_band);
+        // The dock is sized before it's laid out, from the screen's width. If the band comes out a different width
+        // (a TV that reports a wider screen than the app gets), size it again, or the All apps button falls off the end.
+        dockBand.addOnLayoutChangeListener((v, l, t, r, b, ol, ot, or, ob) -> {
+            if (r - l > 0 && r - l != dockBuiltW && dockBuiltW > 0) v.post(this::reloadApps);
+        });
         // Rows rebuilt or a new size: what's cut off may have changed without the page moving.
         findViewById(R.id.page).addOnLayoutChangeListener((v, l, t, r, b, ol, ot, or, ob) -> fadeCutOff());
         dock = findViewById(R.id.dock);
@@ -1067,7 +1074,9 @@ public class HomeActivity extends Activity {
         // apps are 106 dp wide, five 146, ten 73. Four are 198, too tall for the band, which grows upward to hold them.
         boolean more = apps.size() > dockCount && prefs.getBoolean("all_apps_button", true) && !appsOnHome();
         int n = Math.max(1, dockCount);   // the apps it has: with fewer than Dock size, they needn't shrink for empty places
-        float inner = getResources().getDisplayMetrics().widthPixels / dp - 40 - 36;
+        int bandW = dockBand.getWidth() > 0 ? dockBand.getWidth() : getResources().getDisplayMetrics().widthPixels - px(40);
+        dockBuiltW = bandW;
+        float inner = bandW / dp - 36;
         boolean four = dockSize() == 4;
         float w = Math.min(four ? DOCK_4_W : DOCK_MAX_W, (inner - (more ? n * DOCK_GAP + ALL_BUTTON : (n - 1) * DOCK_GAP)) / n);
         ViewGroup.MarginLayoutParams band = (ViewGroup.MarginLayoutParams) dockBand.getLayoutParams();
@@ -4713,7 +4722,7 @@ public class HomeActivity extends Activity {
         addRow("Continue apps", continueAppsLabel(), this::openContinueApps, false);
         addRow("Channels", null, this::openChannelsEditor, false);
         addMenuHeading("Apps and inputs");
-        addRow("Dock apps", dockCount + " in the dock", this::openDockApps, false);
+        final View da = addRow("Dock apps", dockCount + " in the dock", this::openDockApps, false);
         final View[] ds = new View[1];
         ds[0] = addRow("Dock size", dockSize() + " apps", () -> {
             int n = dockSize() + 1;
@@ -4721,6 +4730,7 @@ public class HomeActivity extends Activity {
             prefs.edit().putInt("dock_size", n).apply();
             setStatus(ds[0], n + " apps");
             reloadApps();
+            setStatus(da, dockCount + " in the dock");
         }, true);
         final View[] ab = new View[1];
         ab[0] = addRow("All apps button", prefs.getBoolean("all_apps_button", true) ? "Shown" : "Hidden", () -> {
