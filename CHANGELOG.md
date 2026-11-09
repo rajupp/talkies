@@ -23,6 +23,11 @@ features, a new fix number only fixes. The version shows in Talkies settings →
 - **Apps on Home.** With For You hidden, Talkies settings can put All apps above the dock: two rows of five, and Down
   scrolls to the rest. An idea from Dhananjay.
 
+### Changed
+- **A livelier light look.** The background fades from a cool white to soft blue-grey, the focused app's glow is a
+  little richer, score cards are white with a fine edge instead of grey, the dock's glass is a touch brighter, and a
+  focused tile casts a slightly deeper shadow.
+
 ### Fixed
 - **A crash that could lose Talkies its place as the home app.** When a player stopped at the wrong moment, Talkies could
   crash, and Android then asked which home app to use. Thanks to dossantosee for the logs.

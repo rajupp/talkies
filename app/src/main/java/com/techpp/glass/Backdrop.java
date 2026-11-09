@@ -118,7 +118,7 @@ public class Backdrop extends View {
         }
         if (glow != 0 && image == null) {
             // Strongest left of centre, fading out well before the edges; fainter on the light theme.
-            int a = day ? 0x66 : 0xF0, rgb = glow & 0x00FFFFFF;
+            int a = day ? 0x80 : 0xF0, rgb = glow & 0x00FFFFFF;
             p.setShader(new RadialGradient(w * 0.36f, h * 0.5f, w * 0.62f, new int[]{(a << 24) | rgb, ((a * 2 / 5) << 24) | rgb, rgb},
                     new float[]{0f, 0.4f, 1f}, Shader.TileMode.CLAMP));
             c.drawRect(0, 0, w, h, p);
