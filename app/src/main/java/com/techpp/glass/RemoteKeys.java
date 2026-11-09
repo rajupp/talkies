@@ -131,14 +131,15 @@ final class RemoteKeys {
             if (action.equals(HOME)) {
                 s.openHome();
             } else if (action.equals(SETTINGS) || action.equals(WIFI)) {
-                s.startActivity(settings(s, action).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
+                Intent screen = settings(s, action);
+                HomeState.openingSettings(s, screen);
+                s.startActivity(screen.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
             } else if (action.equals(SOUND)) {
                 s.startActivity(sound(s).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
             } else if (action.equals(PREVIOUS)) {
                 previous(s);
             } else if (action.startsWith(INPUT)) {
-                s.startActivity(new Intent(Intent.ACTION_VIEW).setDataAndType(android.media.tv.TvContract.buildChannelUriForPassthroughInput(
-                        action.substring(INPUT.length())), "vnd.android.cursor.item/channel").addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
+                s.startActivity(AppEntry.inputIntent(s, action.substring(INPUT.length())));
             } else if (action.equals(PLAY_PAUSE)) {
                 android.media.AudioManager am = s.getSystemService(android.media.AudioManager.class);
                 am.dispatchMediaKeyEvent(new KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE));

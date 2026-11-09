@@ -57,6 +57,11 @@
         <intent><action android:name="android.settings.SOUND_SETTINGS" /></intent>
         <intent><action android:name="android.settings.DISPLAY_SETTINGS" /></intent>
         <intent><action android:name="android.settings.INTERNAL_STORAGE_SETTINGS" /></intent>
+        <!-- Fire TV's own way to switch inputs (AppEntry.inputIntent). -->
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <data android:scheme="tvinput" />
+        </intent>
     </queries>
 
     <application

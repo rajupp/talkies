@@ -178,7 +178,9 @@ public class SleepService extends AccessibilityService {
             boolean firstDown = event.getAction() == KeyEvent.ACTION_DOWN && event.getRepeatCount() == 0;
             // When you pressed it, not when this got to it: the main thread can be busy as Talkies comes up.
             long pressedAt = event.getEventTime();
-            if (firstDown && pressedAt - homeUpAt < DOUBLE_MS) homeSecond = true;
+            // Set afresh on each press, so a key-up Android never delivered can't leave later presses swallowed.
+            if (firstDown) homeSecond = pressedAt - homeUpAt < DOUBLE_MS;
+            if (firstDown) HomeState.inSettings = false;  // Home leaves the settings
             if (homeSecond) {
                 if (event.getAction() == KeyEvent.ACTION_UP) {
                     homeSecond = false;
@@ -500,8 +502,7 @@ public class SleepService extends AccessibilityService {
         String open = openAtPowerOn(this);
         Intent i = null;
         if (open != null && open.startsWith(AppEntry.INPUT)) {
-            i = new Intent(Intent.ACTION_VIEW).setDataAndType(android.media.tv.TvContract.buildChannelUriForPassthroughInput(
-                    open.substring(AppEntry.INPUT.length())), "vnd.android.cursor.item/channel");
+            i = AppEntry.inputIntent(this, open.substring(AppEntry.INPUT.length()));
         } else if (open != null) {
             i = getPackageManager().getLeanbackLaunchIntentForPackage(open);
             if (i == null) i = getPackageManager().getLaunchIntentForPackage(open);
@@ -550,7 +551,8 @@ public class SleepService extends AccessibilityService {
                     && (stockHomes.contains(pkg + "/" + event.getClassName())
                         || event.getClassName().toString().endsWith("ProfileChooserActivity"))) {
                 // A built-in launcher's home screen, or the "Choose an account" screen Google TV puts up when it starts.
-                if (SystemClock.elapsedRealtime() - assistantAt > ASSISTANT_GRACE_MS) openHome();
+                if (HomeState.inSettings) Log.i(TAG, "In the TV's settings, part of " + pkg + ": staying");
+                else if (SystemClock.elapsedRealtime() - assistantAt > ASSISTANT_GRACE_MS) openHome();
                 else assistantAt = SystemClock.elapsedRealtime();  // browsing the results: keep them
             }
         }

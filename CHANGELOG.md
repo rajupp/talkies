@@ -3,6 +3,18 @@
 Versions are numbered *major.minor.fix*. While Talkies is in beta they start with 0: a new minor number brings new
 features, a new fix number only fixes. The version shows in Talkies settings → About.
 
+## Unreleased
+
+### Fixed
+- **Apps you install or uninstall show up on Home right away.** Talkies missed changes made while it was in the
+  background, in the Play Store or Settings, until the TV restarted. Thanks to Ganeshkumar for reporting it.
+- **Fire TV: Inputs switch to the HDMI port.** They opened Live TV's settings instead; Talkies now asks Fire TV the way
+  its own Inputs menu does. Thanks to Macario for the log that showed how.
+- **Fire TV: TV settings stay open.** With the Home button service on, opening settings from Talkies bounced straight
+  back, because Fire TV's settings are part of Amazon's launcher. Thanks to Macario.
+- **Recent apps is sturdier.** Its cards can no longer crash Talkies if the app list reloads while they're drawing,
+  OK on an app removed since closes the cards, and a missed Home key-up can't stop later presses from working.
+
 ## 1.2.11 — 8 November 2026
 
 ### Added

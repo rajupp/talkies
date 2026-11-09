@@ -45,6 +45,22 @@ final class AppEntry {
         inputGlyph = null;
     }
 
+    /** Fire TV's input switcher, which its own Inputs menu and the remote's input buttons use. */
+    private static final String FIRE_INPUTS = "com.amazon.tv.inputpreference.service";
+
+    /**
+     * Switches the TV to an input. Android TV's standard link for it opens Live TV's settings on Fire TV, so there it's
+     * the link Fire TV's own Inputs menu sends. From Macario's log of a Xiaomi Fire TV.
+     */
+    static Intent inputIntent(android.content.Context c, String inputId) {
+        Intent fire = new Intent(Intent.ACTION_VIEW, android.net.Uri.parse("tvinput://tunenow?inputId=" + inputId))
+                .setPackage(FIRE_INPUTS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+        if (c.getPackageManager().resolveActivity(fire, 0) != null) return fire;
+        return new Intent(Intent.ACTION_VIEW)
+                .setDataAndType(android.media.tv.TvContract.buildChannelUriForPassthroughInput(inputId), "vnd.android.cursor.item/channel")
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+    }
+
     /** An input: its tile is the glyph and the name on the device's colour. */
     AppEntry(String inputId, String label, int color, Drawable glyph) {
         info = null;
@@ -57,13 +73,8 @@ final class AppEntry {
         inputGlyph = glyph;
     }
 
-    Intent launchIntent() {
-        if (input != null) {
-            // Switches the TV to that input, as Inputs does.
-            return new Intent(Intent.ACTION_VIEW)
-                    .setDataAndType(android.media.tv.TvContract.buildChannelUriForPassthroughInput(input), "vnd.android.cursor.item/channel")
-                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-        }
+    Intent launchIntent(android.content.Context c) {
+        if (input != null) return inputIntent(c, input);  // switches the TV to that input, as Inputs does
         return new Intent(Intent.ACTION_MAIN)
                 .addCategory(tv ? Intent.CATEGORY_LEANBACK_LAUNCHER : Intent.CATEGORY_LAUNCHER)
                 .setComponent(component)

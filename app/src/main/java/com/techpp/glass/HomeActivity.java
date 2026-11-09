@@ -227,9 +227,16 @@ public class HomeActivity extends Activity {
     private final BroadcastReceiver timeReceiver = new BroadcastReceiver() {
         @Override public void onReceive(Context c, Intent i) { onMinute(); }
     };
+    /**
+     * Apps installed, removed or switched on or off. It listens while Home is hidden too, since that's when you install
+     * from the Play Store or uninstall in Settings: then it only remembers, and Home reloads as it comes back.
+     */
     private final BroadcastReceiver packageReceiver = new BroadcastReceiver() {
-        @Override public void onReceive(Context c, Intent i) { reloadApps(); }
+        @Override public void onReceive(Context c, Intent i) {
+            if (started) reloadApps(); else appsStale = true;
+        }
     };
+    private boolean started, appsStale;
 
     // ---------------------------------------------------------------- setup
 
@@ -268,6 +275,11 @@ public class HomeActivity extends Activity {
 
         root = findViewById(R.id.root);
         HomeState.recentsHere(this::openRecents);
+        IntentFilter packages = new IntentFilter(Intent.ACTION_PACKAGE_ADDED);
+        packages.addAction(Intent.ACTION_PACKAGE_REMOVED);
+        packages.addAction(Intent.ACTION_PACKAGE_CHANGED);
+        packages.addDataScheme("package");
+        register(packageReceiver, packages);
         backdrop = findViewById(R.id.backdrop);
         lite = liteEffects();
         backdrop.setLite(lite);
@@ -2378,10 +2390,10 @@ public class HomeActivity extends Activity {
                 openPick(chanRows.get(chanIdx).items.get(chanCol[chanIdx]));
                 break;
             case Z_DOCK:
-                startFromTile(apps.get(dockIdx).launchIntent());
+                startFromTile(apps.get(dockIdx).launchIntent(this));
                 break;
             case Z_GRID:
-                startFromTile(apps.get(dockCount + gridIdx).launchIntent());
+                startFromTile(apps.get(dockCount + gridIdx).launchIntent(this));
                 break;
             case Z_ALL:
                 focusGrid(0);
@@ -2483,8 +2495,10 @@ public class HomeActivity extends Activity {
     }
 
     /** The app's banner, else its icon; null if it's gone. */
-    private Drawable artOf(String pkg) {
-        AppEntry a = appFor(pkg);
+    private Drawable artOf(String pkg) { return artOf(pkg, appFor(pkg)); }
+
+    /** The same with its entry already found (off the main thread, where the app list can't be walked). */
+    private Drawable artOf(String pkg, AppEntry a) {
         Drawable d = a != null ? a.banner(pm) : null;
         try {
             if (d == null) d = pm.getApplicationBanner(pkg);
@@ -2494,6 +2508,8 @@ public class HomeActivity extends Activity {
     }
 
     private void start(Intent i) {
+        if (i.getAction() != null && i.getAction().startsWith("android.settings.") || i.getComponent() != null
+                && i.getComponent().getPackageName().contains("settings")) HomeState.openingSettings(this, i);
         try {
             startActivity(i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
         } catch (ActivityNotFoundException | SecurityException ex) {
@@ -3055,9 +3071,7 @@ public class HomeActivity extends Activity {
 
     private Runnable passthrough(TvInputInfo i) {
         return () -> {
-            Intent v = new Intent(Intent.ACTION_VIEW);
-            v.setDataAndType(TvContract.buildChannelUriForPassthroughInput(i.getId()), "vnd.android.cursor.item/channel");
-            start(v);
+            start(AppEntry.inputIntent(this, i.getId()));
         };
     }
 
@@ -5339,10 +5353,13 @@ public class HomeActivity extends Activity {
         closeRecents();
         recentsOpenedAt = android.os.SystemClock.elapsedRealtime();
         List<RecentsCards.Entry> entries = new ArrayList<>();
+        // Each app's entry, found here: the art thread mustn't walk the app list while a reload rebuilds it.
+        List<AppEntry> found = new ArrayList<>();
         for (String pkg : RecentApps.list(this)) {
             AppEntry a = appFor(pkg);
             if (a == null && pm.getLeanbackLaunchIntentForPackage(pkg) == null && pm.getLaunchIntentForPackage(pkg) == null) continue;  // uninstalled since
             entries.add(new RecentsCards.Entry(pkg, a != null ? a.label : Channels.label(pm, pkg)));
+            found.add(a);
         }
         RecentsCards cards = new RecentsCards(this, entries, theme.tileBg, lite);
         recents = cards;
@@ -5354,13 +5371,16 @@ public class HomeActivity extends Activity {
         }
         int fallback = theme.tileBg;
         Thread art = new Thread(() -> {
-            for (RecentsCards.Entry e : entries) {
-                Drawable d = artOf(e.pkg);
-                int color = RecentsCards.colorOf(d, fallback);
+            for (int i = 0; i < entries.size(); i++) {
+                RecentsCards.Entry e = entries.get(i);
+                int color;
                 android.graphics.Bitmap sized;
                 try {
+                    Drawable d = artOf(e.pkg, found.get(i));
+                    color = RecentsCards.colorOf(d, fallback);
                     sized = RecentsCards.rounded(d, cards.artWidth(), px(11));
                 } catch (RuntimeException | OutOfMemoryError ex) {
+                    Log.w(TAG, "No art for " + e.pkg, ex);
                     continue;  // its card stays plain
                 }
                 runOnUiThread(() -> { if (recents == cards) cards.showArt(e.pkg, sized, color); });
@@ -5375,7 +5395,7 @@ public class HomeActivity extends Activity {
 
     private void closeRecents() {
         if (recents == null) return;
-        ((ViewGroup) recents.getParent()).removeView(recents);
+        if (recents.getParent() != null) ((ViewGroup) recents.getParent()).removeView(recents);
         recents = null;
     }
 
@@ -5384,7 +5404,7 @@ public class HomeActivity extends Activity {
         if (e == null) { closeRecents(); return; }
         Intent open = pm.getLeanbackLaunchIntentForPackage(e.pkg);
         if (open == null) open = pm.getLaunchIntentForPackage(e.pkg);
-        if (open == null) return;
+        if (open == null) { closeRecents(); return; }  // uninstalled or disabled since the cards came up
         startApp(open, null);
     }
 
@@ -5776,11 +5796,11 @@ public class HomeActivity extends Activity {
         t.addAction(Intent.ACTION_TIME_CHANGED);
         t.addAction(Intent.ACTION_TIMEZONE_CHANGED);
         register(timeReceiver, t);
-        IntentFilter p = new IntentFilter(Intent.ACTION_PACKAGE_ADDED);
-        p.addAction(Intent.ACTION_PACKAGE_REMOVED);
-        p.addAction(Intent.ACTION_PACKAGE_CHANGED);
-        p.addDataScheme("package");
-        register(packageReceiver, p);
+        started = true;
+        if (appsStale) {
+            appsStale = false;
+            reloadApps();
+        }
         ConnectivityManager cm = getSystemService(ConnectivityManager.class);
         netCallback = new ConnectivityManager.NetworkCallback() {
             @Override public void onCapabilitiesChanged(Network n, NetworkCapabilities c) { runOnUiThread(() -> updateNetwork(c)); }
@@ -5885,8 +5905,14 @@ public class HomeActivity extends Activity {
         root.removeCallbacks(rereadSavedPicks);
         rowsReadWaiting = false;
         unregisterReceiver(timeReceiver);
-        unregisterReceiver(packageReceiver);
+        started = false;
         getSystemService(ConnectivityManager.class).unregisterNetworkCallback(netCallback);
+    }
+
+    @Override
+    protected void onDestroy() {
+        unregisterReceiver(packageReceiver);
+        super.onDestroy();
     }
 
     @Override
@@ -5895,6 +5921,7 @@ public class HomeActivity extends Activity {
         tabs[2].setText("New in " + Region.name(Region.country(this)));  // the country can change (Region)
         inFront = true;
         HomeState.inFront = true;
+        HomeState.inSettings = false;
         ScoreCard.homeShowing(true);
         watchPlaying();
         if (HomeState.takeRecentsAsked()) openRecents();
