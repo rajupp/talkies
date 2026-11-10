@@ -241,7 +241,7 @@ public class SleepService extends AccessibilityService {
         if (action == null) return false;
         String hold = RemoteKeys.holdAction(this, id);
         if (hold == null) {
-            if (up) RemoteKeys.run(this, action);
+            if (up && !RemoteKeys.burst(event, id)) RemoteKeys.run(this, action);
             return true;
         }
         // Held buttons repeat their down event: only the first starts the wait.
@@ -502,7 +502,8 @@ public class SleepService extends AccessibilityService {
         String open = openAtPowerOn(this);
         Intent i = null;
         if (open != null && open.startsWith(AppEntry.INPUT)) {
-            i = AppEntry.inputIntent(this, open.substring(AppEntry.INPUT.length()));
+            if (!AppEntry.openInput(this, open.substring(AppEntry.INPUT.length()), null)) openHome();
+            return;
         } else if (open != null) {
             i = getPackageManager().getLeanbackLaunchIntentForPackage(open);
             if (i == null) i = getPackageManager().getLaunchIntentForPackage(open);

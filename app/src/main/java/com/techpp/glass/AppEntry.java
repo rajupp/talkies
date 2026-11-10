@@ -56,9 +56,56 @@ final class AppEntry {
         Intent fire = new Intent(Intent.ACTION_VIEW, android.net.Uri.parse("tvinput://tunenow?inputId=" + inputId))
                 .setPackage(FIRE_INPUTS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
         if (c.getPackageManager().resolveActivity(fire, 0) != null) return fire;
+        return passthrough(inputId);
+    }
+
+    private static Intent passthrough(String inputId) {
         return new Intent(Intent.ACTION_VIEW)
                 .setDataAndType(android.media.tv.TvContract.buildChannelUriForPassthroughInput(inputId), "vnd.android.cursor.item/channel")
                 .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+    }
+
+    private static final java.util.regex.Pattern HW = java.util.regex.Pattern.compile("/HW(\\d+)$");
+
+    /**
+     * Switches the TV to an input, and says whether something took the request. On Fire TV: the link its Inputs menu
+     * sends, else Amazon's input switch service with the port's hardware number (HW2 is HDMI 1), which any app may
+     * call. On a TCL Fire TV (AFTDEC012E) HDMI 4 is HW5 but its switch wants 10. That service and the TCL detail are
+     * from Free My TV (MIT), tested there on Xiaomi and TCL Fire TVs. Elsewhere, Android TV's standard link.
+     */
+    static boolean openInput(android.content.Context c, String inputId, android.os.Bundle options) {
+        Intent fire = inputIntent(c, inputId);
+        if (FIRE_INPUTS.equals(fire.getPackage())) {
+            try {
+                c.startActivity(fire, options);
+                return true;
+            } catch (RuntimeException e) {
+                android.util.Log.w("GlassHome", "Fire TV's input link refused: " + e);
+            }
+        }
+        java.util.regex.Matcher m = HW.matcher(inputId);
+        if (m.find()) {
+            Intent sw = new Intent().setComponent(new ComponentName(FIRE_INPUTS, FIRE_INPUTS + ".KaminoInputSwitchService"));
+            if (c.getPackageManager().resolveService(sw, 0) != null) {
+                int hardware = Integer.parseInt(m.group(1));
+                int type = "AFTDEC012E".equalsIgnoreCase(android.os.Build.MODEL) && hardware == 5 ? 10 : hardware;
+                try {
+                    if (c.startService(sw.putExtra("inputType", type)) != null) {
+                        android.util.Log.i("GlassHome", "Fire TV input switch: HW" + hardware + ", type " + type);
+                        return true;
+                    }
+                } catch (RuntimeException e) {
+                    android.util.Log.w("GlassHome", "Fire TV's input switch refused: " + e);
+                }
+            }
+        }
+        try {
+            c.startActivity(passthrough(inputId), options);
+            return true;
+        } catch (RuntimeException e) {
+            android.util.Log.w("GlassHome", "Couldn't switch to " + inputId + ": " + e);
+            return false;
+        }
     }
 
     /** An input: its tile is the glyph and the name on the device's colour. */

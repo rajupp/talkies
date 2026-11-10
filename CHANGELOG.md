@@ -16,6 +16,9 @@ features, a new fix number only fixes. The version shows in Talkies settings →
   Android keeps Force stop. Suggested by @kdkasucl.
 - **Menus**: a slightly see-through panel, a clearer title, and long lists fade out where they're cut instead of
   slicing a row in half.
+- **Remote keys names more buttons**: Netflix, YouTube, Prime Video, Settings and others on Sony, TCL, Hisense,
+  Philips, Xiaomi and Google TV Streamer remotes, instead of *Key 4062* or *Button 0x247*. The codes are from
+  [Free My TV](https://github.com/simbasjungles/free-my-tv)'s remote tables.
 - **All apps names the focused app** next to its title, for tiles that are a logo with no name.
 - **Small things**: the weather and "Film · Netflix" lines are easier to read in the dark theme, the live-score line
   sits in a pill under the top icons, and a card with no picture shows the app's logo on its own colours.
@@ -24,7 +27,12 @@ features, a new fix number only fixes. The version shows in Talkies settings →
 - **Apps you install or uninstall show up on Home right away.** Talkies missed changes made while it was in the
   background, in the Play Store or Settings, until the TV restarted. Thanks to Ganeshkumar for reporting it.
 - **Fire TV: Inputs switch to the HDMI port.** They opened Live TV's settings instead; Talkies now asks Fire TV the way
-  its own Inputs menu does. Thanks to Macario for the log that showed how.
+  its own Inputs menu does. Thanks to Macario for the log that showed how. If Fire TV refuses that, Talkies asks
+  Amazon's input switch service instead, with the TCL Fire TV's own number for HDMI 4 (from
+  [Free My TV](https://github.com/simbasjungles/free-my-tv), tested there on Xiaomi and TCL Fire TVs).
+- **Sony: each app button can have its own job.** Five of them send Android the same key, so Remote keys treated them
+  as one; Talkies now tells them apart by the remote's own code. A job you gave one of them before needs setting again.
+- **Xiaomi: a button with a new job does it once.** Some Xiaomi remotes send one press as several.
 - **Fire TV: TV settings stay open.** With the Home button service on, opening settings from Talkies bounced straight
   back, because Fire TV's settings are part of Amazon's launcher. Thanks to Macario.
 - **Continue watching gets its pictures after a restart** ([#28](https://github.com/rajupp/talkies/issues/28)). Right

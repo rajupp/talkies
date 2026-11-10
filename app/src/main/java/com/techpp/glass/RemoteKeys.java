@@ -23,7 +23,11 @@ import java.util.TreeMap;
  *
  * A button is known by its key code, or, for one Android has no code for (KEYCODE_UNKNOWN: the app buttons on some
  * remotes, such as the Mi Box's Netflix and Prime Video), by its scan code from the remote, stored negated so it
- * can't clash with a key code. See {@link #id}.
+ * can't clash with a key code. See {@link #id}. Sony's app buttons share a key code (BUTTON_9 for five of them), so there
+ * the scan code tells them apart too.
+ *
+ * The names of brands' own buttons ("Netflix button" for TCL's key 4062) and the Sony and Xiaomi details come from Free
+ * My TV's remote tables (github.com/simbasjungles/free-my-tv, MIT), each read there from a real remote.
  */
 final class RemoteKeys {
     static final String INPUTS = "inputs", HOME = "home", NONE = "none", APP = "app:", RECENTS = "recents", CONTROL = "control",
@@ -38,8 +42,109 @@ final class RemoteKeys {
 
     /** The button's id: its key code, or minus its scan code when Android has no key code for it (0: neither). */
     static int id(KeyEvent e) {
+        if (SONY && e.getScanCode() > 0 && sonyShared(e.getKeyCode())) return -e.getScanCode();
         if (e.getKeyCode() != KeyEvent.KEYCODE_UNKNOWN) return e.getKeyCode();
         return e.getScanCode() > 0 ? -e.getScanCode() : 0;
+    }
+
+    private static boolean is(String maker) {
+        return maker.equalsIgnoreCase(android.os.Build.MANUFACTURER) || maker.equalsIgnoreCase(android.os.Build.BRAND);
+    }
+
+    private static final String MODEL = android.os.Build.MODEL;
+    private static final boolean SONY = is("Sony"), TCL = is("TCL"), HISENSE = is("Hisense"),
+            XIAOMI = is("Xiaomi"), XIAOMI_AFKR0 = XIAOMI && MODEL.equals("MiTV-AFKR0"),
+            XIAOMI_M = XIAOMI && MODEL.startsWith("MiTV-M"),
+            GOOGLE_STREAMER = is("Google") && MODEL.equals("Google TV Streamer"),
+            PHILIPS_GTV = (is("Philips") || is("TPV") || MODEL.startsWith("Philips")) && android.os.Build.VERSION.SDK_INT >= 33;
+
+    /** Sony's app buttons: BUTTON_9 for five of them, BUTTON_4, _8, _2 and _15 on some remotes, VIDEO_APP_1 to _8 on others. */
+    private static boolean sonyShared(int code) {
+        return code == KeyEvent.KEYCODE_BUTTON_2 || code == KeyEvent.KEYCODE_BUTTON_4 || code == KeyEvent.KEYCODE_BUTTON_8
+                || code == KeyEvent.KEYCODE_BUTTON_9 || code == KeyEvent.KEYCODE_BUTTON_15 || code >= 289 && code <= 296;
+    }
+
+    /** The button's name on this TV's remote, where it's known; else null. */
+    private static String known(int code) {
+        if (SONY) {
+            switch (code) {
+                case -583: case -758: return "Netflix button";
+                case -490: case -652: return "Prime Video button";
+                case -485: case -653: return "YouTube button";
+                case -491: return "Disney+ button";
+                case -507: return "Crunchyroll button";
+                case -496: return "BRAVIA CORE button";
+                case -587: return "Google Play button";
+                case 3004: return "SonyLIV button";
+                case KeyEvent.KEYCODE_NOTIFICATION: return "Settings button";
+            }
+        }
+        if (TCL) {
+            switch (code) {
+                case 4062: return "Netflix button";
+                case KeyEvent.KEYCODE_BUTTON_3: case 4065: return "YouTube button";
+                case 4099: return "Prime Video button";
+                case 4020: return "TCL Channel button";
+                case KeyEvent.KEYCODE_NOTIFICATION: return "Settings button";
+            }
+        }
+        if (HISENSE) {
+            switch (code) {
+                case 295: return "Prime Video button";
+                case KeyEvent.KEYCODE_BUTTON_3: return "YouTube button";
+                case 607: return "Disney+ button";
+                case 284: return "All apps button";
+                case 288: return "Profile button";
+                case KeyEvent.KEYCODE_NOTIFICATION: return "Settings button";
+            }
+        }
+        if (GOOGLE_STREAMER) {
+            switch (code) {
+                case KeyEvent.KEYCODE_BUTTON_3: return "YouTube button";
+                case KeyEvent.KEYCODE_BUTTON_4: return "Netflix button";
+                case 313: return "Star button";
+            }
+        }
+        if (PHILIPS_GTV) {
+            switch (code) {
+                case 811: return "Settings button";
+                case 816: return "Apps button";
+                case 475: return "Netflix button";
+                case 781: return "YouTube button";
+                case 788: return "Prime Video button";
+            }
+        }
+        if (XIAOMI_AFKR0) {
+            switch (code) {
+                case KeyEvent.KEYCODE_BUTTON_5: return "Mi TV+ button";
+                case KeyEvent.KEYCODE_BUTTON_6: return "Netflix button";
+                case KeyEvent.KEYCODE_BUTTON_7: return "Prime Video button";
+                case KeyEvent.KEYCODE_BUTTON_16: return "YouTube button";
+            }
+        } else if (XIAOMI_M) {
+            switch (code) {
+                case KeyEvent.KEYCODE_BUTTON_3: return "YouTube button";
+                case KeyEvent.KEYCODE_BUTTON_4: return "Mi button";
+                case KeyEvent.KEYCODE_BUTTON_5: return "PatchWall button";
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Xiaomi's MiTV-M remotes send one press as a burst of separate presses: a press of the same button this soon after
+     * the last is the same press, so its job runs once.
+     */
+    private static final long BURST_MS = 1000;
+    private static int lastId;
+    private static long lastAt;
+
+    static boolean burst(KeyEvent e, int id) {
+        if (!XIAOMI_M || e.getAction() != KeyEvent.ACTION_UP) return false;
+        boolean same = id == lastId && e.getEventTime() - lastAt < BURST_MS;
+        lastId = id;
+        lastAt = e.getEventTime();
+        return same;
     }
 
     /** Navigation, OK, Back, Home, volume and power keep their jobs: remapping them could lock you out of the TV. */
@@ -90,6 +195,8 @@ final class RemoteKeys {
 
     /** "Prog Red", "Button 3", "Key 1201" for a vendor key Android has no name for, "Button 0x1a5" by scan code. */
     static String keyName(int code) {
+        String known = known(code);
+        if (known != null) return known;
         if (code < 0) return "Button 0x" + Integer.toHexString(-code);
         String s = KeyEvent.keyCodeToString(code);
         if (!s.startsWith("KEYCODE_")) return "Key " + code;
@@ -139,7 +246,7 @@ final class RemoteKeys {
             } else if (action.equals(PREVIOUS)) {
                 previous(s);
             } else if (action.startsWith(INPUT)) {
-                s.startActivity(AppEntry.inputIntent(s, action.substring(INPUT.length())));
+                AppEntry.openInput(s, action.substring(INPUT.length()), null);
             } else if (action.equals(PLAY_PAUSE)) {
                 android.media.AudioManager am = s.getSystemService(android.media.AudioManager.class);
                 am.dispatchMediaKeyEvent(new KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE));

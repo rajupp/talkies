@@ -316,6 +316,8 @@ Ideas (no code; Talkies' own implementation):
   standard settings screen: [CleanYourTV](https://github.com/Gathin23/cleanyourtv)'s launcher and add-ons.
 - Now playing and the weather forecast: [Luma](https://github.com/0xProbabillity/luma-tv).
 - Animation speed and Storage in Control Center: [GlassLauncher](https://github.com/tlfares/GlassLauncher).
+- Fire TV's input switch service, and the names, codes and quirks of Sony, TCL, Hisense, Philips, Xiaomi and Google TV
+  Streamer remote buttons: [Free My TV](https://github.com/simbasjungles/free-my-tv)'s notes (MIT).
 - Inputs on Home, an app or input at power-on, Lite effects on low-memory TVs, Report a problem with the TV's details,
   ahead-of-time compiling and a list of TVs: [Aerial](https://github.com/pengchujin/aerial-tv).
 - Offering to switch to a device that turns on, naming and hiding inputs, the screensaver clock, what's playing on

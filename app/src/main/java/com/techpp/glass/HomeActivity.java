@@ -2530,10 +2530,10 @@ public class HomeActivity extends Activity {
                 openPick(chanRows.get(chanIdx).items.get(chanCol[chanIdx]));
                 break;
             case Z_DOCK:
-                startFromTile(apps.get(dockIdx).launchIntent(this));
+                openTile(apps.get(dockIdx));
                 break;
             case Z_GRID:
-                startFromTile(apps.get(dockCount + gridIdx).launchIntent(this));
+                openTile(apps.get(dockCount + gridIdx));
                 break;
             case Z_ALL:
                 focusGrid(0);
@@ -2623,6 +2623,12 @@ public class HomeActivity extends Activity {
     }
 
     private void startFromTile(Intent i) { startApp(i, fromTile()); }
+
+    /** An app opens; an input on Home switches the TV to it, the way Inputs does. */
+    private void openTile(AppEntry a) {
+        if (a.input != null) AppEntry.openInput(this, a.input, fromTile());
+        else startFromTile(a.launchIntent(this));
+    }
 
     private void startApp(Intent i, Bundle options) {
         try {
@@ -3213,7 +3219,7 @@ public class HomeActivity extends Activity {
 
     private Runnable passthrough(TvInputInfo i) {
         return () -> {
-            start(AppEntry.inputIntent(this, i.getId()));
+            AppEntry.openInput(this, i.getId(), null);
         };
     }
 
