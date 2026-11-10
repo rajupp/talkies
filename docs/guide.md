@@ -53,7 +53,7 @@ you set once is in **Talkies settings**, at the top.
 | Weather | The current weather on the right; OK shows the next six hours, and OK again the next six days (high / low and conditions) |
 | Sleep timer | Cycles Off → 30 → 60 → 90 min; the time left shows on the right. A minute before, a card counts down over whatever is playing: **OK** gives 15 more minutes |
 | Turn off now | Puts the TV in standby |
-| Recent apps | Big cards of the apps you opened through Talkies (dock, All apps, picks, channels, remote buttons) or left with Home, newest first. A card shows the app's logo on its colour. Left and Right move, OK opens, Back closes. **Press Home twice quickly** to open it, from Talkies or from inside an app (needs Remote keys On). Also on a remote button: Remote keys → Recent apps |
+| Recent apps | Big cards of the apps you opened through Talkies (dock, All apps, picks, channels, remote buttons) or left with Home, newest first. A card shows the app's logo on its colour. Left and Right move, OK opens, Back closes. Down (or Menu, or holding OK) offers **Remove from list** and **App info**, where Android keeps Force stop. **Press Home twice quickly** to open it, from Talkies or from inside an app (needs Remote keys On). Also on a remote button: Remote keys → Recent apps |
 | Storage | Shows the free space ("12.4 GB free of 32 GB"); OK opens the TV's storage settings |
 | Animations | Cycles the speed of every animation on the TV: 1× → 0.5× → Off. Faster makes menus and app switches feel snappier; Off also stills Talkies' own motion. Needs the `WRITE_SECURE_SETTINGS` grant (see [Google Assistant](#google-assistant-and-the-google-tv-launcher)) |
 | Network | Shows the Wi-Fi name (or Ethernet); OK opens Wi-Fi settings |
@@ -78,7 +78,7 @@ Control Center → **Talkies settings**, or **hold OK on the ⚙ icon** (a press
 | TV's screensaver | **Talkies** or **Not Talkies**: which screensaver the TV uses. OK switches it with the `WRITE_SECURE_SETTINGS` grant; without it, shows how to choose it |
 | Screensaver message | Two short lines for the screensaver ("Dinner at 8"), typed on your phone: a QR code opens the page, which shows the message as it is. Send both lines empty to remove it |
 | Quiet hours | When the screensaver dims: **11 PM – 7 AM** (default), 10 PM – 6 AM, Midnight – 7 AM, or Off |
-| Focus | How the selected tile or card shows. **Lift** (default): it grows and lifts on a soft shadow. **Ring**: a white outline as well, easier to see on a busy wallpaper |
+| Focus | How the selected tile or card shows. **Outline** (default): it grows and lifts on a soft shadow, with a thin light line around it. **Lift**: the lift alone. **Ring**: a bold white ring, easier to see on a busy wallpaper |
 | Effects | **Auto** (default): Lite on a TV with under 1.6 GB of memory, or one that turns out slow (Talkies times its frames the first few times you move with the arrows), Full elsewhere. **Full**: the background glows in the focused app's colour and focus and scrolling glide. **Lite**: no glow, and focus and scrolling move at once, which keeps slow TVs responsive |
 | RAM and storage | Shown (default) or Hidden: the two meters beside the icon buttons, with free RAM and free storage, updated every minute |
 | Apps open from their tile | On by default: an app's window grows out of the tile or card you chose. It's Android's normal opening animation, started from the tile, so it costs nothing extra |

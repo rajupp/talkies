@@ -43,5 +43,12 @@ final class RecentApps {
         prefs(c).edit().putString("apps", String.join(",", l)).apply();
     }
 
+    /** Takes {@code pkg} off the list (Recent apps → Remove from list). */
+    static void remove(Context c, String pkg) {
+        List<String> l = all(c);
+        if (!l.remove(pkg)) return;
+        prefs(c).edit().putString("apps", String.join(",", l)).apply();
+    }
+
     static void clear(Context c) { prefs(c).edit().remove("apps").apply(); }
 }

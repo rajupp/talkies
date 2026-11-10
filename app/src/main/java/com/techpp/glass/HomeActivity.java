@@ -307,6 +307,9 @@ public class HomeActivity extends Activity {
         grid = findViewById(R.id.grid);
         menu = findViewById(R.id.menu);
         menuScroll = findViewById(R.id.menu_scroll);
+        // A long menu fades out at the edge it's cut at, so it reads as "there's more" rather than a row sliced in half.
+        menuScroll.setVerticalFadingEdgeEnabled(true);
+        menuScroll.setFadingEdgeLength(Math.round(36 * getResources().getDisplayMetrics().density));
         channelsBox = findViewById(R.id.channels);
         title = findViewById(R.id.title);
         info = findViewById(R.id.info);
@@ -316,7 +319,7 @@ public class HomeActivity extends Activity {
         picksRow = findViewById(R.id.picks);
         picksHint = findViewById(R.id.picks_hint);
         ring = findViewById(R.id.ring);
-        ring.setAlways(prefs.getBoolean("focus_ring", false));
+        ring.setStyle(focusStyle());
         tabs = new TextView[]{findViewById(R.id.tab_recent), findViewById(R.id.tab_trending), findViewById(R.id.tab_india)};
         icons = new ImageView[]{findViewById(R.id.icon_cc), findViewById(R.id.icon_inputs), findViewById(R.id.icon_wifi),
                 findViewById(R.id.icon_settings), findViewById(R.id.icon_bell)};
@@ -367,14 +370,14 @@ public class HomeActivity extends Activity {
                 t.iconBg = 0xC0FFFFFF; t.iconStroke = 0x10000000; t.iconFocusBg = 0xFF1D1D1F; t.iconFocusFg = 0xFFFFFFFF;
                 t.band = 0x94FFFFFF; t.bandStroke = 0xF2FFFFFF;
                 t.scrimTop = 0x8CF5F6F8; t.scrimMid = 0x33EBEEF2; t.scrimBottom = 0xA6E2E5EA;
-                t.menuBg = 0xFFFFFFFF; t.menuStroke = 0x14000000; t.menuFocusBg = 0xFF1D1D1F; t.menuFocusText = 0xFFFFFFFF;
+                t.menuBg = 0xF7FFFFFF; t.menuStroke = 0x14000000; t.menuFocusBg = 0xFF1D1D1F; t.menuFocusText = 0xFFFFFFFF;
                 t.tileBg = 0xFFD9DCE1; t.ambientAlpha = 0.5f;
             } else {
-                t.bgTop = 0xFF121419; t.bgBottom = 0xFF08090C; t.text = 0xFFF5F5F7; t.text2 = 0xFFA1A1A6;
+                t.bgTop = 0xFF121419; t.bgBottom = 0xFF08090C; t.text = 0xFFF5F5F7; t.text2 = 0xFFB4B4BC;
                 t.iconBg = 0x1AFFFFFF; t.iconStroke = 0x1FFFFFFF; t.iconFocusBg = 0xFFF5F5F7; t.iconFocusFg = 0xFF111113;
                 t.band = 0x12FFFFFF; t.bandStroke = 0x1FFFFFFF;
                 t.scrimTop = 0x5908090C; t.scrimMid = 0x2608090C; t.scrimBottom = 0xB308090C;
-                t.menuBg = 0xFF1C1C1F; t.menuStroke = 0x2EFFFFFF; t.menuFocusBg = 0xFFF5F5F7; t.menuFocusText = 0xFF111113;
+                t.menuBg = 0xF61C1C20; t.menuStroke = 0x2EFFFFFF; t.menuFocusBg = 0xFFF5F5F7; t.menuFocusText = 0xFF111113;
                 t.tileBg = 0xFF232326; t.ambientAlpha = 0.65f;
             }
             return t;
@@ -624,6 +627,7 @@ public class HomeActivity extends Activity {
         score.setText(b);
         score.setTextColor(theme.text);
         score.setVisibility(View.VISIBLE);
+        scorePill();
         credit.setAlpha(0f);  // the score sits where the TMDB credit goes; TMDB is credited in the README too
     }
 
@@ -667,6 +671,7 @@ public class HomeActivity extends Activity {
         score.setText(b);
         score.setTextColor(theme.text);
         score.setVisibility(View.VISIBLE);
+        scorePill();
         credit.setAlpha(0f);
         return true;
     }
@@ -1493,7 +1498,10 @@ public class HomeActivity extends Activity {
     /** A match card: each team's flag, short name and score, then the status ("India need 38 off 24"). */
     private View cricketCard(Cricket.Match m) {
         FrameLayout card = new FrameLayout(this);
-        card.setBackground(rounded(theme.tileBg, 0, 10));
+        // Glass like the dock, not a grey box. No shadow under it (one would show through): focus brightens it instead.
+        card.setBackground(glassCard(false));
+        card.setTag("glassCard");
+        card.setOutlineProvider(null);
         LinearLayout col = new LinearLayout(this);
         col.setOrientation(LinearLayout.VERTICAL);
         col.setPadding(px(14), px(12), px(14), px(10));
@@ -1502,15 +1510,15 @@ public class HomeActivity extends Activity {
         TextView st = new TextView(this);
         st.setTag("cricketText");
         String kind = m.kind.isEmpty() ? "" : m.kind + "  ·  ";
-        String status = m.live ? "LIVE  ·  " + kind + m.status : !m.ended && m.start != null ? kind + "starts " + m.start : kind + m.status;
+        String status = m.live ? "LIVE  " + kind + m.status : !m.ended && m.start != null ? kind + "starts " + m.start : kind + m.status;
         SpannableStringBuilder sb = new SpannableStringBuilder(status);
-        if (m.live) sb.setSpan(new ForegroundColorSpan(0xFFFF453A), 0, 4, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+        if (m.live) sb.setSpan(new PillSpan(0xFFE5383B, 0xFFFFFFFF, px(7), px(6)), 0, 4, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
         st.setText(sb);
         st.setSingleLine(true);
         st.setEllipsize(android.text.TextUtils.TruncateAt.END);
         st.setTextSize(12);
         st.setTypeface(getResources().getFont(R.font.outfit));
-        st.setTextColor(theme.text2);
+        st.setTextColor(day ? theme.text2 : 0xFFC7C7CC);
         LinearLayout.LayoutParams sl = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1);
         st.setGravity(android.view.Gravity.BOTTOM);
         col.addView(st, sl);
@@ -1525,11 +1533,13 @@ public class HomeActivity extends Activity {
         line.setGravity(android.view.Gravity.CENTER_VERTICAL);
         ImageView flag = new ImageView(this);
         flag.setScaleType(ImageView.ScaleType.CENTER_CROP);
+        // Until its flag or crest arrives (some teams have none): a quiet badge, so the names still line up.
+        flag.setBackground(rounded(day ? 0x1F000000 : 0x29FFFFFF, 0, 4));
         if (flagUrl != null && !flagUrl.isEmpty()) {
             background.execute(() -> {
                 File f = WatchNext.cached(this, new File(getExternalFilesDir(null), "cricket/flags"), flagUrl, 64);
                 Bitmap b = f == null ? null : BitmapFactory.decodeFile(f.getPath());
-                if (b != null) runOnUiThread(() -> flag.setImageBitmap(b));
+                if (b != null) runOnUiThread(() -> { flag.setBackground(null); flag.setImageBitmap(b); });
             });
         }
         LinearLayout.LayoutParams fl = new LinearLayout.LayoutParams(px(20), px(20));
@@ -1546,13 +1556,49 @@ public class HomeActivity extends Activity {
         sc.setTag("cricketText");
         sc.setText(runs);
         sc.setSingleLine(true);
-        sc.setTextSize(14);
-        sc.setTypeface(Fonts.outfit(this, 500));
+        sc.setTextSize(15);
+        sc.setTypeface(Fonts.outfit(this, 600));
         sc.setTextColor(theme.text);
         line.addView(sc);
         LinearLayout.LayoutParams ll = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, px(26));
         line.setLayoutParams(ll);
         return line;
+    }
+
+    /** A match card's glass: the dock's, a little stronger, and brighter with focus. */
+    private GradientDrawable glassCard(boolean focused) {
+        if (day) return rounded(focused ? 0xF2FFFFFF : 0xB3FFFFFF, 0xF2FFFFFF, 10);
+        return rounded(focused ? 0x33FFFFFF : 0x1AFFFFFF, focused ? 0x55FFFFFF : 0x2EFFFFFF, 10);
+    }
+
+    /** A small filled pill behind a word in a line of text: "LIVE" on a match card. */
+    private static final class PillSpan extends android.text.style.ReplacementSpan {
+        private final int fill, text;
+        private final float padX, gap;
+        private final RectF box = new RectF();
+        PillSpan(int fill, int text, float padX, float gap) { this.fill = fill; this.text = text; this.padX = padX; this.gap = gap; }
+
+        @Override public int getSize(android.graphics.Paint p, CharSequence s, int start, int end, android.graphics.Paint.FontMetricsInt fm) {
+            return Math.round(p.measureText(s, start, end) * 0.92f + 2 * padX + gap);
+        }
+
+        @Override public void draw(android.graphics.Canvas c, CharSequence s, int start, int end, float x, int top, int y, int bottom, android.graphics.Paint p) {
+            float size = p.getTextSize(), w = p.measureText(s, start, end) * 0.92f + 2 * padX;
+            int was = p.getColor();
+            android.graphics.Paint.FontMetrics m = p.getFontMetrics();
+            float mid = y + (m.ascent + m.descent) / 2f, h = size * 1.5f;
+            box.set(x, mid - h / 2, x + w, mid + h / 2);
+            p.setColor(fill);
+            c.drawRoundRect(box, h / 2, h / 2, p);
+            p.setColor(text);
+            p.setTextSize(size * 0.92f);
+            p.setFakeBoldText(true);
+            android.graphics.Paint.FontMetrics sm = p.getFontMetrics();
+            c.drawText(s, start, end, x + padX, mid - (sm.ascent + sm.descent) / 2f, p);
+            p.setFakeBoldText(false);
+            p.setTextSize(size);
+            p.setColor(was);
+        }
     }
 
     private void styleChannels() {
@@ -1791,11 +1837,20 @@ public class HomeActivity extends Activity {
         if (logo == null) {
             try { logo = pm.getApplicationBanner(pkg); } catch (PackageManager.NameNotFoundException e) { return; }
         }
-        int c = a != null ? a.glowColor(pm) : 0xFF3A3A3C;
-        GradientDrawable g = new GradientDrawable(GradientDrawable.Orientation.TL_BR,
-                new int[]{blend(c, 0xFF000000, 0.45f), blend(c, 0xFF000000, 0.8f)});
-        g.setCornerRadius(px(14));
-        card.setBackground(g);
+        // A banner with no one colour (a gradient) sits on a soft blur of itself, not as a box on a dark card.
+        Bitmap blur = RecentsCards.blurOf(logo);
+        if (blur != null) {
+            android.graphics.drawable.BitmapDrawable back = new android.graphics.drawable.BitmapDrawable(getResources(), blur);
+            back.setFilterBitmap(true);
+            card.setBackground(back);
+            card.setClipToOutline(true);
+        } else {
+            int c = a != null ? a.glowColor(pm) : 0xFF3A3A3C;
+            GradientDrawable g = new GradientDrawable(GradientDrawable.Orientation.TL_BR,
+                    new int[]{blend(c, 0xFF000000, 0.45f), blend(c, 0xFF000000, 0.8f)});
+            g.setCornerRadius(px(14));
+            card.setBackground(g);
+        }
         v.setScaleType(ImageView.ScaleType.FIT_CENTER);
         v.setImageDrawable(logo);
         // The logo takes about half the card's width, whatever the card's size.
@@ -2010,15 +2065,50 @@ public class HomeActivity extends Activity {
         if (old != null && old != v) {
             scaleTo(old, 1f);
             old.animate().translationZ(0).setDuration(lite ? 0 : 150).start();
+            if ("glassCard".equals(old.getTag())) old.setBackground(glassCard(false));
         }
+        if (v != null && "glassCard".equals(v.getTag())) v.setBackground(glassCard(true));
         // Lifted on a soft shadow (no ring, like Plume): it shows on white and bright tiles too.
         if (v != null && v != old) v.animate().translationZ(px(14)).setDuration(lite ? 0 : 150).start();
         focusedView = v;
+        nameGridApp(zone == Z_GRID && v != null ? v.getContentDescription() : null);
         ringRadius = px(radiusDp);
         ring.animate().alpha(v == null ? 0f : 1f).setDuration(150).start();
         if (v == null) return;
         scaleTo(v, scale);
         snapRing();
+    }
+
+    /**
+     * How focus shows. Outline (the default): the lift plus a thin light line, so focus is clear on dark posters too.
+     * Lift: the lift alone. Ring: a bold ring, for busy wallpapers. The older Ring/Lift switch carries over.
+     */
+    private static final String[] FOCUS_IDS = {"outline", "lift", "ring"}, FOCUS_NAMES = {"Outline", "Lift", "Ring"};
+
+    private int focusStyle() {
+        String s = prefs.getString("focus_style", null);
+        if (s == null && prefs.contains("focus_ring")) s = prefs.getBoolean("focus_ring", false) ? "ring" : "lift";
+        int i = Arrays.asList(FOCUS_IDS).indexOf(s);
+        return i < 0 ? HighlightView.OUTLINE : i;
+    }
+
+    /** All apps says which app has focus ("All apps · Downloader"): some tiles are a logo with no name on it. */
+    private void nameGridApp(CharSequence name) {
+        if (name == null || name.length() == 0) {
+            if (!"All apps".contentEquals(allAppsLabel.getText())) allAppsLabel.setText("All apps");
+            return;
+        }
+        SpannableStringBuilder b = new SpannableStringBuilder("All apps");
+        int from = b.length();
+        b.append("   ·   ").append(name);
+        b.setSpan(new ForegroundColorSpan(theme.text2), from, b.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+        allAppsLabel.setText(b);
+    }
+
+    /** The live-score or now-playing line sits in a pill like the icons above it, so it reads as part of the top bar. */
+    private void scorePill() {
+        score.setBackground(rounded(theme.iconBg, theme.iconStroke, 14));
+        score.setPadding(px(12), px(5), px(12), px(5));
     }
 
     private void scaleTo(View v, float scale) {
@@ -2246,10 +2336,23 @@ public class HomeActivity extends Activity {
             if (!ours) return true;
         }
         if (recents != null) {
-            if (e.getAction() == KeyEvent.ACTION_DOWN && (k == KeyEvent.KEYCODE_DPAD_LEFT || k == KeyEvent.KEYCODE_DPAD_RIGHT)) {
+            boolean down = e.getAction() == KeyEvent.ACTION_DOWN;
+            if (down && (k == KeyEvent.KEYCODE_DPAD_LEFT || k == KeyEvent.KEYCODE_DPAD_RIGHT)) {
                 if (recents.move(k == KeyEvent.KEYCODE_DPAD_LEFT ? -1 : 1)) navigationSound(k);
+            } else if (down && !recents.choosing() && (k == KeyEvent.KEYCODE_DPAD_DOWN || k == KeyEvent.KEYCODE_MENU
+                    || (select && e.getRepeatCount() > 0 && (e.isLongPress() || e.getRepeatCount() >= 8)))) {
+                // The focused app's options: Remove from list, App info. Holding OK opens them too, not the app.
+                if (select) recentsHeld = true;
+                recents.choose(true);
+                navigationSound(KeyEvent.KEYCODE_DPAD_DOWN);
+            } else if (down && recents.choosing() && k == KeyEvent.KEYCODE_DPAD_UP) {
+                recents.choose(false);
+                navigationSound(k);
             } else if (e.getAction() == KeyEvent.ACTION_UP && !e.isCanceled()) {
-                if (back) closeRecents();
+                if (select && recentsHeld) recentsHeld = false;
+                else if (back && recents.choosing()) recents.choose(false);
+                else if (back) closeRecents();
+                else if (select && recents.choosing()) recentsAction();
                 else if (select) openFromRecents();
             }
             return true;
@@ -2676,9 +2779,10 @@ public class HomeActivity extends Activity {
         if (heading != null) {
             TextView h = new TextView(this);
             h.setText(heading);
-            h.setTextSize(13);
-            h.setTextColor(theme.text2);
-            h.setTypeface(Fonts.outfit(this, 500));
+            h.setTag("menuTitle");
+            h.setTextSize(14);
+            h.setTextColor(theme.text);
+            h.setTypeface(Fonts.outfit(this, 600));
             h.setPadding(px(14), px(8), px(14), px(6));
             menu.addView(h);
         }
@@ -2761,8 +2865,9 @@ public class HomeActivity extends Activity {
         View row = menuItems.get(i);
         menuScroll.post(() -> {
             int top = row.getTop(), bottom = row.getBottom(), y = menuScroll.getScrollY(), h = menuScroll.getHeight();
-            if (top - px(8) < y) menuScroll.smoothScrollTo(0, Math.max(0, top - px(52)));
-            else if (bottom + px(8) > y + h) menuScroll.smoothScrollTo(0, bottom + px(52) - h);
+            // The focused row stays clear of the fade at the menu's cut edge.
+            if (top - px(40) < y) menuScroll.smoothScrollTo(0, Math.max(0, top - px(52)));
+            else if (bottom + px(40) > y + h) menuScroll.smoothScrollTo(0, bottom + px(52) - h);
         });
     }
 
@@ -4643,7 +4748,7 @@ public class HomeActivity extends Activity {
             // The title, the group headings and their rules: what isn't a row.
             for (int i = 0; i < menu.getChildCount(); i++) {
                 View v = menu.getChildAt(i);
-                if (v instanceof TextView && !menuItems.contains(v)) ((TextView) v).setTextColor(theme.text2);
+                if (v instanceof TextView && !menuItems.contains(v)) ((TextView) v).setTextColor("menuTitle".equals(v.getTag()) ? theme.text : theme.text2);
                 else if ("rule".equals(v.getTag())) v.setBackgroundColor(theme.menuStroke);
             }
             focusMenu(menuIdx);
@@ -4688,11 +4793,11 @@ public class HomeActivity extends Activity {
             setStatus(qh[0], quietLabel());
         }, true);
         final View[] fo = new View[1];
-        fo[0] = addRow("Focus", prefs.getBoolean("focus_ring", false) ? "Ring" : "Lift", () -> {
-            boolean on = !prefs.getBoolean("focus_ring", false);
-            prefs.edit().putBoolean("focus_ring", on).apply();
-            ring.setAlways(on);
-            setStatus(fo[0], on ? "Ring" : "Lift");
+        fo[0] = addRow("Focus", FOCUS_NAMES[focusStyle()], () -> {
+            int next = (focusStyle() + 1) % FOCUS_NAMES.length;
+            prefs.edit().putString("focus_style", FOCUS_IDS[next]).apply();
+            ring.setStyle(next);
+            setStatus(fo[0], FOCUS_NAMES[next]);
         }, true);
         final View[] fx = new View[1];
         fx[0] = addRow("Effects", effectsLabel(), () -> {
@@ -5411,16 +5516,17 @@ public class HomeActivity extends Activity {
             for (int i = 0; i < entries.size(); i++) {
                 RecentsCards.Entry e = entries.get(i);
                 int color;
-                android.graphics.Bitmap sized;
+                android.graphics.Bitmap sized, blur;
                 try {
                     Drawable d = artOf(e.pkg, found.get(i));
                     color = RecentsCards.colorOf(d, fallback);
+                    blur = RecentsCards.blurOf(d);
                     sized = RecentsCards.rounded(d, cards.artWidth(), px(11));
                 } catch (RuntimeException | OutOfMemoryError ex) {
                     Log.w(TAG, "No art for " + e.pkg, ex);
                     continue;  // its card stays plain
                 }
-                runOnUiThread(() -> { if (recents == cards) cards.showArt(e.pkg, sized, color); });
+                runOnUiThread(() -> { if (recents == cards) cards.showArt(e.pkg, sized, color, blur); });
             }
         }, "Recents art");
         art.setPriority(Thread.NORM_PRIORITY - 1);
@@ -5434,6 +5540,23 @@ public class HomeActivity extends Activity {
         if (recents == null) return;
         if (recents.getParent() != null) ((ViewGroup) recents.getParent()).removeView(recents);
         recents = null;
+    }
+
+    /** OK was held to open a card's options: its release mustn't then choose the first one. */
+    private boolean recentsHeld;
+
+    /** Recent apps → an app's options. Force stop is on App info: Android lets only system apps do it themselves. */
+    private void recentsAction() {
+        RecentsCards.Entry e = recents.focused();
+        int action = recents.action();
+        if (e == null) { closeRecents(); return; }
+        if (action == 0) {
+            RecentApps.remove(this, e.pkg);
+            openRecents();
+        } else {
+            closeRecents();
+            start(new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:" + e.pkg)));
+        }
     }
 
     private void openFromRecents() {

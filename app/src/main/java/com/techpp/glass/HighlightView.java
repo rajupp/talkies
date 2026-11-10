@@ -8,15 +8,17 @@ import android.util.AttributeSet;
 import android.view.View;
 
 /**
- * Full-screen overlay that draws a ring around the app picked up for moving (hold OK → Move), placed by the activity.
- * Focus itself has no ring by default: the focused card grows and lifts on a shadow, like Plume's. Talkies settings →
- * Focus → Ring keeps the ring on it always, for busy wallpapers where a shadow doesn't show. There, and in the day
- * theme, a faint dark edge keeps the ring visible on light backgrounds.
+ * Full-screen overlay that draws the line around the focused card, placed by the activity, and a bold ring around the
+ * app picked up for moving (hold OK → Move). Talkies settings → Focus: Outline (the default) adds a thin light line to
+ * the lift, so focus is clear on dark posters; Lift has the lift and shadow alone, like Plume's; Ring is bold, for busy
+ * wallpapers. A faint dark edge keeps the line visible on light backgrounds.
  */
 public class HighlightView extends View {
     final RectF rect = new RectF();
     private float radius;
-    private boolean day, moving, always;
+    static final int OUTLINE = 0, LIFT = 1, RING = 2;
+    private boolean day, moving;
+    private int style = OUTLINE;
     private final Paint ring = new Paint(Paint.ANTI_ALIAS_FLAG), edge = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final float dp;
     private final RectF tmp = new RectF();
@@ -36,24 +38,26 @@ public class HighlightView extends View {
     void setRing(RectF r, float radiusPx) {
         rect.set(r);
         radius = radiusPx;
-        if (moving || always) invalidate();
+        if (moving || style != LIFT) invalidate();
     }
 
     void setDay(boolean d) { day = d; invalidate(); }
 
     void setMoving(boolean m) { moving = m; invalidate(); }
 
-    void setAlways(boolean a) { always = a; invalidate(); }
+    void setStyle(int s) { style = s; invalidate(); }
 
     @Override
     protected void onDraw(Canvas canvas) {
-        if ((!moving && !always) || rect.isEmpty()) return;
-        float w = 3 * dp;
+        if ((!moving && style == LIFT) || rect.isEmpty()) return;
+        boolean bold = moving || style == RING;
+        float w = (bold ? 3 : 2) * dp;
         ring.setStrokeWidth(w);
+        ring.setColor(bold ? 0xFFFFFFFF : 0xE6FFFFFF);
         tmp.set(rect);
         tmp.inset(-w / 2, -w / 2);
         canvas.drawRoundRect(tmp, radius + w / 2, radius + w / 2, ring);
-        if (day || always) {
+        if (day || bold) {
             tmp.inset(-w / 2 - dp / 2, -w / 2 - dp / 2);
             canvas.drawRoundRect(tmp, radius + w + dp / 2, radius + w + dp / 2, edge);
         }

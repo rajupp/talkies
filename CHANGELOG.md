@@ -5,6 +5,21 @@ features, a new fix number only fixes. The version shows in Talkies settings →
 
 ## Unreleased
 
+### Changed
+- **Focus is easier to see.** The focused card keeps its lift and gains a thin light outline, so it stands out on dark
+  posters too. Talkies settings → Focus now has three choices: Outline (new, the default), Lift and Ring. If you had
+  chosen Lift or Ring, that's kept.
+- **Match cards match the rest of Home.** Cricket and sports cards are glass like the dock rather than grey boxes, with
+  bolder scores, a red LIVE pill, and a quiet badge where a team has no flag.
+- **Recent apps is cleaner.** Each card sits on its app's own colours, the focused one is outlined, and Home no longer
+  shows through behind it. Press Down (or Menu, or hold OK) on a card for **Remove from list** and **App info**, where
+  Android keeps Force stop. Suggested by @kdkasucl.
+- **Menus**: a slightly see-through panel, a clearer title, and long lists fade out where they're cut instead of
+  slicing a row in half.
+- **All apps names the focused app** next to its title, for tiles that are a logo with no name.
+- **Small things**: the weather and "Film · Netflix" lines are easier to read in the dark theme, the live-score line
+  sits in a pill under the top icons, and a card with no picture shows the app's logo on its own colours.
+
 ### Fixed
 - **Apps you install or uninstall show up on Home right away.** Talkies missed changes made while it was in the
   background, in the Play Store or Settings, until the TV restarted. Thanks to Ganeshkumar for reporting it.
