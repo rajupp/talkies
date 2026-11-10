@@ -107,6 +107,7 @@ final class WatchNext {
                     p.image = art.isEmpty() ? null : cached(c, dir, art);
                 }
                 if (p.image != null) keep.add(p.image.getName());
+                p.artMissing = p.image == null && !art.isEmpty();
                 out.add(p);
             }
         } catch (SecurityException e) {
@@ -234,7 +235,8 @@ final class WatchNext {
             }
             return tmp.renameTo(done) ? done : null;
         } catch (Exception e) {
-            Log.w(TAG, "Artwork failed: " + e.getClass().getSimpleName());
+            Uri u = Uri.parse(uri);
+            Log.w(TAG, "Artwork failed: " + e.getClass().getSimpleName() + " from " + u.getScheme() + "://" + u.getHost());
             return null;
         }
     }

@@ -98,6 +98,7 @@ final class Trending {
         String meta = "";   // the line under a big card, e.g. "Film · Action · Telugu · Netflix"
         float progress = -1; // Continue: how far in (0–1), or -1 when unknown
         Object extra;        // Cricket: the Cricket.Match this card shows
+        transient boolean artMissing; // Watch Next: the app has a picture we couldn't fetch yet (offline after a restart)
 
         String key() { return "pick:" + tab + ":" + kind + ":" + id; }
     }

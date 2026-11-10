@@ -276,6 +276,7 @@ final class Channels {
                 long position = num(cur, col[11]), duration = num(cur, col[12]);
                 if (position > 0 && duration > 0) p.progress = Math.min(1f, position / (float) duration);
                 if (p.image != null) keep.add(p.image.getName());
+                p.artMissing = p.image == null && !art.isEmpty();
                 ch.items.add(p);
             }
         } catch (Exception e) {

@@ -1248,6 +1248,9 @@ public class HomeActivity extends Activity {
             List<Channels.Channel> loaded = Channels.loadShown(this, continuePicks(RecentStore.load(this), watchNext));
             runOnUiThread(() -> {
                 appChannels = loaded;
+                channelArtMissing = false;
+                for (Channels.Channel ch : loaded) if (anyArtMissing(ch.items)) { channelArtMissing = true; break; }
+                retryMissingArt();
                 showChannels(loaded);
             });
         });
@@ -1930,6 +1933,8 @@ public class HomeActivity extends Activity {
             List<Trending.Pick> list = WatchNext.load(this);
             runOnUiThread(() -> {
                 watchNextPicks = list;
+                watchNextArtMissing = anyArtMissing(list);
+                retryMissingArt();
                 refreshChannels();
                 List<Trending.Pick> merged = continuePicks(RecentStore.load(this), watchNextPicks);
                 if (!sameKeys(recentPicks, merged)) {
@@ -1942,11 +1947,43 @@ public class HomeActivity extends Activity {
         });
     }
 
+    /**
+     * Right after the TV starts, the internet (or the app that serves its pictures) often isn't ready when Watch Next is
+     * first read, so cards come up with the app's logo. Read it again a little later until the pictures arrive.
+     */
+    private static final int[] MISSING_ART_WAIT_S = {20, 60, 180};
+    private int missingArtTries;
+    private boolean watchNextArtMissing, channelArtMissing, missingArtWaiting;
+    private final Runnable rereadMissingArt = () -> {
+        missingArtWaiting = false;
+        refreshWatchNext();   // also rereads the channel rows
+    };
+
+    private static boolean anyArtMissing(List<Trending.Pick> list) {
+        for (Trending.Pick p : list) if (p.artMissing) return true;
+        return false;
+    }
+
+    /** Watch Next or a channel row is missing pictures: one more read is booked, a little later each time. */
+    private void retryMissingArt() {
+        if (!watchNextArtMissing && !channelArtMissing) {
+            missingArtTries = 0;
+            root.removeCallbacks(rereadMissingArt);
+            missingArtWaiting = false;
+            return;
+        }
+        if (missingArtWaiting || missingArtTries >= MISSING_ART_WAIT_S.length) return;
+        missingArtWaiting = true;
+        Log.i(TAG, "Pictures missing on Continue or a channel row: reading again in " + MISSING_ART_WAIT_S[missingArtTries] + " s");
+        root.postDelayed(rereadMissingArt, MISSING_ART_WAIT_S[missingArtTries++] * 1000L);
+    }
+
     private static boolean sameKeys(List<Trending.Pick> a, List<Trending.Pick> b) {
         if (a.size() != b.size()) return false;
         for (int i = 0; i < a.size(); i++) {
             Trending.Pick x = a.get(i), y = b.get(i);
-            if (!x.key().equals(y.key()) || x.progress != y.progress || !java.util.Objects.equals(x.intentUri, y.intentUri)) return false;
+            if (!x.key().equals(y.key()) || x.progress != y.progress || !java.util.Objects.equals(x.intentUri, y.intentUri)
+                    || !java.util.Objects.equals(x.image, y.image)) return false;
         }
         return true;
     }
@@ -5730,6 +5767,8 @@ public class HomeActivity extends Activity {
             football.networkBack();
             bing.networkBack();
             refreshOnline();
+            missingArtTries = 0;
+            refreshWatchNext();
         }
         wasOnline = online;
     }
@@ -5901,6 +5940,8 @@ public class HomeActivity extends Activity {
         getContentResolver().unregisterContentObserver(watchNextChanged);
         getContentResolver().unregisterContentObserver(rowsChanged);
         root.removeCallbacks(rereadWatchNext);
+        root.removeCallbacks(rereadMissingArt);
+        missingArtWaiting = false;
         root.removeCallbacks(rereadRows);
         root.removeCallbacks(rereadSavedPicks);
         rowsReadWaiting = false;

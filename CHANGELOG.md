@@ -12,6 +12,10 @@ features, a new fix number only fixes. The version shows in Talkies settings →
   its own Inputs menu does. Thanks to Macario for the log that showed how.
 - **Fire TV: TV settings stay open.** With the Home button service on, opening settings from Talkies bounced straight
   back, because Fire TV's settings are part of Amazon's launcher. Thanks to Macario.
+- **Continue watching gets its pictures after a restart** ([#28](https://github.com/rajupp/talkies/issues/28)). Right
+  after the TV starts, the internet often isn't ready yet, so cards showed only the app's logo until you opened and
+  closed an app. Talkies now tries again when the internet comes back and a few times in the first minutes. Thanks to
+  dakshen.
 - **Recent apps is sturdier.** Its cards can no longer crash Talkies if the app list reloads while they're drawing,
   OK on an app removed since closes the cards, and a missed Home key-up can't stop later presses from working.
 
