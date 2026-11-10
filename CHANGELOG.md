@@ -33,6 +33,12 @@ features, a new fix number only fixes. The version shows in Talkies settings →
 - **Sony: each app button can have its own job.** Five of them send Android the same key, so Remote keys treated them
   as one; Talkies now tells them apart by the remote's own code. A job you gave one of them before needs setting again.
 - **Xiaomi: a button with a new job does it once.** Some Xiaomi remotes send one press as several.
+- **At power-on: the app or input you chose stays.** On TVs that put their own launcher back a moment after waking,
+  Talkies opened itself over your choice; now it opens your app or input again. An idea from
+  [Aerial](https://github.com/pengchujin/aerial-tv).
+- **A game controller's buttons are the game's.** Some share codes with remote buttons (YouTube on TCL remotes), so a
+  job given to that remote button could fire mid-game. A TV's built-in IR receiver that calls itself a gamepad still
+  counts as the remote. From Aerial's and Free My TV's notes.
 - **Fire TV: TV settings stay open.** With the Home button service on, opening settings from Talkies bounced straight
   back, because Fire TV's settings are part of Amazon's launcher. Thanks to Macario.
 - **Continue watching gets its pictures after a restart** ([#28](https://github.com/rajupp/talkies/issues/28)). Right

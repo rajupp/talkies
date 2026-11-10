@@ -47,6 +47,22 @@ final class RemoteKeys {
         return e.getScanCode() > 0 ? -e.getScanCode() : 0;
     }
 
+    /**
+     * A key from a game controller: its buttons aren't the remote's, though some share codes (BUTTON_3 is YouTube on
+     * TCL and Google TV Streamer remotes). Not a TV's own IR receiver that calls itself a gamepad (vendor and product
+     * 0001, Xiaomi ES65 and others), nor a virtual device such as a phone-remote stand-in (TCL): from Aerial's and Free
+     * My TV's notes.
+     */
+    static boolean fromGamepad(KeyEvent e) {
+        int s = e.getSource();
+        boolean pad = (s & android.view.InputDevice.SOURCE_GAMEPAD) == android.view.InputDevice.SOURCE_GAMEPAD
+                || (s & android.view.InputDevice.SOURCE_JOYSTICK) == android.view.InputDevice.SOURCE_JOYSTICK;
+        if (!pad) return false;
+        android.view.InputDevice d = e.getDevice();
+        if (d == null || d.isVirtual()) return false;
+        return !(d.getVendorId() == 1 && d.getProductId() == 1);
+    }
+
     private static boolean is(String maker) {
         return maker.equalsIgnoreCase(android.os.Build.MANUFACTURER) || maker.equalsIgnoreCase(android.os.Build.BRAND);
     }

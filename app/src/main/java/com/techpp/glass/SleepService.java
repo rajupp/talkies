@@ -47,7 +47,9 @@ import java.util.List;
  *
  * With "At power-on: Talkies, every time" set, Talkies also comes up each time the TV wakes from standby, unless you
  * press a button first (an idea from CleanYourTV's power_on_home_always, MIT); with an app or input chosen there, that
- * opens instead, after a restart too (an idea from Aerial, MIT).
+ * opens instead, after a restart too (an idea from Aerial, MIT). If the TV's own launcher comes up over it in the next
+ * few seconds (some TVs put theirs back a moment after waking), the app or input is opened once more rather than
+ * Talkies: also from Aerial.
  * When you press Home in an app it asks which app that was, for Recent apps (some apps don't say).
  * Pressing Home twice quickly opens Recent apps; the second press doesn't reach Android.
  * The sleep warning is a small card drawn as an accessibility overlay, so no "display over other apps" permission.
@@ -225,7 +227,8 @@ public class SleepService extends AccessibilityService {
             if (up) { hideWarning(); Sleep.extend(this); }
             return true;
         }
-        int id = RemoteKeys.id(event);
+        // A game controller's buttons (BUTTON_3 is also a remote's YouTube button on some TVs) are the game's.
+        int id = RemoteKeys.fromGamepad(event) ? 0 : RemoteKeys.id(event);
         KeyListener l = learning;
         if (l != null && event.getAction() == KeyEvent.ACTION_DOWN && event.getRepeatCount() == 0) {
             // What the remote sent, for anyone checking with adb logcat why a button can't be changed (a button the
@@ -497,9 +500,20 @@ public class SleepService extends AccessibilityService {
                 && (r.activityInfo.applicationInfo.flags & android.content.pm.ApplicationInfo.FLAG_SYSTEM) == 0;
     }
 
+    /**
+     * After opening the app or input chosen for power-on: until when a built-in launcher coming up over it means the
+     * TV covered it (it reopens once), not that you pressed Home.
+     */
+    private long powerOnAt, powerOnUntil;
+    private static final long COVER_MS = 10_000;
+
     /** At power-on: the app or input you chose, else Talkies (also when that app is gone). */
     private void powerOn() {
         String open = openAtPowerOn(this);
+        if (open != null) {
+            powerOnAt = SystemClock.elapsedRealtime();
+            powerOnUntil = powerOnAt + COVER_MS;
+        }
         Intent i = null;
         if (open != null && open.startsWith(AppEntry.INPUT)) {
             if (!AppEntry.openInput(this, open.substring(AppEntry.INPUT.length()), null)) openHome();
@@ -552,8 +566,15 @@ public class SleepService extends AccessibilityService {
                     && (stockHomes.contains(pkg + "/" + event.getClassName())
                         || event.getClassName().toString().endsWith("ProfileChooserActivity"))) {
                 // A built-in launcher's home screen, or the "Choose an account" screen Google TV puts up when it starts.
+                long now = SystemClock.elapsedRealtime();
                 if (HomeState.inSettings) Log.i(TAG, "In the TV's settings, part of " + pkg + ": staying");
-                else if (SystemClock.elapsedRealtime() - assistantAt > ASSISTANT_GRACE_MS) openHome();
+                else if (now < powerOnUntil && keyAt < powerOnAt) {
+                    // The TV's launcher covered what power-on opened, with no button pressed since: open it again, once.
+                    powerOnUntil = 0;
+                    Log.i(TAG, pkg + " covered what power-on opened: opening it again");
+                    powerOn();
+                    powerOnUntil = 0;
+                } else if (SystemClock.elapsedRealtime() - assistantAt > ASSISTANT_GRACE_MS) openHome();
                 else assistantAt = SystemClock.elapsedRealtime();  // browsing the results: keep them
             }
         }
