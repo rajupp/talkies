@@ -2323,7 +2323,9 @@ public class HomeActivity extends Activity {
         boolean nav = k == KeyEvent.KEYCODE_DPAD_UP || k == KeyEvent.KEYCODE_DPAD_DOWN
                 || k == KeyEvent.KEYCODE_DPAD_LEFT || k == KeyEvent.KEYCODE_DPAD_RIGHT;
         boolean back = k == KeyEvent.KEYCODE_BACK || k == KeyEvent.KEYCODE_ESCAPE;
-        if (!select && !nav && !back) return super.dispatchKeyEvent(e);
+        // Menu matters only on Recent apps' cards, where it opens a card's options.
+        boolean menuKey = k == KeyEvent.KEYCODE_MENU && recents != null;
+        if (!select && !nav && !back && !menuKey) return super.dispatchKeyEvent(e);
         lastKeyAt = android.os.SystemClock.uptimeMillis();
         if (nav && e.getAction() == KeyEvent.ACTION_DOWN) sampleSmoothness();
         // OK and Back act when let go, so a release whose press went to another app must do nothing here: an app
