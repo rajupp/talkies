@@ -3,6 +3,15 @@
 Versions are numbered *major.minor.fix*. While Talkies is in beta they start with 0: a new minor number brings new
 features, a new fix number only fixes. The version shows in Talkies settings → About.
 
+## Unreleased
+
+### Changed
+- **Recent apps, redone.** The focused card is much bigger, with its neighbours peeking in at each side. A card shows
+  what you last watched in the app when Talkies knows it (the Continue picture, with its title and how far in you are),
+  else the app's logo as before. The focused card's colours glow softly behind everything, the app's name sits on the
+  card's top edge, and OK grows the card to fill the screen as its app opens. The layout is after
+  [Flow launcher](https://github.com/sghmire/flow-launcher-tv)'s.
+
 ## 1.3.0 — 12 November 2026
 
 ### Added

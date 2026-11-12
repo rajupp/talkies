@@ -2344,6 +2344,7 @@ public class HomeActivity extends Activity {
             if (!ours) return true;
         }
         if (recents != null) {
+            if (recents.leaving()) return true;
             boolean down = e.getAction() == KeyEvent.ACTION_DOWN;
             if (down && (k == KeyEvent.KEYCODE_DPAD_LEFT || k == KeyEvent.KEYCODE_DPAD_RIGHT)) {
                 if (recents.move(k == KeyEvent.KEYCODE_DPAD_LEFT ? -1 : 1)) navigationSound(k);
@@ -5514,7 +5515,16 @@ public class HomeActivity extends Activity {
         for (String pkg : RecentApps.list(this)) {
             AppEntry a = appFor(pkg);
             if (a == null && pm.getLeanbackLaunchIntentForPackage(pkg) == null && pm.getLaunchIntentForPackage(pkg) == null) continue;  // uninstalled since
-            entries.add(new RecentsCards.Entry(pkg, a != null ? a.label : Channels.label(pm, pkg)));
+            RecentsCards.Entry entry = new RecentsCards.Entry(pkg, a != null ? a.label : Channels.label(pm, pkg));
+            // What you last watched there, if Continue knows (newest first): its picture fills the card.
+            for (Trending.Pick p : recentPicks) {
+                if (!pkg.equals(p.pkg) || p.image == null || p.artMissing || !p.image.exists()) continue;
+                entry.still = p.image;
+                entry.watched = p.title;
+                entry.progress = p.progress;
+                break;
+            }
+            entries.add(entry);
             found.add(a);
         }
         RecentsCards cards = new RecentsCards(this, entries, theme.tileBg, lite);
@@ -5530,17 +5540,34 @@ public class HomeActivity extends Activity {
             for (int i = 0; i < entries.size(); i++) {
                 RecentsCards.Entry e = entries.get(i);
                 int color;
-                android.graphics.Bitmap sized, blur;
+                android.graphics.Bitmap sized, blur, chip, still = null;
                 try {
+                    if (e.still != null) {
+                        // About the card's size: a 4K backdrop decoded whole is tens of megabytes.
+                        BitmapFactory.Options o = new BitmapFactory.Options();
+                        o.inJustDecodeBounds = true;
+                        BitmapFactory.decodeFile(e.still.getPath(), o);
+                        int sample = 1;
+                        while (o.outWidth / (sample * 2) >= cards.cardWidth()) sample *= 2;
+                        o = new BitmapFactory.Options();
+                        o.inSampleSize = sample;
+                        still = BitmapFactory.decodeFile(e.still.getPath(), o);
+                    }
                     Drawable d = artOf(e.pkg, found.get(i));
                     color = RecentsCards.colorOf(d, fallback);
                     blur = RecentsCards.blurOf(d);
                     sized = RecentsCards.rounded(d, cards.artWidth(), px(11));
+                    chip = still == null ? null : RecentsCards.rounded(d, px(50), px(5));
                 } catch (RuntimeException | OutOfMemoryError ex) {
                     Log.w(TAG, "No art for " + e.pkg, ex);
                     continue;  // its card stays plain
                 }
-                runOnUiThread(() -> { if (recents == cards) cards.showArt(e.pkg, sized, color, blur); });
+                android.graphics.Bitmap picture = still;
+                runOnUiThread(() -> {
+                    if (recents != cards) return;
+                    if (picture != null) cards.showStill(e.pkg, picture);
+                    cards.showArt(e.pkg, sized, color, blur, chip);
+                });
             }
         }, "Recents art");
         art.setPriority(Thread.NORM_PRIORITY - 1);
@@ -5579,7 +5606,14 @@ public class HomeActivity extends Activity {
         Intent open = pm.getLeanbackLaunchIntentForPackage(e.pkg);
         if (open == null) open = pm.getLaunchIntentForPackage(e.pkg);
         if (open == null) { closeRecents(); return; }  // uninstalled or disabled since the cards came up
-        startApp(open, null);
+        RecentsCards cards = recents;
+        Intent app = open;
+        // The card grows to fill the screen, then its app opens over it. If the app never comes up, the cards go.
+        cards.launch(() -> {
+            if (recents != cards) return;
+            startApp(app, null);
+            root.postDelayed(() -> { if (recents == cards) closeRecents(); }, 2500);
+        });
     }
 
     // ---------------------------------------------------------------- control center shortcuts
