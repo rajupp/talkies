@@ -1512,7 +1512,7 @@ public class HomeActivity extends Activity {
         String kind = m.kind.isEmpty() ? "" : m.kind + "  ·  ";
         String status = m.live ? "LIVE  " + kind + m.status : !m.ended && m.start != null ? kind + "starts " + m.start : kind + m.status;
         SpannableStringBuilder sb = new SpannableStringBuilder(status);
-        if (m.live) sb.setSpan(new PillSpan(0xFFE5383B, 0xFFFFFFFF, px(7), px(6)), 0, 4, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+        if (m.live) sb.setSpan(new PillSpan("LIVE", 0xFFE5383B, 0xFFFFFFFF, px(7), px(6)), 0, 4, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
         st.setText(sb);
         st.setSingleLine(true);
         st.setEllipsize(android.text.TextUtils.TruncateAt.END);
@@ -1571,19 +1571,25 @@ public class HomeActivity extends Activity {
         return rounded(focused ? 0x33FFFFFF : 0x1AFFFFFF, focused ? 0x55FFFFFF : 0x2EFFFFFF, 10);
     }
 
-    /** A small filled pill behind a word in a line of text: "LIVE" on a match card. */
+    /**
+     * A small filled pill behind a word in a line of text: "LIVE" on a match card. It draws its own word, not the
+     * text it's given: where the line is cut short with an ellipsis, Android hands it placeholder characters instead.
+     */
     private static final class PillSpan extends android.text.style.ReplacementSpan {
+        private final String word;
         private final int fill, text;
         private final float padX, gap;
         private final RectF box = new RectF();
-        PillSpan(int fill, int text, float padX, float gap) { this.fill = fill; this.text = text; this.padX = padX; this.gap = gap; }
+        PillSpan(String word, int fill, int text, float padX, float gap) {
+            this.word = word; this.fill = fill; this.text = text; this.padX = padX; this.gap = gap;
+        }
 
         @Override public int getSize(android.graphics.Paint p, CharSequence s, int start, int end, android.graphics.Paint.FontMetricsInt fm) {
-            return Math.round(p.measureText(s, start, end) * 0.92f + 2 * padX + gap);
+            return Math.round(p.measureText(word) * 0.92f + 2 * padX + gap);
         }
 
         @Override public void draw(android.graphics.Canvas c, CharSequence s, int start, int end, float x, int top, int y, int bottom, android.graphics.Paint p) {
-            float size = p.getTextSize(), w = p.measureText(s, start, end) * 0.92f + 2 * padX;
+            float size = p.getTextSize(), w = p.measureText(word) * 0.92f + 2 * padX;
             int was = p.getColor();
             android.graphics.Paint.FontMetrics m = p.getFontMetrics();
             float mid = y + (m.ascent + m.descent) / 2f, h = size * 1.5f;
@@ -1594,7 +1600,7 @@ public class HomeActivity extends Activity {
             p.setTextSize(size * 0.92f);
             p.setFakeBoldText(true);
             android.graphics.Paint.FontMetrics sm = p.getFontMetrics();
-            c.drawText(s, start, end, x + padX, mid - (sm.ascent + sm.descent) / 2f, p);
+            c.drawText(word, x + padX, mid - (sm.ascent + sm.descent) / 2f, p);
             p.setFakeBoldText(false);
             p.setTextSize(size);
             p.setColor(was);

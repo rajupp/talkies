@@ -5,6 +5,11 @@ features, a new fix number only fixes. The version shows in Talkies settings →
 
 ## Unreleased
 
+### Added
+- **Football during international breaks.** Football leagues adds the **Nations League** and **international
+  friendlies**, on unless you've picked your own leagues, so the Football row has matches when the club leagues stop.
+  From @dossantosee.
+
 ### Changed
 - **Focus is easier to see.** The focused card keeps its lift and gains a thin light outline, so it stands out on dark
   posters too. Talkies settings → Focus now has three choices: Outline (new, the default), Lift and Ring. If you had

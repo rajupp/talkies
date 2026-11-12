@@ -65,11 +65,13 @@ final class Football {
             {"bra.1", "Brasileirão", "Brazil"}, {"arg.1", "Liga Profesional", "Argentina"},
             {"mex.1", "Liga MX", "Liga MX"}, {"ksa.1", "Saudi Pro League", "Saudi Pro"}, {"aus.1", "A-League", "A-League"},
             {"jpn.1", "J1 League", "J1"}, {"eng.fa", "FA Cup", "FA Cup"}, {"fifa.world", "World Cup", "World Cup"},
-            {"uefa.euro", "Euro", "Euro"}};
+            {"uefa.euro", "Euro", "Euro"}, {"uefa.nations", "Nations League", "UNL"},
+            {"fifa.friendly", "International friendlies", "Friendly"}};
     /** Not leagues to pick but sports of their own (Talkies settings → Sports), from the same scoreboard. */
     static final String NFL = "football/nfl", NBA = "basketball/nba";
     private static final String[][] AMERICAN = {{NFL, "NFL", "NFL"}, {NBA, "NBA", "NBA"}};
-    /** Each country's default leagues (the World Cup and the Euros join everywhere: they only have matches when on). */
+    /** Each country's default leagues (the World Cup, the Euros, the Nations League and international friendlies join
+     * everywhere: they only have matches when on, mostly when the club leagues stop). */
     private static final Map<String, String[]> DEFAULTS = new HashMap<>();
     static {
         DEFAULTS.put("IN", new String[]{"eng.1", "uefa.champions", "ind.1"});
@@ -182,6 +184,9 @@ final class Football {
             on.addAll(Arrays.asList(d != null ? d : new String[]{"eng.1", "uefa.champions"}));
             on.add("fifa.world");
             on.add("uefa.euro");
+            // The international breaks, when the club leagues stop: from dossantosee (discussion #31).
+            on.add("uefa.nations");
+            on.add("fifa.friendly");
         }
         List<String> out = new ArrayList<>();
         for (String[] l : LEAGUES) if (on.contains(l[0])) out.add(l[0]);
