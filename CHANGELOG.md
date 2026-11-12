@@ -3,7 +3,7 @@
 Versions are numbered *major.minor.fix*. While Talkies is in beta they start with 0: a new minor number brings new
 features, a new fix number only fixes. The version shows in Talkies settings → About.
 
-## Unreleased
+## 1.3.0 — 12 November 2026
 
 ### Added
 - **Football during international breaks.** Football leagues adds the **Nations League** and **international
@@ -31,10 +31,10 @@ features, a new fix number only fixes. The version shows in Talkies settings →
 ### Fixed
 - **Apps you install or uninstall show up on Home right away.** Talkies missed changes made while it was in the
   background, in the Play Store or Settings, until the TV restarted. Thanks to Ganeshkumar for reporting it.
-- **Fire TV: Inputs switch to the HDMI port.** They opened Live TV's settings instead; Talkies now asks Fire TV the way
-  its own Inputs menu does. Thanks to Macario for the log that showed how. If Fire TV refuses that, Talkies asks
-  Amazon's input switch service instead, with the TCL Fire TV's own number for HDMI 4 (from
-  [Free My TV](https://github.com/simbasjungles/free-my-tv), tested there on Xiaomi and TCL Fire TVs).
+- **Fire TV: Inputs try harder to switch to the HDMI port.** They opened Live TV's settings; Talkies now also tries
+  Amazon's input switch service, with the TCL Fire TV's own number for HDMI 4 (from
+  [Free My TV](https://github.com/simbasjungles/free-my-tv), tested there on Xiaomi and TCL Fire TVs). Some Fire TVs
+  still open Live TV's settings; a further fix is being tested. Thanks to Macario for the logs.
 - **Sony: each app button can have its own job.** Five of them send Android the same key, so Remote keys treated them
   as one; Talkies now tells them apart by the remote's own code. A job you gave one of them before needs setting again.
 - **Xiaomi: a button with a new job does it once.** Some Xiaomi remotes send one press as several.
