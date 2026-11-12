@@ -6285,6 +6285,13 @@ public class HomeActivity extends Activity {
             if (menuMode == MENU_CHANNELS && channelsEdited) refreshChannels();
             menuMode = MENU_PLAIN;
             zone = Z_TOP;
+            // What the menu does on closing (Sports and Football leagues show the new set, Continue apps rebuilds
+            // the row) happens on Home as it does on Back; the focus it sets is replaced by the dock's just below.
+            Runnable left = menuClosed;
+            menuClosed = null;
+            menuTile = null;
+            menuParents.clear();
+            if (left != null) left.run();
         }
         endMove(false);
         loadWallpaper();

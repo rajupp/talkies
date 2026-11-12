@@ -12,6 +12,11 @@ features, a new fix number only fixes. The version shows in Talkies settings →
   card's top edge, and OK grows the card to fill the screen as its app opens. The layout is after
   [Flow launcher](https://github.com/sghmire/flow-launcher-tv)'s.
 
+### Fixed
+- **A sport you turn off goes right away**, also when you leave Talkies settings with Home. Its scores used to stay
+  until you left a menu with Back, or the TV restarted. The same for Football leagues and Continue apps. Thanks to
+  dossantosee for the report.
+
 ## 1.3.0 — 12 November 2026
 
 ### Added
