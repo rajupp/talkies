@@ -154,6 +154,7 @@
                     android:layout_height="wrap_content"
                     android:layout_marginStart="-2dp"
                     android:fontFamily="@font/outfit"
+                    android:fontFeatureSettings="tnum"
                     android:includeFontPadding="false"
                     android:singleLine="true"
                     android:textSize="42sp" />

@@ -16,6 +16,8 @@ features, a new fix number only fixes. The version shows in Talkies settings →
 - **A sport you turn off goes right away**, also when you leave Talkies settings with Home. Its scores used to stay
   until you left a menu with Back, or the TV restarted. The same for Football leagues and Continue apps. Thanks to
   dossantosee for the report.
+- **The date beside the clock stays put.** The clock's digits are all one width now, so the date no longer shifts a
+  little when the minute changes. The idea is from [CleanYourTV](https://github.com/Gathin23/cleanyourtv) 3.5.
 
 ## 1.3.0 — 12 November 2026
 
