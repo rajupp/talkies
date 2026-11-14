@@ -274,7 +274,9 @@ final class RemoteKeys {
                 Intent dream = screensaver(s);
                 if (dream != null) s.startActivity(dream.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
             } else if (action.equals(TURN_OFF)) {
-                if (!Sleep.now()) android.widget.Toast.makeText(s, "This TV doesn't let Talkies turn it off", android.widget.Toast.LENGTH_LONG).show();
+                // Android 8 has no "lock screen" action to sleep with: the TV's own power menu instead, one OK from off.
+                boolean done = Sleep.SUPPORTED ? Sleep.now() : SleepService.powerMenu();
+                if (!done) android.widget.Toast.makeText(s, "This TV doesn't let Talkies turn it off", android.widget.Toast.LENGTH_LONG).show();
             } else if (action.equals(INPUTS) || action.equals(RECENTS) || action.equals(CONTROL) || action.equals(TALKIES_SETTINGS)
                     || action.equals(RESUME) || action.equals(BLUETOOTH)) {
                 s.startActivity(new Intent(Intent.ACTION_MAIN).setClass(s, HomeActivity.class).putExtra(EXTRA_OPEN, action)

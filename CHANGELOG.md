@@ -18,6 +18,8 @@ features, a new fix number only fixes. The version shows in Talkies settings →
   dossantosee for the report.
 - **The date beside the clock stays put.** The clock's digits are all one width now, so the date no longer shifts a
   little when the minute changes. The idea is from [CleanYourTV](https://github.com/Gathin23/cleanyourtv) 3.5.
+- **Android 8: a remote button set to Turn off opens the TV's power menu**, one OK from off. Android 8 can't let
+  Talkies turn the TV off itself, so the button only said so. Thanks to Ganeshkumar.
 
 ## 1.3.0 — 12 November 2026
 
