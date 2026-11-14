@@ -28,6 +28,13 @@ final class HomeState {
     // Home pressed twice. The first press is already bringing Talkies up, so the second only has to reach it: it's
     // shown now if Talkies is in front, else as Talkies comes to the front. Starting Talkies again for it could lose
     // to the first press's own Home, which would close it.
+    /**
+     * When Home was let go of in an app, and when a second press began (uptime, the key's own time). Home holds its
+     * rows back for a moment after the first, so a second press opens Recent apps without Home showing in between,
+     * as Flow launcher does.
+     */
+    static volatile long homeInAppAt, homeSecondAt;
+
     private static final long RECENTS_WAIT_MS = 2_000;
     private static long recentsAskedAt;
     private static Runnable recentsHere;

@@ -20,6 +20,9 @@ features, a new fix number only fixes. The version shows in Talkies settings →
   little when the minute changes. The idea is from [CleanYourTV](https://github.com/Gathin23/cleanyourtv) 3.5.
 - **Android 8: a remote button set to Turn off opens the TV's power menu**, one OK from off. Android 8 can't let
   Talkies turn the TV off itself, so the button only said so. Thanks to Ganeshkumar.
+- **Home pressed twice in an app goes straight to Recent apps**, without Home showing for a moment first. After Home
+  in an app, Home's rows now wait a moment over the background, in case a second press follows. The way
+  [Flow launcher](https://github.com/sghmire/flow-launcher-tv) does it.
 
 ## 1.3.0 — 12 November 2026
 

@@ -90,7 +90,7 @@ public class SleepService extends AccessibilityService {
         openHome();
     };
     /** Home's second press within DOUBLE_MS of the first's release opens Recent apps. */
-    private static final long DOUBLE_MS = 400;
+    static final long DOUBLE_MS = 400;
     private long homeDownAt, homeUpAt;
     private boolean homeSecond;
     /** For what waits on other processes: this service's main thread is the one Home's key is waiting on. */
@@ -184,6 +184,7 @@ public class SleepService extends AccessibilityService {
             if (firstDown) homeSecond = pressedAt - homeUpAt < DOUBLE_MS;
             if (firstDown) HomeState.inSettings = false;  // Home leaves the settings
             if (homeSecond) {
+                if (firstDown) HomeState.homeSecondAt = pressedAt;
                 if (event.getAction() == KeyEvent.ACTION_UP) {
                     homeSecond = false;
                     homeUpAt = 0;
@@ -196,6 +197,7 @@ public class SleepService extends AccessibilityService {
                 noteLeftApp();
             } else if (event.getAction() == KeyEvent.ACTION_UP && pressedAt - homeDownAt < HOLD_MS) {
                 homeUpAt = pressedAt;
+                HomeState.homeInAppAt = HomeState.inFront ? 0 : pressedAt;
                 main.removeCallbacks(homeSafetyNet);
                 if (!HomeState.inFront) main.postDelayed(homeSafetyNet, HOME_NET_MS);
                 slowThread.execute(this::readHomeSetup);  // may have changed in the TV's settings: for next time

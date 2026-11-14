@@ -2324,6 +2324,7 @@ public class HomeActivity extends Activity {
     @Override
     public boolean dispatchKeyEvent(KeyEvent e) {
         int k = e.getKeyCode();
+        if (contentHeld && e.getAction() == KeyEvent.ACTION_DOWN && k != KeyEvent.KEYCODE_HOME) showContent(false);
         boolean select = k == KeyEvent.KEYCODE_DPAD_CENTER || k == KeyEvent.KEYCODE_ENTER
                 || k == KeyEvent.KEYCODE_NUMPAD_ENTER || k == KeyEvent.KEYCODE_BUTTON_A;
         boolean nav = k == KeyEvent.KEYCODE_DPAD_UP || k == KeyEvent.KEYCODE_DPAD_DOWN
@@ -5535,6 +5536,11 @@ public class HomeActivity extends Activity {
             cards.setAlpha(0f);
             cards.animate().alpha(1f).setDuration(140).start();
         }
+        // Home pressed twice in an app: the rows held back stay so until the cards cover them.
+        if (contentHeld) {
+            root.removeCallbacks(revealContent);
+            root.postDelayed(() -> showContent(false), lite ? 0 : 160);
+        }
         int fallback = theme.tileBg;
         Thread art = new Thread(() -> {
             for (int i = 0; i < entries.size(); i++) {
@@ -5576,6 +5582,48 @@ public class HomeActivity extends Activity {
 
     /** When the cards came up: the first Home press's own Home may still be on its way, and shouldn't close them. */
     private long recentsOpenedAt;
+
+    /**
+     * Home pressed in an app: Home's rows wait over the backdrop until a second press could no longer come, so Home
+     * pressed twice shows Recent apps without Home flashing up first. The way Flow launcher does it, with Talkies'
+     * backdrop where Flow shows a picture of the app you left. A single Home shows the rows that much later.
+     */
+    private boolean contentHeld;
+    private long heldFrom;
+    private final Runnable revealContent = this::revealContentNow;
+
+    private void holdForSecondHome() {
+        long at = HomeState.homeInAppAt;
+        HomeState.homeInAppAt = 0;
+        long left = at + SleepService.DOUBLE_MS - android.os.SystemClock.uptimeMillis();
+        if (at == 0 || left <= 0) return;
+        contentHeld = true;
+        heldFrom = at;
+        page.animate().cancel();
+        page.setAlpha(0f);
+        ring.setVisibility(View.INVISIBLE);
+        root.removeCallbacks(revealContent);
+        root.postDelayed(revealContent, left);
+    }
+
+    private void revealContentNow() {
+        if (!contentHeld || recents != null) return;  // Recent apps shows them once it covers them
+        // A second press under way opens Recent apps when it's let go: wait for that, a little.
+        long second = HomeState.homeSecondAt;
+        if (second > heldFrom && android.os.SystemClock.uptimeMillis() - second < 1000) {
+            root.postDelayed(revealContent, 50);
+            return;
+        }
+        showContent(true);
+    }
+
+    private void showContent(boolean fade) {
+        root.removeCallbacks(revealContent);
+        if (!contentHeld) return;
+        contentHeld = false;
+        ring.setVisibility(View.VISIBLE);
+        page.animate().alpha(1f).setDuration(fade && !lite ? 180 : 0).start();
+    }
 
     private void closeRecents() {
         if (recents == null) return;
@@ -6136,6 +6184,7 @@ public class HomeActivity extends Activity {
         HomeState.inSettings = false;
         ScoreCard.homeShowing(true);
         watchPlaying();
+        holdForSecondHome();
         if (HomeState.takeRecentsAsked()) openRecents();
         root.post(this::snapRing);
         // Give Android time to bind the service after Talkies (re)starts before calling it stopped.
@@ -6208,6 +6257,7 @@ public class HomeActivity extends Activity {
         root.removeCallbacks(reorderApps);
         pressedHere = 0;
         SleepService.learn(null);
+        showContent(false);
         inFront = false;
         HomeState.inFront = false;
         ScoreCard.homeShowing(false);
